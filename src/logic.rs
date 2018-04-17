@@ -1,13 +1,14 @@
 extern crate rand;
 
-use althea_types::{EthAddress};
-use crypto::Crypto;
+use althea_types::{EthAddress, Bytes32, EthPrivateKey, EthSignature};
+// use crypto::Crypto;
 use failure::Error;
 use num256::Uint256;
-use types::{Channel, Counterparty, UpdateTx, NewChannelTx};
+use types::{Channel, Counterparty, UpdateTx, NewChannelTx, ChannelStatus};
+// use ethkey::{sign, Message, Secret};
 
 #[derive(Debug, Fail)]
-enum LogicError {
+enum CallerServerError {
   #[fail(display = "Could not find counterparty")]
   CounterPartyNotFound {},
   #[fail(display = "Could not find channel")]
@@ -16,146 +17,133 @@ enum LogicError {
 
 pub trait Storage {
   fn new_channel(&self, channel: Channel) -> Result<(), Error>;
-  fn get_counterparty_by_address(&self, eth_addr: &EthAddress) -> Result<Option<Counterparty>, Error>;
-  fn get_channel_of_counterparty(&self, counterparty: &Counterparty) -> Result<Option<Channel>, Error>;
+  fn save_channel(&self, channel: &Channel) -> Result<(), Error>;
+  fn save_update(&self, update: &UpdateTx) -> Result<(), Error>;
+  fn get_counterparty_by_address(&self, &EthAddress) -> Result<Option<Counterparty>, Error>;
+  fn get_channel_of_counterparty(&self, &Counterparty) -> Result<Option<Channel>, Error>;
 }
 
-struct DB {}
-impl Storage for DB {
-  fn new_channel(&self, channel: Channel) -> Result<(), Error> {
+pub trait CounterpartyClient {
+  fn add_proposed_channel(&self, &str, &NewChannelTx) -> Result<(), Error>;
+  fn make_payment(&self, &str, &UpdateTx) -> Result<EthSignature, Error>;
+}
+
+pub trait Crypto {
+  fn hash_bytes(&self, &[&[u8]]) -> Bytes32;
+  fn eth_sign(&self, &EthPrivateKey, &Bytes32) -> EthSignature;
+}
+
+// pub struct CounterpartyServer {
+
+// }
+
+// impl CounterpartyServer {
+//   pub fn make_payment(
+//     &self,
+//     update_tx: UpdateTx
+//   ) -> Result<(), Error> {
+//     Ok(())
+//   }
+// }
+
+pub struct CallerServer<CPT: CounterpartyClient, STO: Storage, CRP: Crypto> {
+  pub crypto: CRP,
+  pub counterpartyAPI: CPT,
+  pub storage: STO,
+  pub my_eth_address: EthAddress,
+  pub challenge_length: Uint256
+}
+
+impl<CPT: CounterpartyClient, STO: Storage, CRP: Crypto> CallerServer<CPT, STO, CRP> {
+  pub fn open_channel(
+    &self,
+    amount: Uint256,
+    their_eth_address: EthAddress
+  ) -> Result<(), Error> {
+    let channel_id = Bytes32([0u8; 32]); // Call eth somehow
+
+    let channel = Channel {
+      channel_id,
+      address_a: self.my_eth_address,
+      address_b: their_eth_address,
+      channel_status: ChannelStatus::Open,
+      deposit_a: amount,
+      deposit_b: 0.into(),
+      challenge: self.challenge_length.clone(),
+      nonce: 0.into(),
+      close_time: 0.into(),
+      balance_a: 0.into(),
+      balance_b: 0.into(),
+      is_a: true
+    };
+    self.storage.new_channel(channel);
+
     Ok(())
   }
-  fn get_counterparty_by_address(&self, eth_addr: &EthAddress) -> Result<Option<Counterparty>, Error> {
-    Ok(None)
-  }
-  fn get_channel_of_counterparty(&self, counterparty: &Counterparty) -> Result<Option<Channel>, Error> {
-    Ok(None)
-  }
-}
 
-pub trait CounterpartyAPI {
-  fn add_proposed_channel(&self, url: &str, nc: NewChannelTx) -> Result<(), Error>;
-  fn make_payment(&self, &str, UpdateTx) -> Result<(), Error>;
-}
-
-struct Network {}
-impl CounterpartyAPI for Network {
-  fn add_proposed_channel(&self, url: &str, nc: NewChannelTx) -> Result<(), Error> {
-    Ok(())
-  }
-  fn make_payment(&self, url: &str, update_tx: UpdateTx) -> Result<(), Error> {
-    Ok(())
-  }
-}
-
-pub struct Logic<CP: CounterpartyAPI, ST: Storage> {
-  pub crypto: Crypto,
-  pub counterpartyAPI: CP,
-  pub storage: ST,
-}
-
-impl<CP: CounterpartyAPI, ST: Storage> Logic<CP, ST> {
-  // pub fn propose_channel(
-  //   self,
-  //   channel_id: Bytes32,
-  //   my_address: EthAddress,
-  //   their_address: EthAddress,
-  //   my_balance: Uint256,
-  //   their_balance: Uint256,
-  //   settling_period: Uint256,
+  // pub fn join_channel(
+  //   &self,
+  //   channel_Id: Bytes32,
+  //   amount: Uint256
   // ) -> Result<(), Error> {
-  //   let channel = Channel::new(
-  //     channel_id,
-  //     my_address,
-  //     their_address,
-  //     my_balance.clone(),
-  //     their_balance.clone(),
-  //     Participant::Zero,
-  //   );
-
-  //   try!(self.storage.new_channel(channel));
-
-  //   let mut tx = NewChannelTx {
-  //     channel_id: Bytes32([0; 32]),
-  //     address0: my_address,
-  //     address1: their_address,
-  //     balance0: my_balance,
-  //     balance1: their_balance,
-  //     settling_period,
-  //     signature0: None,
-  //     signature1: None,
-  //   };
-
-  //   tx.signature0 = Some(try!(self.crypto.sign(&my_address, &tx.get_fingerprint())));
-
-  //   let counterparty = match try!(self.storage.get_counterparty(&their_address)) {
-  //     Some(counterparty) => counterparty,
-  //     None => return Err(Error::from(LogicError::CounterPartyNotFound {})),
-  //   };
-
-  //   try!(
-  //     self
-  //       .counterpartyAPI
-  //       .add_proposed_channel(&counterparty.url, tx)
-  //   );
-
+  //   // Call eth somehow
   //   Ok(())
   // }
 
-// pub struct UpdateTx {
-//   pub channelId: Bytes32,
-//   pub sequenceNumber: Uint256,
-
-//   pub balance0: Uint256,
-//   pub balance1: Uint256,
-
-//   pub hashlocks: Vec<Hashlock>,
-
-//   pub signature0: EthSignature,
-//   pub signature1: EthSignature
-// }
-
-  pub fn makePayment(
+  pub fn make_payment(
     self,
     their_address: EthAddress,
     amount: Uint256
   ) -> Result<(), Error> {
     let counterparty = match self.storage.get_counterparty_by_address(&their_address)? {
       Some(counterparty) => counterparty,
-      None => return Err(Error::from(LogicError::CounterPartyNotFound {})), 
+      None => return Err(Error::from(CallerServerError::CounterPartyNotFound {})), 
     };
-    let channel = match self.storage.get_channel_of_counterparty(&counterparty)? {
+    
+    let mut channel = match self.storage.get_channel_of_counterparty(&counterparty)? {
       Some(channel) => channel,
-      None => return Err(Error::from(LogicError::ChannelNotFound {})), 
+      None => return Err(Error::from(CallerServerError::ChannelNotFound {})), 
     };
 
-    channel.sequence_number = channel.sequence_number + 1;
-    channel.set_my_balance(channel.get_my_balance() - amount);
-    channel.set_their_balance(channel.get_their_balance() + amount);
+    let my_balance = channel.get_my_balance();
+    let their_balance = channel.get_their_balance();
 
-    let update_tx = UpdateTx {
-      channel_id: channel.channel_id,
-      sequence_number: channel.sequence_number + 1,
-      balance0: channel.balance0,
-      balance1: channel.balance1,
-      hashlocks: channel.hashlocks,
-      signature0: None,
-      signature1: None,
+    channel.nonce = channel.nonce + 1;
+
+    channel.set_my_balance(&(my_balance - amount.clone()));
+    channel.set_their_balance(&(their_balance + amount));
+
+    let mut update_tx = UpdateTx {
+      channel_id: channel.channel_id.clone(),
+      nonce: channel.nonce.clone() + 1,
+      balance_a: channel.balance_a.clone(),
+      balance_b: channel.balance_b.clone(),
+      signature_a: None,
+      signature_b: None,
     };
 
-    update_tx.sign();
+    let fingerprint = self.crypto.hash_bytes(&[
+      update_tx.channel_id.as_ref(),
+      &update_tx.nonce.to_bytes_le(),
+      &update_tx.balance_a.to_bytes_le(),
+      &update_tx.balance_b.to_bytes_le()
+    ]);
 
-    self.storage.save_channel(channel);
-    self.storage.save_update(update_tx);
+    let my_sig = self.crypto.eth_sign(&EthPrivateKey([0; 64]), &fingerprint);
+
+    update_tx.set_my_signature(channel.is_a, &my_sig);
+
+    self.storage.save_channel(&channel);
+    self.storage.save_update(&update_tx);
 
     let their_signature = 
-      self.counterpartyAPI.make_payment(counterparty.url, channel.update_tx)?;
+      self.counterpartyAPI.make_payment(&counterparty.url, &update_tx)?;
 
-    channel.set_their_signature(their_signature);
-    update_tx.set_their_signature(their_signature);
+    update_tx.set_their_signature(channel.is_a, &their_signature);
 
-    self.storage.save_channel(channel);
-    self.storage.save_update(update_tx);
+    self.storage.save_channel(&channel);
+    self.storage.save_update(&update_tx);
+    Ok(())
   }
 }
 
