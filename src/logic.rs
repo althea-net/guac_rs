@@ -6,6 +6,7 @@ use failure::Error;
 use num256::Uint256;
 use types::{Channel, Counterparty, UpdateTx, NewChannelTx, ChannelStatus};
 // use ethkey::{sign, Message, Secret};
+use futures::{future, Future};
 
 #[derive(Debug, Fail)]
 enum CallerServerError {
@@ -16,7 +17,7 @@ enum CallerServerError {
 }
 
 pub trait Storage {
-  fn new_channel(&self, channel: Channel) -> Result<(), Error>;
+  fn new_channel(&self, channel: Channel) -> Box<Future<Item = (), Error = Error>>;
   fn save_channel(&self, channel: &Channel) -> Result<(), Error>;
   fn save_update(&self, update: &UpdateTx) -> Result<(), Error>;
   fn get_counterparty_by_address(&self, &EthAddress) -> Result<Option<Counterparty>, Error>;
@@ -25,12 +26,16 @@ pub trait Storage {
 
 pub trait CounterpartyClient {
   fn add_proposed_channel(&self, &str, &NewChannelTx) -> Result<(), Error>;
-  fn make_payment(&self, &str, &UpdateTx) -> Result<EthSignature, Error>;
+  fn make_payment(&self, &str, &UpdateTx) -> Box<Future<Item = EthSignature, Error = Error>>;
 }
 
 pub trait Crypto {
   fn hash_bytes(&self, &[&[u8]]) -> Bytes32;
   fn eth_sign(&self, &EthPrivateKey, &Bytes32) -> EthSignature;
+}
+
+pub trait Blockchain {
+
 }
 
 // pub struct CounterpartyServer {
@@ -48,7 +53,7 @@ pub trait Crypto {
 
 pub struct CallerServer<CPT: CounterpartyClient, STO: Storage, CRP: Crypto> {
   pub crypto: CRP,
-  pub counterpartyAPI: CPT,
+  pub counterpartyClient: CPT,
   pub storage: STO,
   pub my_eth_address: EthAddress,
   pub challenge_length: Uint256
@@ -59,7 +64,7 @@ impl<CPT: CounterpartyClient, STO: Storage, CRP: Crypto> CallerServer<CPT, STO, 
     &self,
     amount: Uint256,
     their_eth_address: EthAddress
-  ) -> Result<(), Error> {
+  ) -> Box<Future<Item = (), Error = Error>> {
     let channel_id = Bytes32([0u8; 32]); // Call eth somehow
 
     let channel = Channel {
@@ -76,9 +81,8 @@ impl<CPT: CounterpartyClient, STO: Storage, CRP: Crypto> CallerServer<CPT, STO, 
       balance_b: 0.into(),
       is_a: true
     };
-    self.storage.new_channel(channel);
 
-    Ok(())
+    Box::new(self.storage.new_channel(channel))
   }
 
   // pub fn join_channel(
@@ -94,15 +98,17 @@ impl<CPT: CounterpartyClient, STO: Storage, CRP: Crypto> CallerServer<CPT, STO, 
     self,
     their_address: EthAddress,
     amount: Uint256
-  ) -> Result<(), Error> {
-    let counterparty = match self.storage.get_counterparty_by_address(&their_address)? {
-      Some(counterparty) => counterparty,
-      None => return Err(Error::from(CallerServerError::CounterPartyNotFound {})), 
+  ) -> Box<Future<Item = (), Error = Error>> {
+    let counterparty = match self.storage.get_counterparty_by_address(&their_address) {
+      Ok(Some(counterparty)) => counterparty,
+      Ok(None) => return Box::new(future::err(Error::from(CallerServerError::CounterPartyNotFound {}))),
+      Err(err) => return Box::new(future::err(err))
     };
     
-    let mut channel = match self.storage.get_channel_of_counterparty(&counterparty)? {
-      Some(channel) => channel,
-      None => return Err(Error::from(CallerServerError::ChannelNotFound {})), 
+    let mut channel = match self.storage.get_channel_of_counterparty(&counterparty) {
+      Ok(Some(channel)) => channel,
+      Ok(None) => return Box::new(future::err(Error::from(CallerServerError::ChannelNotFound {}))),
+      Err(err) => return Box::new(future::err(err))
     };
 
     let my_balance = channel.get_my_balance();
@@ -136,14 +142,21 @@ impl<CPT: CounterpartyClient, STO: Storage, CRP: Crypto> CallerServer<CPT, STO, 
     self.storage.save_channel(&channel);
     self.storage.save_update(&update_tx);
 
-    let their_signature = 
-      self.counterpartyAPI.make_payment(&counterparty.url, &update_tx)?;
+    Box::new(self.counterpartyClient.make_payment(&counterparty.url, &update_tx)
+      .from_err()
+      .and_then(|their_signature| {
+        update_tx.set_their_signature(channel.is_a, &their_signature);
+        match self.storage.save_channel(&channel) {
+          Err(err) => return Err(err),
+          _ => ()
+        };
+        match self.storage.save_update(&update_tx) {
+          Err(err) => return Err(err),
+          _ => ()
+        };
 
-    update_tx.set_their_signature(channel.is_a, &their_signature);
-
-    self.storage.save_channel(&channel);
-    self.storage.save_update(&update_tx);
-    Ok(())
+        Ok(())
+      }))
   }
 }
 
