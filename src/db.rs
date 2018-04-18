@@ -1,9 +1,9 @@
 //! Db executor actor
-use uuid;
-use diesel;
-use actix_web::*;
 use actix::prelude::*;
+use actix_web::*;
+use diesel;
 use diesel::prelude::*;
+use uuid;
 
 use models;
 use schema;
