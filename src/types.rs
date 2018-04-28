@@ -129,26 +129,26 @@ pub struct Fullnode {
 
 #[cfg(test)]
 mod tests {
-    use serde_json;
-    use types;
-    #[test]
-    fn serialize() {
-        // Some data structure.
-        let new_channel_tx = types::NewChannelTx {
-            address_a: types::Address([7; 20]),
-            address_b: types::Address([9; 20]),
-            balance_a: 23,
-            balance_b: 23,
-            channel_id: types::Bytes32([11; 32]),
-            settling_period: 45,
-            signature_a: None,
-            signature_b: None,
-        };
+    // use serde_json;
+    // use types;
+    // #[test]
+    // fn serialize() {
+    //     // Some data structure.
+    //     let new_channel_tx = types::NewChannelTx {
+    //         address_a: types::Address([7; 20]),
+    //         address_b: types::Address([9; 20]),
+    //         balance_a: 23,
+    //         balance_b: 23,
+    //         channel_id: types::Bytes32([11; 32]),
+    //         settling_period: 45,
+    //         signature_a: None,
+    //         signature_b: None,
+    //     };
 
-        // Serialize it to a JSON string.
-        let j = serde_json::to_string(&new_channel_tx).unwrap();
+    //     // Serialize it to a JSON string.
+    //     let j = serde_json::to_string(&new_channel_tx).unwrap();
 
-        // Print, write to a file, or send to an HTTP server.
-        assert_eq!("{\"channel_id\":\"CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws=\",\"settling_period\":45,\"address_a\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwc=\",\"address_b\":\"CQkJCQkJCQkJCQkJCQkJCQkJCQk=\",\"balance_a\":23,\"balance_b\":23,\"signature_a\":null,\"signature_b\":null}", j);
-    }
+    //     // Print, write to a file, or send to an HTTP server.
+    //     assert_eq!("{\"channel_id\":\"CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws=\",\"settling_period\":45,\"address_a\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwc=\",\"address_b\":\"CQkJCQkJCQkJCQkJCQkJCQkJCQk=\",\"balance_a\":23,\"balance_b\":23,\"signature_a\":null,\"signature_b\":null}", j);
+    // }
 }

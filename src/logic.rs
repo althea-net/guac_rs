@@ -253,6 +253,25 @@ impl CounterpartyClient for FakeCounterpartyClient {
     }
 }
 
+mock_trait!(
+    MockStorage,
+    new_channel(Channel) -> Result<(), Error>,
+    save_channel(Channel) -> Result<(), Error>,
+    save_update(UpdateTx) -> Result<(), Error>,
+    get_counterparty_by_address(EthAddress) -> Result<Option<Counterparty>, Error>,
+    get_channel_of_counterparty(Counterparty) -> Result<Option<Channel>, Error>);
+
+
+impl Storage for MockStorage {
+    mock_method!(save_channel(&self, channel: &Channel) -> Result<(), Error>);
+    mock_method!(new_channel(&self, channel: &Channel) -> Result<(), Error>);
+    mock_method!(save_update(&self, update: &UpdateTx) -> Result<(), Error>);
+    mock_method!(get_counterparty_by_address(&self, addr: &EthAddress) -> Result<Option<Counterparty>, Error>);
+    mock_method!(get_channel_of_counterparty(&self, cpt: &Counterparty) -> Result<Option<Channel>, Error>);
+
+}
+
+
 // #[cfg(test)]
 // mod tests {
 //     use super::*;

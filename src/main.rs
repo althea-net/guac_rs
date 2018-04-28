@@ -23,6 +23,9 @@ extern crate tiny_keccak;
 extern crate uuid;
 extern crate web3;
 
+#[macro_use]
+extern crate double;
+
 use actix::prelude::*;
 use actix_web::{middleware, Application, AsyncResponder, Error, HttpRequest, HttpResponse,
                 HttpServer, Method};
