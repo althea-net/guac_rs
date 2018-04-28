@@ -9,6 +9,7 @@ use types::{Channel, ChannelStatus, Counterparty, NewChannelTx, UpdateTx};
 use futures::{future, Future};
 use web3::contract::{Contract, Options};
 use web3::transports::http::Http;
+use std::cell::RefCell;
 
 #[derive(Debug, Fail)]
 enum CallerServerError {
@@ -19,7 +20,7 @@ enum CallerServerError {
 }
 
 pub trait Storage {
-    fn new_channel(&self, channel: Channel) -> Result<(), Error>;
+    fn new_channel(&self, channel: &Channel) -> Result<(), Error>;
     fn save_channel(&self, channel: &Channel) -> Result<(), Error>;
     fn save_update(&self, update: &UpdateTx) -> Result<(), Error>;
     fn get_counterparty_by_address(&self, &EthAddress) -> Result<Option<Counterparty>, Error>;
@@ -30,9 +31,13 @@ pub trait CounterpartyClient {
     fn make_payment(&self, &str, &UpdateTx) -> Box<Future<Item = EthSignature, Error = Error>>;
 }
 
-pub trait Crypto {
-    fn hash_bytes(&self, &[&[u8]]) -> Bytes32;
-    fn eth_sign(&self, &EthPrivateKey, &Bytes32) -> EthSignature;
+
+fn hash_bytes(bytes: &[&[u8]]) -> Bytes32 {
+    Bytes32([0; 32])
+}
+
+fn eth_sign(key: &EthPrivateKey, input: &Bytes32) -> EthSignature {
+    EthSignature([0; 65])
 }
 
 
@@ -49,8 +54,7 @@ pub trait Crypto {
 //   }
 // }
 
-pub struct CallerServer<CPT: CounterpartyClient, STO: Storage, CRP: Crypto> {
-    pub crypto: CRP,
+pub struct CallerServer<CPT: CounterpartyClient, STO: Storage> {
     pub counterpartyClient: CPT,
     pub storage: STO,
     pub contract: Contract<Http>,
@@ -58,11 +62,11 @@ pub struct CallerServer<CPT: CounterpartyClient, STO: Storage, CRP: Crypto> {
     pub challenge_length: Uint256,
 }
 
-impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static, CRP: Crypto + 'static>
-    CallerServer<CPT, STO, CRP>
+impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static>
+    CallerServer<CPT, STO>
 {
     pub fn open_channel(
-        self,
+        &'static self,
         amount: Uint256,
         their_eth_address: EthAddress,
     ) -> Box<Future<Item = (), Error = Error>> {
@@ -76,7 +80,6 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static, CRP: Crypto + 's
                     Options::with(|options| ()),
                     1u8.into(),
                 )
-                // .from_err()
                 .map_err(SyncFailure::new)
                 .from_err()
                 .and_then(move |_| {
@@ -94,7 +97,7 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static, CRP: Crypto + 's
                         balance_b: 0.into(),
                         is_a: true,
                     };
-                    match self.storage.new_channel(channel) {
+                    match self.storage.new_channel(&channel) {
                         Err(err) => return Err(err),
                         _ => return Ok(()),
                     };
@@ -102,17 +105,17 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static, CRP: Crypto + 's
         )
     }
 
-    // pub fn join_channel(
-    //   &self,
-    //   channel_Id: Bytes32,
-    //   amount: Uint256
-    // ) -> Result<(), Error> {
-    //   // Call eth somehow
-    //   Ok(())
-    // }
+    pub fn join_channel(
+      &self,
+      channel_Id: Bytes32,
+      amount: Uint256
+    ) -> Result<(), Error> {
+      // Call eth somehow
+      Ok(())
+    }
 
     pub fn make_payment(
-        self,
+        &'static self,
         their_url: &str,
         their_address: EthAddress,
         amount: Uint256,
@@ -154,14 +157,14 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static, CRP: Crypto + 's
             signature_b: None,
         };
 
-        let fingerprint = self.crypto.hash_bytes(&[
+        let fingerprint = hash_bytes(&[
             update_tx.channel_id.as_ref(),
             &update_tx.nonce.to_bytes_le(),
             &update_tx.balance_a.to_bytes_le(),
             &update_tx.balance_b.to_bytes_le(),
         ]);
 
-        let my_sig = self.crypto.eth_sign(&EthPrivateKey([0; 64]), &fingerprint);
+        let my_sig = eth_sign(&EthPrivateKey([0; 64]), &fingerprint);
 
         update_tx.set_my_signature(channel.is_a, &my_sig);
 
@@ -193,10 +196,13 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static, CRP: Crypto + 's
     // }
 }
 
-struct FakeStorage {}
+struct FakeStorage {
+
+}
 
 impl Storage for FakeStorage {
-    fn new_channel(&self, channel: Channel) -> Result<(), Error> {
+    fn new_channel(&self, channel: &Channel) -> Result<(), Error> {
+        
         Ok(())
     }
     fn save_channel(&self, channel: &Channel) -> Result<(), Error> {
@@ -244,17 +250,6 @@ impl CounterpartyClient for FakeCounterpartyClient {
         update: &UpdateTx,
     ) -> Box<Future<Item = EthSignature, Error = Error>> {
         Box::new(future::ok(EthSignature([0; 65])))
-    }
-}
-
-struct FakeCrypto {}
-
-impl Crypto for FakeCrypto {
-    fn hash_bytes(&self, bytes: &[&[u8]]) -> Bytes32 {
-        Bytes32([0; 32])
-    }
-    fn eth_sign(&self, key: &EthPrivateKey, input: &Bytes32) -> EthSignature {
-        EthSignature([0; 65])
     }
 }
 
