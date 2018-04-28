@@ -21,6 +21,7 @@ extern crate num256;
 extern crate serde_json;
 extern crate tiny_keccak;
 extern crate uuid;
+extern crate web3;
 
 use actix::prelude::*;
 use actix_web::{middleware, Application, AsyncResponder, Error, HttpRequest, HttpResponse,
