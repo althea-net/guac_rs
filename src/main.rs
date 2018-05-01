@@ -1,3 +1,4 @@
+#![cfg_attr(test, feature(proc_macro))]
 //! Actix web diesel example
 //!
 //! Diesel does not support tokio, so we have to run it in separate threads.
@@ -23,8 +24,8 @@ extern crate tiny_keccak;
 extern crate uuid;
 extern crate web3;
 
-#[macro_use]
-extern crate double;
+#[cfg(test)]
+extern crate mocktopus;
 
 use actix::prelude::*;
 use actix_web::{middleware, Application, AsyncResponder, Error, HttpRequest, HttpResponse,

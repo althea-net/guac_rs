@@ -7,9 +7,12 @@ use num256::Uint256;
 use types::{Channel, ChannelStatus, Counterparty, NewChannelTx, UpdateTx};
 // use ethkey::{sign, Message, Secret};
 use futures::{future, Future};
-use web3::contract::{Contract, Options};
-use web3::transports::http::Http;
 use std::cell::RefCell;
+use web3::contract::{Contract as Ctr, Options};
+use web3::transports::http::Http;
+
+#[cfg(test)]
+use mocktopus::macros::*;
 
 #[derive(Debug, Fail)]
 enum CallerServerError {
@@ -19,52 +22,84 @@ enum CallerServerError {
     ChannelNotFound {},
 }
 
-pub trait Storage {
-    fn new_channel(&self, channel: &Channel) -> Result<(), Error>;
-    fn save_channel(&self, channel: &Channel) -> Result<(), Error>;
-    fn save_update(&self, update: &UpdateTx) -> Result<(), Error>;
-    fn get_counterparty_by_address(&self, &EthAddress) -> Result<Option<Counterparty>, Error>;
-    fn get_channel_of_counterparty(&self, &Counterparty) -> Result<Option<Channel>, Error>;
+mod storage {
+    use super::*;
+
+    pub fn new_channel(channel: &Channel) -> Result<(), Error> {
+        Ok(())
+    }
+    pub fn save_channel(channel: &Channel) -> Result<(), Error> {
+        Ok(())
+    }
+    pub fn save_update(update: &UpdateTx) -> Result<(), Error> {
+        Ok(())
+    }
+    pub fn get_counterparty_by_address(
+        eth_address: &EthAddress,
+    ) -> Result<Option<Counterparty>, Error> {
+        Ok(Some(Counterparty {
+            address: *eth_address,
+            url: String::from(""),
+        }))
+    }
+    pub fn get_channel_of_counterparty(
+        counterparty: &Counterparty,
+    ) -> Result<Option<Channel>, Error> {
+        Ok(Some(Channel {
+            channel_id: Bytes32([0; 32]),
+            address_a: EthAddress([0; 20]),
+            address_b: EthAddress([0; 20]),
+            channel_status: ChannelStatus::Open,
+            deposit_a: 0.into(),
+            deposit_b: 0.into(),
+            challenge: 0.into(),
+            nonce: 0.into(),
+            close_time: 0.into(),
+            balance_a: 0.into(),
+            balance_b: 0.into(),
+            is_a: true,
+        }))
+    }
 }
 
-pub trait CounterpartyClient {
-    fn make_payment(&self, &str, &UpdateTx) -> Box<Future<Item = EthSignature, Error = Error>>;
+mod counterparty_client {
+    use super::*;
+
+    pub fn make_payment(
+        their_url: &str,
+        update_tx: &UpdateTx,
+    ) -> Box<Future<Item = EthSignature, Error = Error>> {
+        Box::new(future::ok(EthSignature([0; 65])))
+    }
 }
 
+mod crypto {
+    use super::*;
 
-fn hash_bytes(bytes: &[&[u8]]) -> Bytes32 {
-    Bytes32([0; 32])
+    pub fn hash_bytes(bytes: &[&[u8]]) -> Bytes32 {
+        Bytes32([0; 32])
+    }
+
+    pub fn eth_sign(key: &EthPrivateKey, input: &Bytes32) -> EthSignature {
+        EthSignature([0; 65])
+    }
 }
 
-fn eth_sign(key: &EthPrivateKey, input: &Bytes32) -> EthSignature {
-    EthSignature([0; 65])
+struct Contract {
+    contract: Ctr<Http>,
 }
 
+impl Contract {
+    pub fn open_channel(channel_id: Bytes32, counterparty_address: EthAddress) {}
+}
 
-// pub struct CounterpartyServer {
-
-// }
-
-// impl CounterpartyServer {
-//   pub fn make_payment(
-//     &self,
-//     update_tx: UpdateTx
-//   ) -> Result<(), Error> {
-//     Ok(())
-//   }
-// }
-
-pub struct CallerServer<CPT: CounterpartyClient, STO: Storage> {
-    pub counterpartyClient: CPT,
-    pub storage: STO,
+pub struct CallerServer {
     pub contract: Contract<Http>,
     pub my_eth_address: EthAddress,
     pub challenge_length: Uint256,
 }
 
-impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static>
-    CallerServer<CPT, STO>
-{
+impl CallerServer {
     pub fn open_channel(
         &'static self,
         amount: Uint256,
@@ -85,7 +120,7 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static>
                 .and_then(move |_| {
                     let channel = Channel {
                         channel_id,
-                        address_a: self.my_eth_address,
+                        address_a: self.my_eth_address.clone(),
                         address_b: their_eth_address,
                         channel_status: ChannelStatus::Open,
                         deposit_a: amount,
@@ -97,7 +132,7 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static>
                         balance_b: 0.into(),
                         is_a: true,
                     };
-                    match self.storage.new_channel(&channel) {
+                    match storage::new_channel(&channel) {
                         Err(err) => return Err(err),
                         _ => return Ok(()),
                     };
@@ -105,13 +140,9 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static>
         )
     }
 
-    pub fn join_channel(
-      &self,
-      channel_Id: Bytes32,
-      amount: Uint256
-    ) -> Result<(), Error> {
-      // Call eth somehow
-      Ok(())
+    pub fn join_channel(&self, channel_Id: Bytes32, amount: Uint256) -> Result<(), Error> {
+        // Call eth somehow
+        Ok(())
     }
 
     pub fn make_payment(
@@ -120,7 +151,7 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static>
         their_address: EthAddress,
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>> {
-        let counterparty = match self.storage.get_counterparty_by_address(&their_address) {
+        let counterparty = match storage::get_counterparty_by_address(&their_address) {
             Ok(Some(counterparty)) => counterparty,
             Ok(None) => {
                 return Box::new(future::err(Error::from(
@@ -130,7 +161,7 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static>
             Err(err) => return Box::new(future::err(err)),
         };
 
-        let mut channel = match self.storage.get_channel_of_counterparty(&counterparty) {
+        let mut channel = match storage::get_channel_of_counterparty(&counterparty) {
             Ok(Some(channel)) => channel,
             Ok(None) => {
                 return Box::new(future::err(Error::from(
@@ -157,31 +188,30 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static>
             signature_b: None,
         };
 
-        let fingerprint = hash_bytes(&[
+        let fingerprint = crypto::hash_bytes(&[
             update_tx.channel_id.as_ref(),
             &update_tx.nonce.to_bytes_le(),
             &update_tx.balance_a.to_bytes_le(),
             &update_tx.balance_b.to_bytes_le(),
         ]);
 
-        let my_sig = eth_sign(&EthPrivateKey([0; 64]), &fingerprint);
+        let my_sig = crypto::eth_sign(&EthPrivateKey([0; 64]), &fingerprint);
 
         update_tx.set_my_signature(channel.is_a, &my_sig);
 
-        self.storage.save_channel(&channel);
-        self.storage.save_update(&update_tx);
+        storage::save_channel(&channel);
+        storage::save_update(&update_tx);
 
         Box::new(
-            self.counterpartyClient
-                .make_payment(their_url, &update_tx)
+            counterparty_client::make_payment(their_url, &update_tx)
                 .from_err()
                 .and_then(move |their_signature| {
                     update_tx.set_their_signature(channel.is_a, &their_signature);
-                    match self.storage.save_channel(&channel) {
+                    match storage::save_channel(&channel) {
                         Err(err) => return Err(err),
                         _ => (),
                     };
-                    match self.storage.save_update(&update_tx) {
+                    match storage::save_update(&update_tx) {
                         Err(err) => return Err(err),
                         _ => (),
                     };
@@ -196,97 +226,11 @@ impl<CPT: CounterpartyClient + 'static, STO: Storage + 'static>
     // }
 }
 
-struct FakeStorage {
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mocktopus::mocking::*;
 
+    #[test]
+    fn happy_path() {}
 }
-
-impl Storage for FakeStorage {
-    fn new_channel(&self, channel: &Channel) -> Result<(), Error> {
-        
-        Ok(())
-    }
-    fn save_channel(&self, channel: &Channel) -> Result<(), Error> {
-        Ok(())
-    }
-    fn save_update(&self, update: &UpdateTx) -> Result<(), Error> {
-        Ok(())
-    }
-    fn get_counterparty_by_address(
-        &self,
-        eth_address: &EthAddress,
-    ) -> Result<Option<Counterparty>, Error> {
-        Ok(Some(Counterparty {
-            address: *eth_address,
-            url: String::from(""),
-        }))
-    }
-    fn get_channel_of_counterparty(
-        &self,
-        eth_address: &Counterparty,
-    ) -> Result<Option<Channel>, Error> {
-        Ok(Some(Channel {
-            channel_id: Bytes32([0; 32]),
-            address_a: EthAddress([0; 20]),
-            address_b: EthAddress([0; 20]),
-            channel_status: ChannelStatus::Open,
-            deposit_a: 0.into(),
-            deposit_b: 0.into(),
-            challenge: 0.into(),
-            nonce: 0.into(),
-            close_time: 0.into(),
-            balance_a: 0.into(),
-            balance_b: 0.into(),
-            is_a: true,
-        }))
-    }
-}
-
-struct FakeCounterpartyClient {}
-
-impl CounterpartyClient for FakeCounterpartyClient {
-    fn make_payment(
-        &self,
-        url: &str,
-        update: &UpdateTx,
-    ) -> Box<Future<Item = EthSignature, Error = Error>> {
-        Box::new(future::ok(EthSignature([0; 65])))
-    }
-}
-
-mock_trait!(
-    MockStorage,
-    new_channel(Channel) -> Result<(), Error>,
-    save_channel(Channel) -> Result<(), Error>,
-    save_update(UpdateTx) -> Result<(), Error>,
-    get_counterparty_by_address(EthAddress) -> Result<Option<Counterparty>, Error>,
-    get_channel_of_counterparty(Counterparty) -> Result<Option<Channel>, Error>);
-
-
-impl Storage for MockStorage {
-    mock_method!(save_channel(&self, channel: &Channel) -> Result<(), Error>);
-    mock_method!(new_channel(&self, channel: &Channel) -> Result<(), Error>);
-    mock_method!(save_update(&self, update: &UpdateTx) -> Result<(), Error>);
-    mock_method!(get_counterparty_by_address(&self, addr: &EthAddress) -> Result<Option<Counterparty>, Error>);
-    mock_method!(get_channel_of_counterparty(&self, cpt: &Counterparty) -> Result<Option<Channel>, Error>);
-
-}
-
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn happy_path() {
-//         let callerServer = CallerServer {
-//             challenge_length: 0.into(),
-//             my_eth_address: EthAddress([0; 20]),
-//             storage: FakeStorage {},
-//             crypto: FakeCrypto {},
-//             counterpartyClient: FakeCounterpartyClient {},
-//         };
-
-//         callerServer.open_channel(0.into(), EthAddress([0; 20]));
-//         callerServer.make_payment("", EthAddress([0; 20]), 0.into());
-//     }
-// }

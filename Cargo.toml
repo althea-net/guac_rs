@@ -24,4 +24,4 @@ web3 = "0.3.0"
 
 diesel = { version = "1.0.0-beta1", features = ["sqlite"] }
 dotenv = "0.10"
-double = "0.2.2"
+mocktopus = "0.2.0"
