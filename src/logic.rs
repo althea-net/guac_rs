@@ -1,10 +1,11 @@
+/*
 extern crate rand;
 
 use althea_types::{Bytes32, EthAddress, EthPrivateKey, EthSignature};
 // use crypto::Crypto;
 use failure::{Error, SyncFailure};
 use num256::Uint256;
-use types::{Channel, ChannelStatus, Counterparty, NewChannelTx, UpdateTx};
+use types::{Channel, ChannelStatus, Counterparty, NewChannelTx, UpdateTx, ChannelManager};
 // use ethkey::{sign, Message, Secret};
 use futures::{future, Future};
 use web3::contract::{Contract, Options};
@@ -19,11 +20,11 @@ enum CallerServerError {
 }
 
 pub trait Storage {
-    fn new_channel(&self, channel: Channel) -> Result<(), Error>;
-    fn save_channel(&self, channel: &Channel) -> Result<(), Error>;
+    fn new_channel(&self, channel: ChannelManager) -> Result<(), Error>;
+    fn save_channel(&self, channel: &ChannelManager) -> Result<(), Error>;
     fn save_update(&self, update: &UpdateTx) -> Result<(), Error>;
     fn get_counterparty_by_address(&self, &EthAddress) -> Result<Option<Counterparty>, Error>;
-    fn get_channel_of_counterparty(&self, &Counterparty) -> Result<Option<Channel>, Error>;
+    fn get_channel_of_counterparty(&self, &Counterparty) -> Result<Option<ChannelManager>, Error>;
 }
 
 pub trait CounterpartyClient {
@@ -117,7 +118,6 @@ impl<'a>
 
     pub fn make_payment(
         self,
-        their_url: &str,
         their_address: EthAddress,
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>> {
@@ -141,40 +141,14 @@ impl<'a>
             Err(err) => return Box::new(future::err(err)),
         };
 
-        let my_balance = channel.get_my_balance();
-        let their_balance = channel.get_their_balance();
-
-        channel.nonce = channel.nonce + 1;
-
-        channel.set_my_balance(&(my_balance - amount.clone()));
-        channel.set_their_balance(&(their_balance + amount));
-
-        let mut update_tx = UpdateTx {
-            channel_id: channel.channel_id.clone(),
-            nonce: channel.nonce.clone() + 1,
-            balance_a: channel.balance_a.clone(),
-            balance_b: channel.balance_b.clone(),
-            signature_a: None,
-            signature_b: None,
-        };
-
-        let fingerprint = self.crypto.hash_bytes(&[
-            update_tx.channel_id.as_ref(),
-            &update_tx.nonce.to_bytes_le(),
-            &update_tx.balance_a.to_bytes_le(),
-            &update_tx.balance_b.to_bytes_le(),
-        ]);
-
-        let my_sig = self.crypto.eth_sign(&EthPrivateKey([0; 64]), &fingerprint);
-
-        update_tx.set_my_signature(channel.is_a, &my_sig);
+        let update_tx = channel.pay_counterparty(amount);
 
         self.storage.save_channel(&channel);
         self.storage.save_update(&update_tx);
 
         Box::new(
             self.counterpartyClient
-                .make_payment(their_url, &update_tx)
+                .make_payment(counterparty, &update_tx)
                 .from_err()
                 .and_then(move |their_signature| {
                     update_tx.set_their_signature(channel.is_a, &their_signature);
@@ -221,7 +195,7 @@ impl Storage for FakeStorage {
     fn get_channel_of_counterparty(
         &self,
         eth_address: &Counterparty,
-    ) -> Result<Option<Channel>, Error> {
+    ) -> Result<Option<ChannelManager>, Error> {
         Ok(Some(Channel {
             channel_id: Bytes32([0; 32]),
             address_a: EthAddress([0; 20]),
@@ -280,3 +254,4 @@ mod tests {
         callerServer.make_payment("", EthAddress([0; 20]), 0.into());
     }
 }
+*/

@@ -18,13 +18,11 @@ impl Crypto {
             keystore: HashMap::new(),
         }
     }
-    pub fn sign(&self, _address: &EthAddress, _hash: &Bytes32) -> Result<EthSignature, Error> {
-        match self.keystore.get(_address) {
-            None => Err(Error::from(CryptoError::EthAddressNotFound {})),
-            Some(_pk) => Ok(EthSignature([0; 65])),
-        }
+
+    pub fn eth_sign(&self, data: &Bytes32) -> EthSignature {
+        EthSignature([0; 65])
     }
-    pub fn hash(_input: Vec<Bytes32>) -> Bytes32 {
+    pub fn hash_bytes(&self, x: &[&[u8]]) -> Bytes32 {
         Bytes32([0; 32])
     }
     pub fn verify(_fingerprint: &Bytes32, _signature: &EthSignature, _address: EthAddress) -> bool {

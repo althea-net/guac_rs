@@ -1,7 +1,7 @@
 [package]
-name = "diesel-example"
+name = "guac_rs"
 version = "0.1.0"
-authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
+authors = ["Ben Wang <wangben3@gmail.com>"]
 
 [dependencies]
 env_logger = "0.5"
@@ -21,6 +21,7 @@ base64 = "0.9.0"
 tiny-keccak = "1.4.1"
 mockito = "0.9.1"
 web3 = "0.3.0"
+lazy_static = "1.0"
 
 diesel = { version = "1.0.0-beta1", features = ["sqlite"] }
 dotenv = "0.10"
