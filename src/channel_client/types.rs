@@ -1,6 +1,11 @@
 use althea_types::{Bytes32, EthAddress, EthPrivateKey, EthSignature};
-use num256::{Int256, Uint256};
-use failure::{Error};
+use failure::Error;
+
+use futures::Future;
+
+use ethereum_types::U256;
+
+use counterparty::Counterparty;
 
 use CRYPTO;
 
@@ -12,53 +17,89 @@ pub enum ChannelStatus {
     Closed,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Channel {
     pub channel_id: Bytes32,
     pub address_a: EthAddress,
     pub address_b: EthAddress,
     pub channel_status: ChannelStatus,
-    pub deposit_a: Uint256,
-    pub deposit_b: Uint256,
-    pub challenge: Uint256,
-    pub nonce: Uint256,
-    pub close_time: Uint256,
-    pub balance_a: Uint256,
-    pub balance_b: Uint256,
+    pub deposit_a: U256,
+    pub deposit_b: U256,
+    pub challenge: U256,
+    pub nonce: U256,
+    pub close_time: U256,
+    pub balance_a: U256,
+    pub balance_b: U256,
     pub is_a: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ChannelManager {
-    their_state: Channel,
-    their_sig: Bytes32,
+    pub state: Channel,
+    pub pending_send: U256,
+    pub pending_rec: U256,
 
-    my_state: Channel,
+    pub counterparty: Counterparty,
 }
 
 impl ChannelManager {
-    fn pay_counterparty(&mut self, amount: Uint256) -> Result<ChannelUpdate, Error> {
-        self.my_state.nonce += 1;
-        *self.my_state.their_balance_mut() -= amount.clone();
-        *self.my_state.my_balance_mut() += amount.clone();
-
-        let payment_amount: Uint256 = self.my_state.their_balance() - self.their_state.their_balance();
-
-        Ok(ChannelUpdate{
-            tx: self.my_state.create_update(),
-            base_nonce: self.their_state.nonce.clone(),
-            payment: payment_amount
-        })
+    /// Function to pay counterparty, doesn't actually send anything
+    pub fn pay_counterparty(&mut self, amount: U256) -> Result<(), Error> {
+        self.pending_send += amount;
+        Ok(())
     }
 
-    fn payment_recieved(&mut self, update: ChannelUpdate) -> Result<(), Error> {
-        if update.base_nonce != self.my_state.nonce {
-            bail!("Payment in flight already")
+    /// This sums up the pending amount and returns a channel update
+    pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
+        let mut state = self.state.clone();
+
+        state.nonce += 1.into();
+
+        if state.my_balance() < &self.pending_send {
+            bail!("Not enough money in channel")
         }
 
-        // TODO: Check if this validation is ok
+        *state.my_balance_mut() -= self.pending_send;
+        *state.their_balance_mut() += self.pending_send;
 
-        self.my_state.apply_counterparty_update(update.tx.clone())?;
-        self.their_state.apply_counterparty_update(update.tx.clone())?;
+        Ok(state.create_update())
+    }
+
+    /// This is called by send_payment
+    pub fn rec_payment(&mut self, update: UpdateTx) -> Result<(), Error> {
+        let old_balance = self.state.my_balance().clone();
+        self.state.apply_counterparty_update(&update)?;
+        let payment_amt = self.state.my_balance() - old_balance;
+
+        self.pending_rec += payment_amt;
+
+        Ok(())
+    }
+
+    /// This is called on the response to rec_payment
+    pub fn rec_updated_state(
+        &mut self,
+        sent_update: UpdateTx,
+        rec_update: UpdateTx,
+    ) -> Result<(), Error> {
+        let mut self_ = self.clone(); // this update must be atomic
+
+        let their_old_balance = self_.state.their_balance().clone();
+        self_.state.apply_own_update(&sent_update)?;
+        let payment_amt_to_them = self_.state.their_balance() - their_old_balance;
+
+        if payment_amt_to_them > self_.pending_send {
+            bail!("somehow sent too much");
+        }
+
+        self_.pending_send -= payment_amt_to_them;
+
+        if rec_update != sent_update {
+            self_.rec_payment(rec_update)?;
+        };
+
+        *self = self_;
+
         Ok(())
     }
 }
@@ -76,25 +117,25 @@ impl Channel {
             false => self.address_a,
         }
     }
-    pub fn my_balance(&self) -> &Uint256 {
+    pub fn my_balance(&self) -> &U256 {
         match self.is_a.clone() {
             true => &self.balance_a,
             false => &self.balance_b,
         }
     }
-    pub fn their_balance(&self) -> &Uint256 {
+    pub fn their_balance(&self) -> &U256 {
         match self.is_a.clone() {
             true => &self.balance_b,
             false => &self.balance_a,
         }
     }
-    pub fn my_balance_mut(&mut self) -> &mut Uint256 {
+    pub fn my_balance_mut(&mut self) -> &mut U256 {
         match self.is_a {
             true => &mut self.balance_a,
             false => &mut self.balance_b,
         }
     }
-    pub fn their_balance_mut(&mut self) -> &mut Uint256 {
+    pub fn their_balance_mut(&mut self) -> &mut U256 {
         match self.is_a {
             true => &mut self.balance_b,
             false => &mut self.balance_a,
@@ -113,7 +154,36 @@ impl Channel {
         update_tx.sign(self.is_a, self.channel_id.clone());
         update_tx
     }
-    pub fn apply_counterparty_update(&mut self, update: UpdateTx) -> Result<(), Error> {
+    pub fn apply_own_update(&mut self, update: &UpdateTx) -> Result<(), Error> {
+        if self.nonce >= update.nonce {
+            bail!("Update too old");
+        }
+
+        if update.their_balance(self.is_a) + update.my_balance(self.is_a)
+            != self.my_balance() + self.their_balance()
+        {
+            bail!("balance does not add up")
+        }
+
+        if update.their_balance(self.is_a) + update.my_balance(self.is_a)
+            != self.deposit_a.clone() + self.deposit_b.clone()
+        {
+            bail!("balance does not add up")
+        }
+
+        if update.channel_id != self.channel_id {
+            bail!("update not for the right channel")
+        }
+
+        // TODO: Check if validation is good enough
+
+        self.balance_a = update.balance_a;
+        self.balance_b = update.balance_b;
+        self.nonce = update.nonce;
+
+        Ok(())
+    }
+    pub fn apply_counterparty_update(&mut self, update: &UpdateTx) -> Result<(), Error> {
         if self.nonce >= update.nonce {
             bail!("Update too old");
         };
@@ -122,11 +192,15 @@ impl Channel {
             bail!("sig is bad")
         }
 
-        if update.their_balance(self.is_a) + update.my_balance(self.is_a) != self.my_balance() + self.their_balance() {
+        if update.their_balance(self.is_a) + update.my_balance(self.is_a)
+            != self.my_balance() + self.their_balance()
+        {
             bail!("balance does not add up")
         }
 
-        if update.their_balance(self.is_a) + update.my_balance(self.is_a) != self.deposit_a.clone() + self.deposit_b.clone() {
+        if update.their_balance(self.is_a) + update.my_balance(self.is_a)
+            != self.deposit_a.clone() + self.deposit_b.clone()
+        {
             bail!("balance does not add up")
         }
 
@@ -149,43 +223,22 @@ impl Channel {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Hashlock {
-    pub hash: Bytes32,
-    pub amount: Int256,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct NewChannelTx {
-    pub channel_id: Bytes32,
-    pub settling_period: Uint256,
-    pub address_a: EthAddress,
-    pub address_b: EthAddress,
-    pub balance_a: Uint256,
-    pub balance_b: Uint256,
-    pub signature_a: Option<EthSignature>,
-    pub signature_b: Option<EthSignature>,
+    pub to: EthAddress,
+    pub challenge: U256,
+    pub deposit: U256,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct UpdateTx {
     pub channel_id: Bytes32,
-    pub nonce: Uint256,
+    pub nonce: U256,
 
-    pub balance_a: Uint256,
-    pub balance_b: Uint256,
+    pub balance_a: U256,
+    pub balance_b: U256,
 
     pub signature_a: Option<EthSignature>,
     pub signature_b: Option<EthSignature>,
-}
-
-pub struct ChannelUpdate {
-    tx: UpdateTx,
-
-    /// the last nonce which I have your signature for
-    base_nonce: Uint256,
-
-    /// the payments made since the base_nonce
-    payment: Uint256,
 }
 
 impl UpdateTx {
@@ -199,13 +252,13 @@ impl UpdateTx {
         // TODO: actually do validation
         true
     }
-    pub fn their_balance(&self, is_a: bool) -> &Uint256 {
+    pub fn their_balance(&self, is_a: bool) -> &U256 {
         match is_a {
             true => &self.balance_b,
             false => &self.balance_a,
         }
     }
-    pub fn my_balance(&self, is_a: bool) -> &Uint256 {
+    pub fn my_balance(&self, is_a: bool) -> &U256 {
         match is_a {
             true => &self.balance_a,
             false => &self.balance_b,
@@ -219,14 +272,16 @@ impl UpdateTx {
     }
 
     pub fn sign(&mut self, is_a: bool, channel_id: Bytes32) {
-        let fingerprint = CRYPTO.hash_bytes(&[
-            channel_id.as_ref(),
-            &self.nonce.to_bytes_le(),
-            &self.balance_a.to_bytes_le(),
-            &self.balance_b.to_bytes_le(),
-        ]);
+        let mut nonce = [0u8; 32];
+        self.nonce.to_big_endian(&mut nonce);
+        let mut balance_a = [0u8; 32];
+        self.balance_a.to_big_endian(&mut balance_a);
+        let mut balance_b = [0u8; 32];
+        self.balance_b.to_big_endian(&mut balance_b);
 
-        let my_sig = CRYPTO.eth_sign(&fingerprint);
+        let fingerprint = CRYPTO.hash_bytes(&[channel_id.as_ref(), &nonce, &balance_a, &balance_b]);
+
+        let my_sig = CRYPTO.eth_sign(&fingerprint.0);
 
         self.set_my_signature(is_a, &my_sig);
     }
@@ -234,26 +289,27 @@ impl UpdateTx {
 
 #[cfg(test)]
 mod tests {
-    use serde_json;
     use super::*;
+    use serde_json;
     #[test]
     fn serialize() {
         // Some data structure.
-        let new_channel_tx = NewChannelTx {
-            address_a: EthAddress([7; 20]),
-            address_b: EthAddress([9; 20]),
+        let update_tx = UpdateTx {
             balance_a: 23.into(),
             balance_b: 23.into(),
             channel_id: Bytes32([11; 32]),
-            settling_period: 45.into(),
+            nonce: 45.into(),
             signature_a: None,
             signature_b: None,
         };
 
         // Serialize it to a JSON string.
-        let j = serde_json::to_string(&new_channel_tx).unwrap();
+        let j = serde_json::to_string(&update_tx).unwrap();
 
         // Print, write to a file, or send to an HTTP server.
-        assert_eq!("{\"channel_id\":\"0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b\",\"settling_period\":\"45\",\"address_a\":\"0x0707070707070707070707070707070707070707\",\"address_b\":\"0x0909090909090909090909090909090909090909\",\"balance_a\":\"23\",\"balance_b\":\"23\",\"signature_a\":null,\"signature_b\":null}", j);
+        assert_eq!("{\"channel_id\":\"0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b\",\"nonce\":\"0x2d\",\"balance_a\":\"0x17\",\"balance_b\":\"0x17\",\"signature_a\":null,\"signature_b\":null}", j);
     }
+
+    #[test]
+    fn test_channel_manager_send_happy() {}
 }

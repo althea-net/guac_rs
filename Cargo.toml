@@ -5,8 +5,8 @@ authors = ["Ben Wang <wangben3@gmail.com>"]
 
 [dependencies]
 env_logger = "0.5"
-actix = "0.5"
-actix-web = "0.4.10"
+actix = "0.5.7"
+actix-web = "0.6.7"
 rand = "0.4.2"
 futures = "0.1"
 failure_derive = "*"
@@ -22,6 +22,17 @@ tiny-keccak = "1.4.1"
 mockito = "0.9.1"
 web3 = "0.3.0"
 lazy_static = "1.0"
-
+ethcore-transaction = {git="https://github.com/paritytech/parity.git"}
+ethkey = {git="https://github.com/paritytech/parity.git"}
+rlp = {git="https://github.com/paritytech/parity.git", path="util/rlp"}
+ethereum-types = "0.3.1"
+ethabi-derive = "5.1.2"
+ethabi = "5.1.1"
+multihash = "0.7.0"
+hex = "0.3.2"
 diesel = { version = "1.0.0-beta1", features = ["sqlite"] }
 dotenv = "0.10"
+qutex = "^0.2"
+
+[patch.crates-io]
+ethereum-types = {git="https://github.com/kingoflolz/primitives.git"}

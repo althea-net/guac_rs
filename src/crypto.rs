@@ -1,6 +1,12 @@
 use althea_types::{Bytes32, EthAddress, EthPrivateKey, EthSignature};
+use ethkey::{sign, Generator, KeyPair, Message, Random};
 use failure::Error;
+use multihash::{encode, Hash};
 use std::collections::HashMap;
+
+lazy_static! {
+    pub static ref CRYPTO: Box<Crypto> = Box::new(Crypto::new());
+}
 
 #[derive(Debug, Fail)]
 enum CryptoError {
@@ -9,18 +15,20 @@ enum CryptoError {
 }
 
 pub struct Crypto {
-    keystore: HashMap<EthAddress, EthPrivateKey>,
+    pub key_pair: KeyPair,
 }
 
 impl Crypto {
     pub fn new() -> Crypto {
         Crypto {
-            keystore: HashMap::new(),
+            key_pair: Random::generate(&mut Random {}).unwrap(),
         }
     }
-
-    pub fn eth_sign(&self, data: &Bytes32) -> EthSignature {
-        EthSignature([0; 65])
+    pub fn eth_sign(&self, data: &[u8]) -> EthSignature {
+        let fingerprint = encode(Hash::Keccak256, &data).unwrap();
+        let msg = Message::from_slice(&fingerprint[2..]);
+        let sig = sign(&self.key_pair.secret(), &msg).unwrap();
+        EthSignature(sig.into())
     }
     pub fn hash_bytes(&self, x: &[&[u8]]) -> Bytes32 {
         Bytes32([0; 32])
