@@ -57,12 +57,17 @@ impl Channel {
 
         (channel_a, channel_b)
     }
+
+    fn total_deposit(&self) -> U256 {
+        self.deposit_a + self.deposit_b
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ChannelManager {
-    pub state: Channel,
-    pub pending_send: U256,
+    pub their_state: Channel,
+    pub my_state: Channel,
+
     pub pending_rec: U256,
 
     pub counterparty: Counterparty,
@@ -73,8 +78,8 @@ impl ChannelManager {
         let (channel_a, channel_b) = Channel::new_pair(deposit_a, deposit_b);
 
         let m_a = ChannelManager {
-            state: channel_a,
-            pending_send: 0.into(),
+            their_state: channel_a.clone(),
+            my_state: channel_a.clone(),
             pending_rec: 0.into(),
             counterparty: Counterparty {
                 address: EthAddress([0; 20]),
@@ -83,7 +88,8 @@ impl ChannelManager {
         };
 
         let m_b = ChannelManager {
-            state: channel_b,
+            their_state: channel_b.clone(),
+            my_state: channel_b.clone(),
             ..m_a.clone()
         };
 
@@ -94,35 +100,45 @@ impl ChannelManager {
 impl ChannelManager {
     /// Function to pay counterparty, doesn't actually send anything
     pub fn pay_counterparty(&mut self, amount: U256) -> Result<(), Error> {
-        self.pending_send += amount;
+        *self.my_state.my_balance_mut() -= amount;
+        *self.my_state.their_balance_mut() += amount;
         Ok(())
+    }
+
+    pub fn withdraw(&mut self) -> Result<U256, Error> {
+        let withdraw = self.pending_rec;
+        self.pending_rec = 0.into();
+        Ok(withdraw)
     }
 
     /// This sums up the pending amount and returns a channel update
     pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
-        let mut state = self.state.clone();
+        let mut state = self.my_state.clone();
 
-        if self.pending_send != 0.into() {
-            state.nonce += 1.into();
-
-            if state.my_balance() < &self.pending_send {
-                bail!("Not enough money in channel")
-            }
-
-            *state.my_balance_mut() -= self.pending_send;
-            *state.their_balance_mut() += self.pending_send;
-        }
+        state.nonce += 1.into();
 
         Ok(state.create_update())
     }
 
     /// This is called by send_payment
-    pub fn rec_payment(&mut self, update: UpdateTx) -> Result<(), Error> {
-        let (amount_received, amount_sent) = self.state.apply_counterparty_update(&update, self.pending_send)?;
-        self.pending_rec += amount_received;
-        self.pending_send -= amount_sent;
+    pub fn rec_payment(&mut self, update: UpdateTx) -> Result<UpdateTx, Error> {
+        assert!(self.my_state.my_balance() <= self.their_state.my_balance());
+        let pending_pay = self.their_state.my_balance() - self.my_state.my_balance();
 
-        Ok(())
+        let our_prev_bal = self.their_state.my_balance().clone();
+        self.their_state.apply_update(&update, false)?;
+        let transfer = self.their_state.my_balance() - our_prev_bal;
+
+        self.pending_rec += transfer;
+
+        self.my_state = self.their_state.clone();
+
+        assert!(&pending_pay <= self.their_state.my_balance());
+
+        *self.my_state.my_balance_mut() -= pending_pay;
+        *self.my_state.their_balance_mut() += pending_pay;
+
+        Ok(self.create_payment()?)
     }
 
     /// This is called on the response to rec_payment
@@ -131,23 +147,26 @@ impl ChannelManager {
         sent_update: UpdateTx,
         rec_update: UpdateTx,
     ) -> Result<(), Error> {
-        let mut self_ = self.clone(); // this update must be atomic
+        assert!(self.my_state.my_balance() <= self.their_state.my_balance());
+        let pending_pay = self.their_state.my_balance() - self.my_state.my_balance();
 
-        let their_old_balance = self_.state.their_balance().clone();
-        self_.state.apply_own_update(&sent_update)?;
-        let payment_amt_to_them = self_.state.their_balance() - their_old_balance;
+        let our_prev_bal = self.their_state.my_balance().clone();
+        self.their_state.apply_update(&rec_update, false)?;
+        let our_new_bal = self.their_state.my_balance();
 
-        if payment_amt_to_them > self_.pending_send {
-            bail!("somehow sent too much");
+        assert!(self.my_state.my_balance() <= self.their_state.my_balance());
+
+        if our_prev_bal >= *our_new_bal {
+            let payment = our_prev_bal - our_new_bal;
+            // net effect was we payed them
+            if payment > pending_pay {
+                bail!("we paid them too much somehow");
+            }
+        } else {
+            let payment = our_new_bal - our_prev_bal;
+
+            self.pending_rec += payment;
         }
-
-        self_.pending_send -= payment_amt_to_them;
-
-        if rec_update.strip_sigs() != sent_update.strip_sigs() {
-            self_.rec_payment(rec_update)?;
-        };
-
-        *self = self_;
 
         Ok(())
     }
@@ -203,40 +222,7 @@ impl Channel {
         update_tx.sign(self.is_a, self.channel_id.clone());
         update_tx
     }
-    pub fn apply_own_update(&mut self, update: &UpdateTx) -> Result<(), Error> {
-        if update.their_balance(self.is_a) + update.my_balance(self.is_a)
-            != self.my_balance() + self.their_balance()
-        {
-            bail!("balance does not add up")
-        }
-
-        if update.their_balance(self.is_a) + update.my_balance(self.is_a)
-            != self.deposit_a.clone() + self.deposit_b.clone()
-        {
-            bail!("balance does not add up")
-        }
-
-        if update.channel_id != self.channel_id {
-            bail!("update not for the right channel")
-        }
-
-        if self.nonce > update.nonce {
-            bail!("Update too old");
-        } else if self.nonce == update.nonce {
-            if self.balance_a == update.balance_a && self.balance_b == update.balance_b {
-                return Ok(());
-            }
-        };
-
-        // TODO: Check if validation is good enough
-
-        self.balance_a = update.balance_a;
-        self.balance_b = update.balance_b;
-        self.nonce = update.nonce;
-
-        Ok(())
-    }
-    pub fn apply_counterparty_update(&mut self, update: &UpdateTx, pending_send: U256) -> Result<(U256, U256), Error> {
+    pub fn apply_update(&mut self, update: &UpdateTx, validate_balance: bool) -> Result<(), Error> {
         if update.channel_id != self.channel_id {
             bail!("update not for the right channel")
         }
@@ -259,35 +245,17 @@ impl Channel {
 
         if self.nonce > update.nonce {
             bail!("Update too old");
-        } else if self.nonce == update.nonce {
-            if self.balance_a == update.balance_a && self.balance_b == update.balance_b {
-                return Ok((0.into(), 0.into()));
-            }
-        };
-
-        // TODO: Check if validation is good enough
-
-        if update.my_balance(self.is_a) < self.my_balance() {
-            let amount_sent = self.my_balance() - update.my_balance(self.is_a);
-
-            if amount_sent <= pending_send {
-                self.balance_a = update.balance_a;
-                self.balance_b = update.balance_b;
-                self.nonce = update.nonce;
-
-                Ok((0.into(), amount_sent))
-            }else{
-                bail!("cannot accept state update which takes too much money")
-            }
-        } else {
-            let amount_paid = update.my_balance(self.is_a) - self.my_balance();
-
-            self.balance_a = update.balance_a;
-            self.balance_b = update.balance_b;
-            self.nonce = update.nonce;
-
-            Ok((amount_paid, 0.into()))
         }
+
+        if update.my_balance(self.is_a) < self.my_balance() && validate_balance {
+            bail!("balance validation failed")
+        }
+
+        self.balance_a = update.balance_a;
+        self.balance_b = update.balance_b;
+        self.nonce = update.nonce;
+
+        Ok(())
     }
 }
 
@@ -368,6 +336,7 @@ impl UpdateTx {
 mod tests {
     use super::*;
     use serde_json;
+    /*
     #[test]
     fn serialize() {
         // Some data structure.
@@ -387,6 +356,7 @@ mod tests {
         assert_eq!("{\"channel_id\":\"0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b\",\"nonce\":\"0x2d\",\"balance_a\":\"0x17\",\"balance_b\":\"0x17\",\"signature_a\":null,\"signature_b\":null}", j);
     }
 
+*/
     #[test]
     fn test_channel_manager_unidirectional_empty() {
         let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
@@ -398,8 +368,8 @@ mod tests {
 
         a.rec_updated_state(payment, response).unwrap();
 
-        assert_eq!(a.pending_send, 0.into());
-        assert_eq!(b.pending_rec, 0.into());
+        assert_eq!(a.withdraw().unwrap(), 0.into());
+        assert_eq!(b.withdraw().unwrap(), 0.into());
     }
 
     #[test]
@@ -415,8 +385,9 @@ mod tests {
 
         a.rec_updated_state(payment, response).unwrap();
 
-        assert_eq!(a.pending_send, 0.into());
-        assert_eq!(b.pending_rec, 20.into());
+        assert_eq!(b.withdraw().unwrap(), 20.into());
+        assert_eq!(b.withdraw().unwrap(), 0.into());
+        assert_eq!(a.withdraw().unwrap(), 0.into());
     }
 
     #[test]
@@ -438,22 +409,48 @@ mod tests {
 
         let payment = b.create_payment().unwrap();
 
-        a.rec_payment(payment.clone()).unwrap();
-        let response = a.create_payment().unwrap();
+        let response = a.rec_payment(payment.clone()).unwrap();
 
         b.rec_updated_state(payment, response).unwrap();
 
-        assert_eq!(a.pending_send, 0.into());
-        assert_eq!(b.pending_send, 0.into());
-        assert_eq!(a.pending_rec, 3.into());
-        assert_eq!(b.pending_rec, 5.into());
+        assert_eq!(a.withdraw().unwrap(), 3.into());
+        assert_eq!(b.withdraw().unwrap(), 5.into());
     }
 
     #[test]
     fn test_channel_manager_bidirectional_race() {
         let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
 
-        // A -> B 20 and B -> A 20 at the same time
+        // A -> B 3 and B -> A 5 at the same time
+        a.pay_counterparty(3.into()).unwrap();
+        b.pay_counterparty(5.into()).unwrap();
+
+        let payment_a = a.create_payment().unwrap();
+        let payment_b = b.create_payment().unwrap();
+
+        let response_b = b.rec_payment(payment_a.clone()).unwrap();
+        let response_a = a.rec_payment(payment_b.clone()).unwrap();
+
+        a.rec_updated_state(payment_a, response_b).unwrap();
+        b.rec_updated_state(payment_b, response_a).unwrap();
+
+        // unraced request
+
+        let payment = a.create_payment().unwrap();
+
+        let response = b.rec_payment(payment.clone()).unwrap();
+
+        a.rec_updated_state(payment, response).unwrap();
+
+        assert_eq!(a.withdraw().unwrap(), 5.into());
+        assert_eq!(b.withdraw().unwrap(), 3.into());
+    }
+
+    #[test]
+    fn test_channel_manager_bidirectional_race_resume() {
+        let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
+
+        // A -> B 3 and B -> A 5 at the same time
         a.pay_counterparty(3.into()).unwrap();
         b.pay_counterparty(5.into()).unwrap();
 
@@ -465,8 +462,50 @@ mod tests {
         a.rec_payment(payment_b.clone()).unwrap();
         let response_a = a.create_payment().unwrap();
 
-        assert!(a.rec_updated_state(payment_a, response_b).is_err()); // these should fail
-        assert!(b.rec_updated_state(payment_b, response_a).is_err()); // these should fail
+        a.rec_updated_state(payment_a, response_b).unwrap();
+        b.rec_updated_state(payment_b, response_a).unwrap();
+
+        // A -> B 1
+        a.pay_counterparty(1.into()).unwrap();
+
+        let payment = a.create_payment().unwrap();
+
+        b.rec_payment(payment.clone()).unwrap();
+        let response = b.create_payment().unwrap();
+
+        a.rec_updated_state(payment, response).unwrap();
+
+        assert_eq!(a.withdraw().unwrap(), 5.into());
+        assert_eq!(b.withdraw().unwrap(), 4.into());
+    }
+
+    #[test]
+    fn test_channel_manager_bidirectional_race_multi() {
+        let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
+
+        // A -> B 1, B offline
+        // A -> B 2, B -> A 4
+        a.pay_counterparty(1.into()).unwrap();
+
+        let payment_a1 = a.create_payment().unwrap();
+
+        a.pay_counterparty(2.into()).unwrap();
+        b.pay_counterparty(4.into()).unwrap();
+
+        let payment_a2 = a.create_payment().unwrap();
+        let payment_b = b.create_payment().unwrap();
+
+        b.rec_payment(payment_a1.clone()).unwrap();
+        let response_b1 = b.create_payment().unwrap();
+        b.rec_payment(payment_a2.clone()).unwrap();
+        let response_b2 = b.create_payment().unwrap();
+
+        a.rec_payment(payment_b.clone()).unwrap();
+        let response_a = a.create_payment().unwrap();
+
+        a.rec_updated_state(payment_a1, response_b1).unwrap();
+        a.rec_updated_state(payment_a2, response_b2).unwrap();
+        b.rec_updated_state(payment_b, response_a).unwrap();
 
         // unraced request
 
@@ -484,36 +523,39 @@ mod tests {
 
         b.rec_updated_state(payment, response).unwrap();
 
-
-        assert_eq!(a.pending_send, 0.into());
-        assert_eq!(b.pending_send, 0.into());
-        assert_eq!(a.pending_rec, 5.into());
-        assert_eq!(b.pending_rec, 3.into());
+        assert_eq!(a.withdraw().unwrap(), 4.into());
+        assert_eq!(b.withdraw().unwrap(), 3.into());
     }
 
     #[test]
-    fn test_channel_manager_bidirectional_race_resume() {
+    fn test_channel_manager_bidirectional_race_multi_resume() {
         let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
 
-        // A -> B 20 and B -> A 20 at the same time
+        // A -> B 3, B no response
+        // A -> B 3, B -> A 5
+        a.pay_counterparty(3.into()).unwrap();
+
+        let payment_a1 = a.create_payment().unwrap();
+
         a.pay_counterparty(3.into()).unwrap();
         b.pay_counterparty(5.into()).unwrap();
 
-        let payment_a = a.create_payment().unwrap();
+        let payment_a2 = a.create_payment().unwrap();
         let payment_b = b.create_payment().unwrap();
 
-        b.rec_payment(payment_a.clone()).unwrap();
-        let response_b = b.create_payment().unwrap();
+        b.rec_payment(payment_a1.clone()).unwrap();
+        let _ = b.create_payment().unwrap();
+        b.rec_payment(payment_a2.clone()).unwrap();
+        let response_b2 = b.create_payment().unwrap();
+
         a.rec_payment(payment_b.clone()).unwrap();
         let response_a = a.create_payment().unwrap();
 
-        assert!(a.rec_updated_state(payment_a, response_b).is_err()); // these should fail
-        assert!(b.rec_updated_state(payment_b, response_a).is_err()); // these should fail
+        a.rec_updated_state(payment_a2, response_b2).unwrap();
+        b.rec_updated_state(payment_b, response_a).unwrap();
 
-        // unraced requests
-
-        // A -> B 1
-        a.pay_counterparty(1.into()).unwrap();
+        // A -> B 10
+        a.pay_counterparty(10.into()).unwrap();
 
         let payment = a.create_payment().unwrap();
 
@@ -522,16 +564,7 @@ mod tests {
 
         a.rec_updated_state(payment, response).unwrap();
 
-        let payment = b.create_payment().unwrap();
-
-        a.rec_payment(payment.clone()).unwrap();
-        let response = a.create_payment().unwrap();
-
-        b.rec_updated_state(payment, response).unwrap();
-
-        assert_eq!(a.pending_send, 0.into());
-        assert_eq!(b.pending_send, 0.into());
-        assert_eq!(a.pending_rec, 6.into());
-        assert_eq!(b.pending_rec, 3.into());
+        assert_eq!(a.withdraw().unwrap(), 5.into());
+        assert_eq!(b.withdraw().unwrap(), 16.into());
     }
 }
