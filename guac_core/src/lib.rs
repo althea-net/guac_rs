@@ -1,5 +1,3 @@
-extern crate actix;
-extern crate actix_web;
 #[macro_use]
 extern crate diesel;
 extern crate env_logger;
@@ -28,23 +26,11 @@ extern crate multihash;
 extern crate qutex;
 extern crate rlp;
 
-use actix_web::{http, server, App};
+pub mod channel_client;
+pub mod counterparty;
+pub mod crypto;
+pub mod eth_client;
+pub mod storage;
 
-mod channel_client;
-mod counterparty;
-mod crypto;
-mod eth_client;
-mod network_endpoints;
-mod storage;
-
-use network_endpoints::update;
-
-use crypto::CRYPTO;
-use storage::STORAGE;
-
-fn main() {
-    server::new(|| App::new().route("/update", http::Method::POST, update))
-        .bind("127.0.0.1:8080")
-        .unwrap()
-        .run();
-}
+pub use crypto::CRYPTO;
+pub use storage::STORAGE;
