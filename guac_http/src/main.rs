@@ -1,12 +1,10 @@
 extern crate actix;
 extern crate actix_web;
-extern crate failure;
-extern crate guac_core;
-extern crate futures;
 extern crate althea_types;
+extern crate failure;
+extern crate futures;
+extern crate guac_core;
 
 mod network_endpoints;
 
-fn main() {
-
-}
+fn main() {}

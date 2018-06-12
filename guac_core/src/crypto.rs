@@ -1,5 +1,5 @@
 use althea_types::{Bytes32, EthAddress, EthPrivateKey, EthSignature};
-use ethkey::{sign, Generator, KeyPair, Message, Random};
+use ethkey::{sign, Generator, KeyPair, Message, Random, Signature};
 use failure::Error;
 use multihash::{encode, Hash};
 use std::collections::HashMap;
@@ -24,14 +24,14 @@ impl Crypto {
             key_pair: Random::generate(&mut Random {}).unwrap(),
         }
     }
-    pub fn eth_sign(&self, data: &[u8]) -> EthSignature {
+    pub fn eth_sign(&self, data: &[u8]) -> Signature {
         let fingerprint = encode(Hash::Keccak256, &data).unwrap();
         let msg = Message::from_slice(&fingerprint[2..]);
         let sig = sign(&self.key_pair.secret(), &msg).unwrap();
-        EthSignature(sig.into())
+        sig
     }
     pub fn hash_bytes(&self, x: &[&[u8]]) -> Bytes32 {
-        Bytes32([0; 32])
+        0.into()
     }
     pub fn verify(_fingerprint: &Bytes32, _signature: &EthSignature, _address: EthAddress) -> bool {
         true

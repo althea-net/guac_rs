@@ -27,12 +27,14 @@ fn get_ethcalate_abi() -> Contract {
 }
 
 fn create_update_tx(update: UpdateTx) -> SignedTransaction {
+    let channel_id: [u8; 32] = update.channel_id.into();
+
     let data = ABI
         .function("updateState")
         .unwrap()
         .encode_input(&[
             // channelId
-            Token::FixedBytes(update.channel_id.0.to_vec()),
+            Token::FixedBytes(channel_id.to_vec()),
             // nonce
             Token::Uint(update.nonce),
             // balanceA
@@ -100,9 +102,9 @@ fn test_create_update_tx() {
         nonce: 0.into(),
         balance_a: 23.into(),
         balance_b: 23.into(),
-        channel_id: Bytes32([11; 32]),
-        signature_a: Some(EthSignature([1; 65])),
-        signature_b: Some(EthSignature([2; 65])),
+        channel_id: 11.into(),
+        signature_a: Some(1.into()),
+        signature_b: Some(2.into()),
     });
     println!("tx: 0x{}", hex::encode(&(*tx.rlp_bytes())));
 }
@@ -110,7 +112,7 @@ fn test_create_update_tx() {
 #[test]
 fn test_new_channel_tx() {
     let tx = create_new_channel_tx(NewChannelTx {
-        to: EthAddress([11; 20]),
+        to: 11.into(),
         challenge: 23.into(),
         deposit: 100.into(),
     });

@@ -36,9 +36,9 @@ pub struct Channel {
 impl Channel {
     fn new_pair(deposit_a: U256, deposit_b: U256) -> (Channel, Channel) {
         let channel_a = Channel {
-            channel_id: Bytes32([0; 32]),
-            address_a: EthAddress([0; 20]),
-            address_b: EthAddress([0; 20]),
+            channel_id: 0.into(),
+            address_a: 1.into(),
+            address_b: 2.into(),
             channel_status: ChannelStatus::Joined,
             deposit_a,
             deposit_b,
@@ -47,10 +47,10 @@ impl Channel {
             close_time: 10.into(),
             balance_a: deposit_a,
             balance_b: deposit_b,
-            is_a: true
+            is_a: true,
         };
 
-        let channel_b = Channel{
+        let channel_b = Channel {
             is_a: false,
             ..channel_a
         };
@@ -61,36 +61,124 @@ impl Channel {
     fn total_deposit(&self) -> U256 {
         self.deposit_a + self.deposit_b
     }
+
+    fn swap(&self) -> Self {
+        Channel {
+            is_a: !self.is_a,
+            ..self.clone()
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ChannelManager {
-    pub their_state: Channel,
-    pub my_state: Channel,
+pub enum ChannelManager {
+    New,
+    Proposed {
+        state: Channel,
+        accepted: bool,
+    },
+    PendingOpening {
+        state: Channel,
+    },
+    PendingJoin {
+        state: Channel,
+    },
+    Open {
+        their_state: Channel,
+        my_state: Channel,
 
-    pub pending_rec: U256,
+        pending_rec: U256,
+    }, // TODO: close/dispute
+}
 
-    pub counterparty: Counterparty,
+/// If we should accept their proposal
+fn is_proposal_acceptable(state: &Channel) -> Result<bool, Error> {
+    Ok(true)
 }
 
 impl ChannelManager {
-    fn new_pair(deposit_a: U256, deposit_b: U256) -> (ChannelManager, ChannelManager) {
+    fn new() -> ChannelManager {
+        ChannelManager::New
+    }
+
+    fn propose_channel(&mut self) -> Result<Channel, Error> {
+        match self {
+            ChannelManager::New => {
+                // TODO make the defaults configurable
+                let proposal = Channel {
+                    channel_id: 0.into(),
+                    address_a: 1.into(),
+                    address_b: 2.into(),
+                    channel_status: ChannelStatus::Joined,
+                    deposit_a: 1000.into(),
+                    deposit_b: 0.into(),
+                    challenge: 0.into(),
+                    nonce: 0.into(),
+                    close_time: 10.into(),
+                    balance_a: 1000.into(),
+                    balance_b: 0.into(),
+                    is_a: true,
+                };
+                *self = ChannelManager::Proposed {
+                    accepted: false,
+                    state: proposal.clone(),
+                };
+                Ok(proposal)
+            }
+            ChannelManager::Proposed {
+                accepted: false,
+                state,
+            } => Ok(state.clone()),
+            _ => bail!("can only propose if not accepted and in state Proposed"),
+        }
+    }
+
+    fn check_proposal(&mut self, their_prop: Channel) -> Result<bool, Error> {
+        if is_proposal_acceptable(&their_prop.swap())? {
+            *self = match self {
+                ChannelManager::Proposed {
+                    accepted: false,
+                    state,
+                } => {
+                    let our_prop = state;
+                    assert!(their_prop.address_a != our_prop.address_a);
+                    // smallest address wins
+                    if their_prop.address_a > our_prop.address_a {
+                        bail!("our address is lower, rejecting")
+                    } else {
+                        // use their proposal
+                        ChannelManager::Proposed {
+                            accepted: true,
+                            state: their_prop.swap(),
+                        }
+                    }
+                }
+                // accept if new
+                ChannelManager::New => ChannelManager::PendingOpening {
+                    state: their_prop.swap().clone(),
+                },
+                _ => bail!("cannot accept proposal if not in New or Proposed"),
+            }
+        } else {
+            bail!("Cannot accept proposal")
+        }
+
+        Ok(true)
+    }
+
+    fn new_open_pair(deposit_a: U256, deposit_b: U256) -> (ChannelManager, ChannelManager) {
         let (channel_a, channel_b) = Channel::new_pair(deposit_a, deposit_b);
 
-        let m_a = ChannelManager {
+        let m_a = ChannelManager::Open {
             their_state: channel_a.clone(),
             my_state: channel_a.clone(),
             pending_rec: 0.into(),
-            counterparty: Counterparty {
-                address: EthAddress([0; 20]),
-                url: String::new(),
-            }
         };
 
-        let m_b = ChannelManager {
+        let m_b = ChannelManager::Open {
             their_state: channel_b.clone(),
             my_state: channel_b.clone(),
-            ..m_a.clone()
+            pending_rec: 0.into(),
         };
 
         (m_a, m_b)
@@ -100,43 +188,83 @@ impl ChannelManager {
 impl ChannelManager {
     /// Function to pay counterparty, doesn't actually send anything
     pub fn pay_counterparty(&mut self, amount: U256) -> Result<(), Error> {
-        *self.my_state.my_balance_mut() -= amount;
-        *self.my_state.their_balance_mut() += amount;
-        Ok(())
+        match self {
+            ChannelManager::Open {
+                my_state,
+                their_state,
+                pending_rec,
+            } => {
+                *my_state.my_balance_mut() -= amount;
+                *my_state.their_balance_mut() += amount;
+                Ok(())
+            }
+            // TODO: Handle close and dispute
+            _ => bail!("can only pay in open state"),
+        }
     }
 
     pub fn withdraw(&mut self) -> Result<U256, Error> {
-        let withdraw = self.pending_rec;
-        self.pending_rec = 0.into();
-        Ok(withdraw)
+        match self {
+            ChannelManager::Open {
+                my_state,
+                their_state,
+                pending_rec,
+            } => {
+                let withdraw = pending_rec.clone();
+                *pending_rec = 0.into();
+                Ok(withdraw)
+            }
+            // TODO: Handle close and dispute
+            _ => Ok(0.into()),
+        }
     }
 
     /// This sums up the pending amount and returns a channel update
     pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
-        let mut state = self.my_state.clone();
+        match self {
+            ChannelManager::Open {
+                my_state,
+                their_state,
+                pending_rec,
+            } => {
+                let mut state = my_state.clone();
 
-        state.nonce += 1.into();
+                state.nonce += 1.into();
 
-        Ok(state.create_update())
+                Ok(state.create_update())
+            }
+            // TODO: Handle close and dispute
+            _ => bail!("can only pay in open state"),
+        }
     }
 
     /// This is called by send_payment
     pub fn rec_payment(&mut self, update: UpdateTx) -> Result<UpdateTx, Error> {
-        assert!(self.my_state.my_balance() <= self.their_state.my_balance());
-        let pending_pay = self.their_state.my_balance() - self.my_state.my_balance();
+        match self {
+            ChannelManager::Open {
+                my_state,
+                their_state,
+                pending_rec,
+            } => {
+                assert!(my_state.my_balance() <= their_state.my_balance());
+                let pending_pay = their_state.my_balance() - my_state.my_balance();
 
-        let our_prev_bal = self.their_state.my_balance().clone();
-        self.their_state.apply_update(&update, false)?;
-        let transfer = self.their_state.my_balance() - our_prev_bal;
+                let our_prev_bal = their_state.my_balance().clone();
+                their_state.apply_update(&update, true)?;
+                let transfer = their_state.my_balance() - our_prev_bal;
 
-        self.pending_rec += transfer;
+                *pending_rec += transfer;
 
-        self.my_state = self.their_state.clone();
+                *my_state = their_state.clone();
 
-        assert!(&pending_pay <= self.their_state.my_balance());
+                assert!(&pending_pay <= their_state.my_balance());
 
-        *self.my_state.my_balance_mut() -= pending_pay;
-        *self.my_state.their_balance_mut() += pending_pay;
+                *my_state.my_balance_mut() -= pending_pay;
+                *my_state.their_balance_mut() += pending_pay;
+            }
+            // TODO: Withdraw from close
+            _ => bail!("can only pay in open state"),
+        }
 
         Ok(self.create_payment()?)
     }
@@ -147,28 +275,38 @@ impl ChannelManager {
         sent_update: UpdateTx,
         rec_update: UpdateTx,
     ) -> Result<(), Error> {
-        assert!(self.my_state.my_balance() <= self.their_state.my_balance());
-        let pending_pay = self.their_state.my_balance() - self.my_state.my_balance();
+        match self {
+            ChannelManager::Open {
+                my_state,
+                their_state,
+                pending_rec,
+            } => {
+                assert!(my_state.my_balance() <= their_state.my_balance());
+                let pending_pay = their_state.my_balance() - my_state.my_balance();
 
-        let our_prev_bal = self.their_state.my_balance().clone();
-        self.their_state.apply_update(&rec_update, false)?;
-        let our_new_bal = self.their_state.my_balance();
+                let our_prev_bal = their_state.my_balance().clone();
+                their_state.apply_update(&rec_update, false)?;
+                let our_new_bal = their_state.my_balance();
 
-        assert!(self.my_state.my_balance() <= self.their_state.my_balance());
+                assert!(my_state.my_balance() <= their_state.my_balance());
 
-        if our_prev_bal >= *our_new_bal {
-            let payment = our_prev_bal - our_new_bal;
-            // net effect was we payed them
-            if payment > pending_pay {
-                bail!("we paid them too much somehow");
+                if our_prev_bal >= *our_new_bal {
+                    let payment = our_prev_bal - our_new_bal;
+                    // net effect was we payed them
+                    if payment > pending_pay {
+                        bail!("we paid them too much somehow");
+                    }
+                } else {
+                    let payment = our_new_bal - our_prev_bal;
+
+                    *pending_rec += payment;
+                }
+
+                Ok(())
             }
-        } else {
-            let payment = our_new_bal - our_prev_bal;
-
-            self.pending_rec += payment;
+            // TODO: Handle close and dispute
+            _ => bail!("can only pay in open state"),
         }
-
-        Ok(())
     }
 }
 
@@ -316,11 +454,14 @@ impl UpdateTx {
         let mut balance_b = [0u8; 32];
         self.balance_b.to_big_endian(&mut balance_b);
 
-        let fingerprint = CRYPTO.hash_bytes(&[channel_id.as_ref(), &nonce, &balance_a, &balance_b]);
+        let channel_id: [u8; 32] = channel_id.into();
 
-        let my_sig = CRYPTO.eth_sign(&fingerprint.0);
+        let fingerprint = CRYPTO.hash_bytes(&[&channel_id, &nonce, &balance_a, &balance_b]);
+        let fingerprint: [u8; 32] = fingerprint.into();
 
-        self.set_my_signature(is_a, &my_sig);
+        let my_sig = CRYPTO.eth_sign(&fingerprint);
+
+        self.set_my_signature(is_a, &my_sig.into());
     }
 
     pub fn strip_sigs(&self) -> UpdateTx {
@@ -359,7 +500,7 @@ mod tests {
 */
     #[test]
     fn test_channel_manager_unidirectional_empty() {
-        let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
+        let (mut a, mut b) = ChannelManager::new_open_pair(100.into(), 100.into());
 
         let payment = a.create_payment().unwrap();
 
@@ -374,7 +515,7 @@ mod tests {
 
     #[test]
     fn test_channel_manager_unidirectional() {
-        let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
+        let (mut a, mut b) = ChannelManager::new_open_pair(100.into(), 100.into());
 
         a.pay_counterparty(20.into());
 
@@ -392,7 +533,7 @@ mod tests {
 
     #[test]
     fn test_channel_manager_bidirectional() {
-        let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
+        let (mut a, mut b) = ChannelManager::new_open_pair(100.into(), 100.into());
 
         // A -> B 5
         a.pay_counterparty(5.into()).unwrap();
@@ -419,7 +560,7 @@ mod tests {
 
     #[test]
     fn test_channel_manager_bidirectional_race() {
-        let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
+        let (mut a, mut b) = ChannelManager::new_open_pair(100.into(), 100.into());
 
         // A -> B 3 and B -> A 5 at the same time
         a.pay_counterparty(3.into()).unwrap();
@@ -448,7 +589,7 @@ mod tests {
 
     #[test]
     fn test_channel_manager_bidirectional_race_resume() {
-        let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
+        let (mut a, mut b) = ChannelManager::new_open_pair(100.into(), 100.into());
 
         // A -> B 3 and B -> A 5 at the same time
         a.pay_counterparty(3.into()).unwrap();
@@ -481,7 +622,7 @@ mod tests {
 
     #[test]
     fn test_channel_manager_bidirectional_race_multi() {
-        let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
+        let (mut a, mut b) = ChannelManager::new_open_pair(100.into(), 100.into());
 
         // A -> B 1, B offline
         // A -> B 2, B -> A 4
@@ -529,7 +670,7 @@ mod tests {
 
     #[test]
     fn test_channel_manager_bidirectional_race_multi_resume() {
-        let (mut a, mut b) = ChannelManager::new_pair(100.into(), 100.into());
+        let (mut a, mut b) = ChannelManager::new_open_pair(100.into(), 100.into());
 
         // A -> B 3, B no response
         // A -> B 3, B -> A 5

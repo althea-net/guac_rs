@@ -2,4 +2,4 @@
 members = ["guac_core", "guac_actix", "guac_http"]
 
 [patch.crates-io]
-ethereum-types = {git="https://github.com/kingoflolz/primitives.git"}
+ethereum-types = {git="https://github.com/paritytech/primitives.git"}
