@@ -6,7 +6,7 @@ use futures::Future;
 use qutex::{FutureGuard, FutureWriteGuard, Guard, QrwLock, Qutex};
 use std::collections::HashMap;
 
-use channel_client::types::ChannelManager;
+use channel_client::ChannelManager;
 
 lazy_static! {
     pub static ref STORAGE: Storage = Storage {

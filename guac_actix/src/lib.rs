@@ -106,7 +106,7 @@ fn send_payment(counterparty: Counterparty) -> impl Future<Item = (), Error = Er
         .and_then(move |mut channel_manager| {
             let sent_update = channel_manager.create_payment().unwrap();
             client::post(&format!("{}/update", counterparty.url))
-                .json(sent_update.clone())
+                .json(sent_update)
                 .unwrap()
                 .send()
                 .from_err()
@@ -115,7 +115,7 @@ fn send_payment(counterparty: Counterparty) -> impl Future<Item = (), Error = Er
                         .json()
                         .from_err()
                         .and_then(move |res_update: UpdateTx| {
-                            channel_manager.rec_updated_state(sent_update.clone(), res_update)
+                            channel_manager.rec_updated_state(res_update)
                         })
                 })
                 .from_err()
