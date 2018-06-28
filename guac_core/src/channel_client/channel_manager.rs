@@ -3,9 +3,9 @@ use failure::Error;
 use althea_types::{Bytes32, EthAddress, EthPrivateKey, EthSignature};
 use ethereum_types::U256;
 
-use channel_client::Channel;
-use channel_client::types::{ChannelStatus, UpdateTx};
 use channel_client::combined_state::CombinedState;
+use channel_client::types::{ChannelStatus, UpdateTx};
+use channel_client::Channel;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChannelManager {
@@ -36,10 +36,10 @@ pub enum ChannelManager {
 }
 
 pub enum ChannelManagerAction {
-    SendNewChannelTransaction (Channel),
-    SendChannelJoinTransaction (Channel),
+    SendNewChannelTransaction(Channel),
+    SendChannelJoinTransaction(Channel),
 
-    None
+    None,
 }
 
 /// If we should accept their proposal
@@ -84,21 +84,25 @@ impl ChannelManager {
             }
             ChannelManager::Proposed {
                 accepted: false,
-                state
+                state,
             } => {
                 ret = ChannelManagerAction::None;
                 ChannelManager::Proposed {
                     accepted: false,
                     state: state.clone(),
                 }
-            },
+            }
             _ => bail!("can only propose if not accepted and in state Proposed"),
         };
 
         Ok(ret)
     }
 
-    fn channel_created(&mut self, channel: &Channel, our_address: EthAddress) -> Result<ChannelManagerAction, Error> {
+    fn channel_created(
+        &mut self,
+        channel: &Channel,
+        our_address: EthAddress,
+    ) -> Result<ChannelManagerAction, Error> {
         let ret;
         *self = match self {
             ChannelManager::Proposed { .. } | ChannelManager::PendingCreation { .. } => {
@@ -304,7 +308,7 @@ mod tests {
 
         let channel_prop = match proposal {
             ChannelManagerAction::SendNewChannelTransaction(channel) => channel,
-            _ => panic!("Wrong action returned")
+            _ => panic!("Wrong action returned"),
         };
 
         assert!(manager_b.check_proposal(&channel_prop).unwrap());
@@ -340,7 +344,7 @@ mod tests {
 
         let channel_prop_a = match proposal_a {
             ChannelManagerAction::SendNewChannelTransaction(channel) => channel,
-            _ => panic!("Wrong action returned")
+            _ => panic!("Wrong action returned"),
         };
 
         let proposal_b = manager_b
@@ -349,7 +353,7 @@ mod tests {
 
         let channel_prop_b = match proposal_b {
             ChannelManagerAction::SendNewChannelTransaction(channel) => channel,
-            _ => panic!("Wrong action returned")
+            _ => panic!("Wrong action returned"),
         };
 
         assert!(manager_b.check_proposal(&channel_prop_a).unwrap());
@@ -365,8 +369,12 @@ mod tests {
             }
         );
 
-        manager_a.channel_created(&channel_prop_a, 1.into()).unwrap();
-        manager_b.channel_created(&channel_prop_a, 2.into()).unwrap();
+        manager_a
+            .channel_created(&channel_prop_a, 1.into())
+            .unwrap();
+        manager_b
+            .channel_created(&channel_prop_a, 2.into())
+            .unwrap();
 
         assert_eq!(
             manager_a,

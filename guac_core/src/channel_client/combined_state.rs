@@ -25,8 +25,10 @@ impl CombinedState {
 
     fn new_pair(deposit_a: U256, deposit_b: U256) -> (CombinedState, CombinedState) {
         let (channel_a, channel_b) = Channel::new_pair(deposit_a, deposit_b);
-        (CombinedState::new(&channel_a), CombinedState::new(&channel_b))
-
+        (
+            CombinedState::new(&channel_a),
+            CombinedState::new(&channel_b),
+        )
     }
     /// Function to pay counterparty, doesn't actually send anything, returning the "overflow" if we
     /// don't have enough monty in the channel
