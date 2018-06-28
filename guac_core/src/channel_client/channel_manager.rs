@@ -35,6 +35,13 @@ pub enum ChannelManager {
     // TODO: close/dispute
 }
 
+pub enum ChannelManagerAction {
+    SendNewChannelTransaction (Channel),
+    SendChannelJoinTransaction (Channel),
+
+    None
+}
+
 /// If we should accept their proposal
 fn is_channel_acceptable(state: &Channel) -> Result<bool, Error> {
     Ok(true)
@@ -50,8 +57,9 @@ impl ChannelManager {
         from: EthAddress,
         to: EthAddress,
         deposit: U256,
-    ) -> Result<Channel, Error> {
-        match self {
+    ) -> Result<ChannelManagerAction, Error> {
+        let ret;
+        *self = match self {
             ChannelManager::New => {
                 // TODO make the defaults configurable
                 let proposal = Channel {
@@ -68,30 +76,41 @@ impl ChannelManager {
                     balance_b: 0.into(),
                     is_a: true,
                 };
-                *self = ChannelManager::Proposed {
+                ret = ChannelManagerAction::SendNewChannelTransaction(proposal.clone());
+                ChannelManager::Proposed {
                     accepted: false,
                     state: proposal.clone(),
-                };
-                Ok(proposal)
+                }
             }
             ChannelManager::Proposed {
                 accepted: false,
-                state,
-            } => Ok(state.clone()),
+                state
+            } => {
+                ret = ChannelManagerAction::None;
+                ChannelManager::Proposed {
+                    accepted: false,
+                    state: state.clone(),
+                }
+            },
             _ => bail!("can only propose if not accepted and in state Proposed"),
-        }
+        };
+
+        Ok(ret)
     }
 
-    fn channel_created(&mut self, channel: &Channel, our_address: EthAddress) -> Result<(), Error> {
+    fn channel_created(&mut self, channel: &Channel, our_address: EthAddress) -> Result<ChannelManagerAction, Error> {
+        let ret;
         *self = match self {
             ChannelManager::Proposed { .. } | ChannelManager::PendingCreation { .. } => {
                 // TODO: verify it actually made it into the blockchain
                 if is_channel_acceptable(&channel)? {
                     if channel.address_a == our_address {
+                        ret = ChannelManagerAction::None;
                         ChannelManager::Joined {
                             state: CombinedState::new(&channel),
                         }
                     } else {
+                        ret = ChannelManagerAction::None;
                         ChannelManager::Open {
                             state: CombinedState::new(&channel.swap()),
                         }
@@ -103,7 +122,7 @@ impl ChannelManager {
             _ => bail!("Channel creation when not in proposed state"),
         };
 
-        Ok(())
+        Ok(ret)
     }
 
     fn proposal_result(&mut self, decision: bool) -> Result<(), Error> {
@@ -177,15 +196,27 @@ impl ChannelManager {
     pub fn pay_counterparty(&mut self, amount: U256) -> Result<(), Error> {
         *self = match self {
             ChannelManager::Open { ref mut state } => {
-                state.pay_counterparty(amount)?;
-                ChannelManager::Open {
-                    state: state.clone(),
+                let overflow = state.pay_counterparty(amount)?;
+                if overflow != 0.into() {
+                    ChannelManager::PendingJoin {
+                        state: state.clone(),
+                        pending_send: overflow,
+                    }
+                } else {
+                    ChannelManager::Open {
+                        state: state.clone(),
+                    }
                 }
             }
             ChannelManager::Joined { ref mut state } => {
-                state.pay_counterparty(amount)?;
-                ChannelManager::Joined {
-                    state: state.clone(),
+                let overflow = state.pay_counterparty(amount)?;
+                if overflow != 0.into() {
+                    // TODO: Handle reopening channel
+                    bail!("not enough money to pay them")
+                } else {
+                    ChannelManager::Joined {
+                        state: state.clone(),
+                    }
                 }
             }
             // TODO: Handle close and dispute
@@ -271,7 +302,12 @@ mod tests {
             .propose_channel(1.into(), 2.into(), 100.into())
             .unwrap();
 
-        assert!(manager_b.check_proposal(&proposal).unwrap());
+        let channel_prop = match proposal {
+            ChannelManagerAction::SendNewChannelTransaction(channel) => channel,
+            _ => panic!("Wrong action returned")
+        };
+
+        assert!(manager_b.check_proposal(&channel_prop).unwrap());
         manager_a.proposal_result(true).unwrap();
 
         let (channel_a, channel_b) = Channel::new_pair(100.into(), 0.into());
@@ -301,37 +337,48 @@ mod tests {
         let proposal_a = manager_a
             .propose_channel(1.into(), 2.into(), 100.into())
             .unwrap();
+
+        let channel_prop_a = match proposal_a {
+            ChannelManagerAction::SendNewChannelTransaction(channel) => channel,
+            _ => panic!("Wrong action returned")
+        };
+
         let proposal_b = manager_b
             .propose_channel(2.into(), 1.into(), 100.into())
             .unwrap();
 
-        assert!(manager_b.check_proposal(&proposal_a).unwrap());
-        assert!(manager_a.check_proposal(&proposal_b).is_err());
+        let channel_prop_b = match proposal_b {
+            ChannelManagerAction::SendNewChannelTransaction(channel) => channel,
+            _ => panic!("Wrong action returned")
+        };
+
+        assert!(manager_b.check_proposal(&channel_prop_a).unwrap());
+        assert!(manager_a.check_proposal(&channel_prop_b).is_err());
         manager_a.proposal_result(true).unwrap();
         manager_b.proposal_result(false).unwrap();
 
         assert_eq!(
             manager_a,
             ChannelManager::PendingCreation {
-                state: proposal_a.clone(),
+                state: channel_prop_a.clone(),
                 pending_send: 0.into(),
             }
         );
 
-        manager_a.channel_created(&proposal_a, 1.into()).unwrap();
-        manager_b.channel_created(&proposal_a, 2.into()).unwrap();
+        manager_a.channel_created(&channel_prop_a, 1.into()).unwrap();
+        manager_b.channel_created(&channel_prop_a, 2.into()).unwrap();
 
         assert_eq!(
             manager_a,
             ChannelManager::Joined {
-                state: CombinedState::new(&proposal_a)
+                state: CombinedState::new(&channel_prop_a)
             }
         );
 
         assert_eq!(
             manager_b,
             ChannelManager::Open {
-                state: CombinedState::new(&proposal_a.swap())
+                state: CombinedState::new(&channel_prop_a.swap())
             }
         )
     }

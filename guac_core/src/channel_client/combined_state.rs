@@ -28,14 +28,20 @@ impl CombinedState {
         (CombinedState::new(&channel_a), CombinedState::new(&channel_b))
 
     }
-    /// Function to pay counterparty, doesn't actually send anything
-    pub fn pay_counterparty(&mut self, amount: U256) -> Result<bool, Error> {
+    /// Function to pay counterparty, doesn't actually send anything, returning the "overflow" if we
+    /// don't have enough monty in the channel
+    pub fn pay_counterparty(&mut self, amount: U256) -> Result<U256, Error> {
         if amount > *self.my_state.my_balance_mut() {
-            return Ok(false);
+            let remaining_amount = amount - *self.my_state.my_balance();
+
+            *self.my_state.their_balance_mut() += *self.my_state.my_balance();
+            *self.my_state.my_balance_mut() = 0.into();
+
+            return Ok(remaining_amount);
         };
         *self.my_state.my_balance_mut() -= amount;
         *self.my_state.their_balance_mut() += amount;
-        Ok(true)
+        Ok(0.into())
     }
 
     pub fn withdraw(&mut self) -> Result<U256, Error> {
@@ -119,6 +125,25 @@ mod tests {
 
         assert_eq!(a.withdraw().unwrap(), 0.into());
         assert_eq!(b.withdraw().unwrap(), 0.into());
+    }
+
+    #[test]
+    fn test_channel_manager_unidirectional_overpay() {
+        let (mut a, mut b) = CombinedState::new_pair(100.into(), 100.into());
+
+        let overflow = a.pay_counterparty(150.into()).unwrap();
+
+        assert_eq!(overflow, 50.into());
+
+        let payment = a.create_payment().unwrap();
+
+        b.rec_payment(payment.clone()).unwrap();
+        let response = b.create_payment().unwrap();
+
+        a.rec_updated_state(response).unwrap();
+
+        assert_eq!(a.withdraw().unwrap(), 0.into());
+        assert_eq!(b.withdraw().unwrap(), 100.into());
     }
 
     #[test]
