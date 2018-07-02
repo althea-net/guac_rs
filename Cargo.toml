@@ -1,26 +1,5 @@
-[package]
-name = "diesel-example"
-version = "0.1.0"
-authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
+[workspace]
+members = ["guac_core", "guac_actix", "guac_http"]
 
-[dependencies]
-env_logger = "0.5"
-actix = "0.5"
-actix-web = "0.4.10"
-rand = "0.4.2"
-futures = "0.1"
-failure_derive = "*"
-uuid = { version = "0.5", features = ["serde", "v4"] }
-althea_types = { path = "../althea_rs/althea_types" }
-num256 = { path = "../althea_rs/num256" }
-serde = "1.0"
-serde_json = "1.0"
-serde_derive = "1.0"
-failure = "0.1.1"
-base64 = "0.9.0"
-tiny-keccak = "1.4.1"
-mockito = "0.9.1"
-web3 = "0.3.0"
-
-diesel = { version = "1.0.0-beta1", features = ["sqlite"] }
-dotenv = "0.10"
+[patch.crates-io]
+ethereum-types = {git="https://github.com/paritytech/primitives.git"}

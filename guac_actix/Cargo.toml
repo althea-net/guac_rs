@@ -1,0 +1,14 @@
+[package]
+name = "guac_actix"
+version = "0.1.0"
+authors = ["Ben Wang <wangben3@gmail.com>"]
+
+[dependencies]
+actix = "0.5.7"
+actix-web = "0.6.7"
+futures = "0.1"
+failure = "0.1"
+guac_core = {path="../guac_core"}
+althea_types = {git="https://github.com/althea-mesh/althea_rs.git"}
+num256 = {git="https://github.com/althea-mesh/althea_rs.git"}
+log = "0.4"
