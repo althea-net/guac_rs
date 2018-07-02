@@ -6,6 +6,11 @@ extern crate futures;
 extern crate guac_core;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+
+use std::fmt::Debug;
 
 use actix::prelude::*;
 use actix_web::*;
@@ -17,6 +22,20 @@ use futures::Future;
 use guac_core::channel_client::types::UpdateTx;
 use guac_core::counterparty::Counterparty;
 use guac_core::STORAGE;
+
+use serde::{Deserialize, Serialize};
+
+mod network_endpoints;
+mod network_requests;
+
+use network_requests::send_payment;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NetworkRequest<T> {
+    pub from_addr: EthAddress,
+    pub from_counterparty: Counterparty,
+    pub data: T,
+}
 
 pub struct PaymentController {}
 
@@ -98,28 +117,6 @@ impl Handler<Tick> for PaymentController {
             Ok(())
         }))
     }
-}
-
-fn send_payment(counterparty: Counterparty) -> impl Future<Item = (), Error = Error> {
-    STORAGE
-        .get_channel(counterparty.address)
-        .and_then(move |mut channel_manager| {
-            let sent_update = channel_manager.create_payment().unwrap();
-            client::post(&format!("{}/update", counterparty.url))
-                .json(sent_update)
-                .unwrap()
-                .send()
-                .from_err()
-                .and_then(move |response| {
-                    response
-                        .json()
-                        .from_err()
-                        .and_then(move |res_update: UpdateTx| {
-                            channel_manager.rec_updated_state(res_update)
-                        })
-                })
-                .from_err()
-        })
 }
 
 /*

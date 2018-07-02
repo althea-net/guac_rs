@@ -24,6 +24,9 @@ impl Crypto {
             key_pair: Random::generate(&mut Random {}).unwrap(),
         }
     }
+    pub fn own_eth_addr(&self) -> EthAddress {
+        self.key_pair.address()
+    }
     pub fn eth_sign(&self, data: &[u8]) -> Signature {
         let fingerprint = encode(Hash::Keccak256, &data).unwrap();
         let msg = Message::from_slice(&fingerprint[2..]);

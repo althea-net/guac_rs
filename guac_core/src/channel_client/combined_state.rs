@@ -62,7 +62,7 @@ impl CombinedState {
     }
 
     /// This is called by send_payment
-    pub fn rec_payment(&mut self, update: UpdateTx) -> Result<UpdateTx, Error> {
+    pub fn rec_payment(&mut self, update: &UpdateTx) -> Result<UpdateTx, Error> {
         assert!(self.my_state.my_balance() <= self.their_state.my_balance());
         let pending_pay = self.their_state.my_balance() - self.my_state.my_balance();
 
@@ -83,7 +83,7 @@ impl CombinedState {
     }
 
     /// This is called on the response to rec_payment
-    pub fn rec_updated_state(&mut self, rec_update: UpdateTx) -> Result<(), Error> {
+    pub fn rec_updated_state(&mut self, rec_update: &UpdateTx) -> Result<(), Error> {
         assert!(self.my_state.my_balance() <= self.their_state.my_balance());
         let pending_pay = self.their_state.my_balance() - self.my_state.my_balance();
 
@@ -120,10 +120,10 @@ mod tests {
 
         let payment = a.create_payment().unwrap();
 
-        b.rec_payment(payment.clone()).unwrap();
+        b.rec_payment(&payment).unwrap();
         let response = b.create_payment().unwrap();
 
-        a.rec_updated_state(response).unwrap();
+        a.rec_updated_state(&response).unwrap();
 
         assert_eq!(a.withdraw().unwrap(), 0.into());
         assert_eq!(b.withdraw().unwrap(), 0.into());
@@ -139,10 +139,10 @@ mod tests {
 
         let payment = a.create_payment().unwrap();
 
-        b.rec_payment(payment.clone()).unwrap();
+        b.rec_payment(&payment).unwrap();
         let response = b.create_payment().unwrap();
 
-        a.rec_updated_state(response).unwrap();
+        a.rec_updated_state(&response).unwrap();
 
         assert_eq!(a.withdraw().unwrap(), 0.into());
         assert_eq!(b.withdraw().unwrap(), 100.into());
@@ -156,10 +156,10 @@ mod tests {
 
         let payment = a.create_payment().unwrap();
 
-        b.rec_payment(payment.clone()).unwrap();
+        b.rec_payment(&payment).unwrap();
         let response = b.create_payment().unwrap();
 
-        a.rec_updated_state(response).unwrap();
+        a.rec_updated_state(&&response).unwrap();
 
         assert_eq!(b.withdraw().unwrap(), 20.into());
         assert_eq!(b.withdraw().unwrap(), 0.into());
@@ -175,19 +175,19 @@ mod tests {
 
         let payment = a.create_payment().unwrap();
 
-        b.rec_payment(payment.clone()).unwrap();
+        b.rec_payment(&payment).unwrap();
         let response = b.create_payment().unwrap();
 
-        a.rec_updated_state(response).unwrap();
+        a.rec_updated_state(&response).unwrap();
 
         // B -> A 3
         b.pay_counterparty(3.into()).unwrap();
 
         let payment = b.create_payment().unwrap();
 
-        let response = a.rec_payment(payment.clone()).unwrap();
+        let response = a.rec_payment(&payment).unwrap();
 
-        b.rec_updated_state(response).unwrap();
+        b.rec_updated_state(&response).unwrap();
 
         assert_eq!(a.withdraw().unwrap(), 3.into());
         assert_eq!(b.withdraw().unwrap(), 5.into());
@@ -204,19 +204,19 @@ mod tests {
         let payment_a = a.create_payment().unwrap();
         let payment_b = b.create_payment().unwrap();
 
-        let response_b = b.rec_payment(payment_a.clone()).unwrap();
-        let response_a = a.rec_payment(payment_b.clone()).unwrap();
+        let response_b = b.rec_payment(&payment_a).unwrap();
+        let response_a = a.rec_payment(&payment_b).unwrap();
 
-        a.rec_updated_state(response_b).unwrap();
-        b.rec_updated_state(response_a).unwrap();
+        a.rec_updated_state(&response_b).unwrap();
+        b.rec_updated_state(&response_a).unwrap();
 
         // unraced request
 
         let payment = a.create_payment().unwrap();
 
-        let response = b.rec_payment(payment.clone()).unwrap();
+        let response = b.rec_payment(&payment).unwrap();
 
-        a.rec_updated_state(response).unwrap();
+        a.rec_updated_state(&response).unwrap();
 
         assert_eq!(a.withdraw().unwrap(), 5.into());
         assert_eq!(b.withdraw().unwrap(), 3.into());
@@ -233,23 +233,23 @@ mod tests {
         let payment_a = a.create_payment().unwrap();
         let payment_b = b.create_payment().unwrap();
 
-        b.rec_payment(payment_a.clone()).unwrap();
+        b.rec_payment(&payment_a).unwrap();
         let response_b = b.create_payment().unwrap();
-        a.rec_payment(payment_b.clone()).unwrap();
+        a.rec_payment(&payment_b).unwrap();
         let response_a = a.create_payment().unwrap();
 
-        a.rec_updated_state(response_b).unwrap();
-        b.rec_updated_state(response_a).unwrap();
+        a.rec_updated_state(&response_b).unwrap();
+        b.rec_updated_state(&response_a).unwrap();
 
         // A -> B 1
         a.pay_counterparty(1.into()).unwrap();
 
         let payment = a.create_payment().unwrap();
 
-        b.rec_payment(payment.clone()).unwrap();
+        b.rec_payment(&payment).unwrap();
         let response = b.create_payment().unwrap();
 
-        a.rec_updated_state(response).unwrap();
+        a.rec_updated_state(&response).unwrap();
 
         assert_eq!(a.withdraw().unwrap(), 5.into());
         assert_eq!(b.withdraw().unwrap(), 4.into());
@@ -271,33 +271,33 @@ mod tests {
         let payment_a2 = a.create_payment().unwrap();
         let payment_b = b.create_payment().unwrap();
 
-        b.rec_payment(payment_a1.clone()).unwrap();
+        b.rec_payment(&payment_a1).unwrap();
         let response_b1 = b.create_payment().unwrap();
-        b.rec_payment(payment_a2.clone()).unwrap();
+        b.rec_payment(&payment_a2).unwrap();
         let response_b2 = b.create_payment().unwrap();
 
-        a.rec_payment(payment_b.clone()).unwrap();
+        a.rec_payment(&payment_b).unwrap();
         let response_a = a.create_payment().unwrap();
 
-        a.rec_updated_state(response_b1).unwrap();
-        a.rec_updated_state(response_b2).unwrap();
-        b.rec_updated_state(response_a).unwrap();
+        a.rec_updated_state(&response_b1).unwrap();
+        a.rec_updated_state(&response_b2).unwrap();
+        b.rec_updated_state(&response_a).unwrap();
 
         // unraced request
 
         let payment = a.create_payment().unwrap();
 
-        b.rec_payment(payment.clone()).unwrap();
+        b.rec_payment(&payment).unwrap();
         let response = b.create_payment().unwrap();
 
-        a.rec_updated_state(response).unwrap();
+        a.rec_updated_state(&response).unwrap();
 
         let payment = b.create_payment().unwrap();
 
-        a.rec_payment(payment.clone()).unwrap();
+        a.rec_payment(&payment).unwrap();
         let response = a.create_payment().unwrap();
 
-        b.rec_updated_state(response).unwrap();
+        b.rec_updated_state(&response).unwrap();
 
         assert_eq!(a.withdraw().unwrap(), 4.into());
         assert_eq!(b.withdraw().unwrap(), 3.into());
@@ -319,26 +319,26 @@ mod tests {
         let payment_a2 = a.create_payment().unwrap();
         let payment_b = b.create_payment().unwrap();
 
-        b.rec_payment(payment_a1.clone()).unwrap();
+        b.rec_payment(&payment_a1).unwrap();
         let _ = b.create_payment().unwrap();
-        b.rec_payment(payment_a2.clone()).unwrap();
+        b.rec_payment(&payment_a2).unwrap();
         let response_b2 = b.create_payment().unwrap();
 
-        a.rec_payment(payment_b.clone()).unwrap();
+        a.rec_payment(&payment_b).unwrap();
         let response_a = a.create_payment().unwrap();
 
-        a.rec_updated_state(response_b2).unwrap();
-        b.rec_updated_state(response_a).unwrap();
+        a.rec_updated_state(&response_b2).unwrap();
+        b.rec_updated_state(&response_a).unwrap();
 
         // A -> B 10
         a.pay_counterparty(10.into()).unwrap();
 
         let payment = a.create_payment().unwrap();
 
-        b.rec_payment(payment.clone()).unwrap();
+        b.rec_payment(&payment).unwrap();
         let response = b.create_payment().unwrap();
 
-        a.rec_updated_state(response).unwrap();
+        a.rec_updated_state(&response).unwrap();
 
         assert_eq!(a.withdraw().unwrap(), 5.into());
         assert_eq!(b.withdraw().unwrap(), 16.into());

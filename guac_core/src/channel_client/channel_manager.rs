@@ -98,7 +98,7 @@ impl ChannelManager {
         Ok(ret)
     }
 
-    fn channel_created(
+    pub fn channel_created(
         &mut self,
         channel: &Channel,
         our_address: EthAddress,
@@ -150,7 +150,7 @@ impl ChannelManager {
         Ok(())
     }
 
-    fn check_proposal(&mut self, their_prop: &Channel) -> Result<bool, Error> {
+    pub fn check_proposal(&mut self, their_prop: &Channel) -> Result<bool, Error> {
         if is_channel_acceptable(&their_prop.swap())? {
             *self = match self {
                 ChannelManager::Proposed {
@@ -242,27 +242,29 @@ impl ChannelManager {
 
     pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
         match self {
-            ChannelManager::Open { ref mut state } | ChannelManager::Joined { ref mut state } => {
-                Ok(state.create_payment()?)
-            }
+            ChannelManager::Open { ref mut state }
+            | ChannelManager::Joined { ref mut state }
+            | ChannelManager::PendingJoin { ref mut state, .. } => Ok(state.create_payment()?),
             // TODO: Handle close and dispute
             _ => bail!("we can only create payments in open or joined"),
         }
     }
 
-    pub fn rec_payment(&mut self, payment: UpdateTx) -> Result<UpdateTx, Error> {
+    pub fn rec_payment(&mut self, payment: &UpdateTx) -> Result<UpdateTx, Error> {
         match self {
-            ChannelManager::Open { ref mut state } | ChannelManager::Joined { ref mut state } => {
-                Ok(state.rec_payment(payment)?)
-            }
+            ChannelManager::Open { ref mut state }
+            | ChannelManager::Joined { ref mut state }
+            | ChannelManager::PendingJoin { ref mut state, .. } => Ok(state.rec_payment(payment)?),
             // TODO: Handle close and dispute
             _ => bail!("we can only recieve payments in open or joined"),
         }
     }
 
-    pub fn rec_updated_state(&mut self, rec_update: UpdateTx) -> Result<(), Error> {
+    pub fn rec_updated_state(&mut self, rec_update: &UpdateTx) -> Result<(), Error> {
         match self {
-            ChannelManager::Open { ref mut state } | ChannelManager::Joined { ref mut state } => {
+            ChannelManager::Open { ref mut state }
+            | ChannelManager::Joined { ref mut state }
+            | ChannelManager::PendingJoin { ref mut state, .. } => {
                 Ok(state.rec_updated_state(rec_update)?)
             }
             // TODO: Handle close and dispute
