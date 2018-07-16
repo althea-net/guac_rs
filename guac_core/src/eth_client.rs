@@ -7,6 +7,7 @@ use hex;
 use serde_json;
 use std::io::Cursor;
 
+use crypto::CryptoService;
 use CRYPTO;
 
 pub struct Fullnode {
@@ -57,7 +58,7 @@ fn create_update_tx(update: UpdateTx) -> SignedTransaction {
         gas: U256::from(50_000),
         value: U256::from(0),
         data,
-    }.sign(&CRYPTO.key_pair.secret(), None)
+    }.sign(&CRYPTO.own_secret(), None)
 }
 
 fn create_new_channel_tx(update: NewChannelTx) -> SignedTransaction {
@@ -86,7 +87,7 @@ fn create_new_channel_tx(update: NewChannelTx) -> SignedTransaction {
         gas: U256::from(50_000),
         value: update.deposit.into(),
         data,
-    }.sign(&CRYPTO.key_pair.secret(), None)
+    }.sign(&CRYPTO.own_secret(), None)
 }
 
 #[test]

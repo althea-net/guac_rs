@@ -7,6 +7,7 @@ use ethereum_types::U256;
 
 use counterparty::Counterparty;
 
+use crypto::CryptoService;
 use CRYPTO;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

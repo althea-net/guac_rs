@@ -852,6 +852,7 @@ dependencies = [
  "mockito 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "multihash 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num256 0.1.0 (git+https://github.com/althea-mesh/althea_rs.git)",
+ "owning_ref 0.3.3 (git+https://github.com/kingoflolz/owning-ref-rs/?branch=fix-bug)",
  "qutex 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.70 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1458,6 +1459,14 @@ dependencies = [
  "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "vcpkg 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "owning_ref"
+version = "0.3.3"
+source = "git+https://github.com/kingoflolz/owning-ref-rs/?branch=fix-bug#601028848abf0754b0f5da8af97bdca1d92b5756"
+dependencies = [
+ "stable_deref_trait 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2813,6 +2822,7 @@ dependencies = [
 "checksum num_cpus 1.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c51a3322e4bca9d212ad9a158a02abc6934d005490c054a2778df73a70aa0a30"
 "checksum openssl 0.9.24 (registry+https://github.com/rust-lang/crates.io-index)" = "a3605c298474a3aa69de92d21139fb5e2a81688d308262359d85cdd0d12a7985"
 "checksum openssl-sys 0.9.33 (registry+https://github.com/rust-lang/crates.io-index)" = "d8abc04833dcedef24221a91852931df2f63e3369ae003134e70aff3645775cc"
+"checksum owning_ref 0.3.3 (git+https://github.com/kingoflolz/owning-ref-rs/?branch=fix-bug)" = "<none>"
 "checksum owning_ref 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "cdf84f41639e037b484f93433aa3897863b561ed65c6e59c7073d7c561710f37"
 "checksum parity-bytes 0.1.0 (git+https://github.com/paritytech/parity-common)" = "<none>"
 "checksum parity-crypto 0.1.0 (git+https://github.com/paritytech/parity-common)" = "<none>"

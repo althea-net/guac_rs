@@ -6,6 +6,7 @@ use actix_web::Json;
 use qutex::Guard;
 
 use guac_core::channel_client::types::{Channel, UpdateTx};
+use guac_core::crypto::CryptoService;
 use guac_core::CRYPTO;
 use guac_core::STORAGE;
 
@@ -28,11 +29,16 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                 .unwrap();
 
             match action {
-                ChannelManagerAction::SendNewChannelTransaction(channel) => Box::new(
+                ChannelManagerAction::SendChannelProposal(channel) => Box::new(
                     send_proposal_request(channel, counterparty.url, channel_manager),
                 )
                     as Box<Future<Item = (), Error = Error>>,
+                ChannelManagerAction::SendNewChannelTransaction(channel) => {
+                    *CRYPTO.get_balance_mut() -= 1000.into();
+                    Box::new(futures::future::ok(())) as Box<Future<Item = (), Error = Error>>
+                }
                 ChannelManagerAction::SendChannelJoinTransaction(_) => {
+                    *CRYPTO.get_balance_mut() -= 1000.into();
                     Box::new(futures::future::ok(())) as Box<Future<Item = (), Error = Error>>
                 }
 

@@ -8,10 +8,13 @@ extern crate guac_core;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
+extern crate num256;
 extern crate qutex;
 extern crate serde;
 
 use std::fmt::Debug;
+
+use num256::Uint256;
 
 use actix::prelude::*;
 use actix_web::*;
@@ -24,6 +27,9 @@ use guac_core::channel_client::types::UpdateTx;
 use guac_core::channel_client::ChannelManager;
 use guac_core::counterparty::Counterparty;
 use guac_core::STORAGE;
+
+use guac_core::crypto::CryptoService;
+use guac_core::CRYPTO;
 
 use serde::{Deserialize, Serialize};
 
@@ -145,15 +151,25 @@ impl Handler<PaymentControllerUpdate> for PaymentController {
     fn handle(&mut self, msg: PaymentControllerUpdate, ctx: &mut Context<Self>) -> Self::Result {}
 }
 
-pub struct GetOwnBalance;
+pub struct Withdraw;
 
-impl Message for GetOwnBalance {
-    type Result = Result<i64, Error>;
+impl Message for Withdraw {
+    type Result = Result<Uint256, Error>;
 }
 
-impl Handler<GetOwnBalance> for PaymentController {
-    type Result = Result<i64, Error>;
-    fn handle(&mut self, _msg: GetOwnBalance, _: &mut Context<Self>) -> Self::Result {
-        Ok(0)
+impl Handler<Withdraw> for PaymentController {
+    type Result = ResponseFuture<Uint256, Error>;
+    fn handle(&mut self, _msg: Withdraw, _: &mut Context<Self>) -> Self::Result {
+        Box::new(STORAGE.get_all_channel_managers_mut().and_then(|mut keys| {
+            let mut out = 0.into();
+
+            for mut i in keys {
+                let single_withdraw = i.withdraw()?;
+                out += single_withdraw;
+                *CRYPTO.get_balance_mut() += single_withdraw;
+            }
+
+            Ok(out)
+        }))
     }
 }

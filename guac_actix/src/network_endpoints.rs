@@ -4,6 +4,8 @@ use actix_web::*;
 use actix::*;
 
 use guac_core::channel_client::types::{Channel, UpdateTx};
+
+use guac_core::crypto::CryptoService;
 use guac_core::{CRYPTO, STORAGE};
 
 use failure::Error;

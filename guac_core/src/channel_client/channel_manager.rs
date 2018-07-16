@@ -41,6 +41,7 @@ pub enum ChannelManagerAction {
     SendChannelJoinTransaction(Channel),
 
     // to counterparty
+    SendChannelProposal(Channel),
     SendChannelCreatedUpdate(Channel),
     SendUpdatedState(UpdateTx),
 
@@ -64,10 +65,9 @@ impl ChannelManager {
         their_address: EthAddress,
     ) -> Result<ChannelManagerAction, Error> {
         match self.clone() {
-            ChannelManager::New
-            | ChannelManager::Proposed {
-                accepted: false, ..
-            } => self.propose_channel(my_address, their_address, 1000.into()),
+            ChannelManager::New | ChannelManager::Proposed { .. } => {
+                self.propose_channel(my_address, their_address, 1000.into())
+            }
             ChannelManager::PendingCreation {
                 state,
                 pending_send,
@@ -92,7 +92,6 @@ impl ChannelManager {
             ChannelManager::Joined { state } | ChannelManager::Open { state } => Ok(
                 ChannelManagerAction::SendUpdatedState(self.create_payment()?),
             ),
-            _ => Ok(ChannelManagerAction::None),
         }
     }
 
@@ -120,7 +119,7 @@ impl ChannelManager {
                     balance_b: 0.into(),
                     is_a: true,
                 };
-                ret = ChannelManagerAction::SendNewChannelTransaction(proposal.clone());
+                ret = ChannelManagerAction::SendChannelProposal(proposal.clone());
                 ChannelManager::Proposed {
                     accepted: false,
                     state: proposal.clone(),
@@ -136,7 +135,17 @@ impl ChannelManager {
                     state: state.clone(),
                 }
             }
-            _ => bail!("can only propose if not accepted and in state Proposed"),
+            ChannelManager::Proposed {
+                accepted: true,
+                state,
+            } => {
+                ret = ChannelManagerAction::SendNewChannelTransaction(state.clone());
+                ChannelManager::PendingCreation {
+                    state: state.clone(),
+                    pending_send: 0.into(),
+                }
+            }
+            _ => bail!("can only propose if in state Proposed"),
         };
 
         Ok(ret)
@@ -351,7 +360,7 @@ mod tests {
             .unwrap();
 
         let channel_prop = match proposal {
-            ChannelManagerAction::SendNewChannelTransaction(channel) => channel,
+            ChannelManagerAction::SendChannelProposal(channel) => channel,
             _ => panic!("Wrong action returned"),
         };
 
@@ -387,7 +396,7 @@ mod tests {
             .unwrap();
 
         let channel_prop_a = match proposal_a {
-            ChannelManagerAction::SendNewChannelTransaction(channel) => channel,
+            ChannelManagerAction::SendChannelProposal(channel) => channel,
             _ => panic!("Wrong action returned"),
         };
 
@@ -396,7 +405,7 @@ mod tests {
             .unwrap();
 
         let channel_prop_b = match proposal_b {
-            ChannelManagerAction::SendNewChannelTransaction(channel) => channel,
+            ChannelManagerAction::SendChannelProposal(channel) => channel,
             _ => panic!("Wrong action returned"),
         };
 

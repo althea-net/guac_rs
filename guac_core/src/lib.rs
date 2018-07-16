@@ -23,6 +23,7 @@ extern crate ethabi_derive;
 extern crate ethkey;
 extern crate hex;
 extern crate multihash;
+extern crate owning_ref;
 extern crate qutex;
 
 pub mod channel_client;

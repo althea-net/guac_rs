@@ -1,8 +1,11 @@
 use althea_types::EthAddress;
 use counterparty::Counterparty;
 use failure::Error;
+
 use futures;
+use futures::future::join_all;
 use futures::Future;
+
 use qutex::{FutureGuard, FutureWriteGuard, Guard, QrwLock, Qutex};
 use std::collections::HashMap;
 
@@ -35,6 +38,22 @@ impl Storage {
                     keys.push(i.clone());
                 }
                 Ok(keys)
+            })
+            .from_err()
+    }
+
+    pub fn get_all_channel_managers_mut(
+        &self,
+    ) -> impl Future<Item = Vec<Guard<ChannelManager>>, Error = Error> {
+        self.inner
+            .clone()
+            .read()
+            .and_then(|data| {
+                let mut keys = Vec::new();
+                for i in data.addr_to_channel.values() {
+                    keys.push(i.clone().lock());
+                }
+                join_all(keys)
             })
             .from_err()
     }
