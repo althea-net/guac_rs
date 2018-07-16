@@ -4,7 +4,6 @@ use ethabi::{Bytes, Contract, Token};
 use ethcore_transaction::{Action, SignedTransaction, Transaction};
 use ethereum_types::{Address, U256};
 use hex;
-use rlp::Encodable;
 use serde_json;
 use std::io::Cursor;
 
@@ -106,7 +105,7 @@ fn test_create_update_tx() {
         signature_a: Some(1.into()),
         signature_b: Some(2.into()),
     });
-    println!("tx: 0x{}", hex::encode(&(*tx.rlp_bytes())));
+    println!("tx: {:?}", tx);
 }
 
 #[test]

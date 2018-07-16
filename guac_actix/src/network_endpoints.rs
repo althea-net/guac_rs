@@ -1,20 +1,32 @@
-use actix_web::client;
-use actix_web::AsyncResponder;
-use actix_web::HttpMessage;
-use actix_web::Json;
+use actix_web::server::HttpServer;
+use actix_web::*;
+
+use actix::*;
 
 use guac_core::channel_client::types::{Channel, UpdateTx};
-use guac_core::CRYPTO;
-use guac_core::STORAGE;
+use guac_core::{CRYPTO, STORAGE};
 
 use failure::Error;
-use futures;
-use futures::Future;
+
+use futures::{self, Future};
 
 use NetworkRequest;
 
 use althea_types::Bytes32;
 use guac_core::counterparty::Counterparty;
+
+pub fn init_server() {
+    server::new(|| {
+        App::new()
+            .resource("/update", |r| r.with_async(update_endpoint))
+            .resource("/propose", |r| r.with_async(propose_channel_endpoint))
+            .resource("/channel_created", |r| {
+                r.with_async(channel_created_endpoint)
+            })
+    }).bind("127.0.0.1:8080")
+        .unwrap()
+        .start();
+}
 
 pub fn update_endpoint(
     update: Json<NetworkRequest<UpdateTx>>,

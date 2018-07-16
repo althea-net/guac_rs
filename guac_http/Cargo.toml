@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Ben Wang <wangben3@gmail.com>"]
 
 [dependencies]
-actix = "0.5.7"
-actix-web = "0.6.7"
+actix = { git = "https://github.com/kingoflolz/actix.git", branch = "althea-mesh" }
+actix-web = { git = "https://github.com/actix/actix-web.git"}
 futures = "0.1"
 guac_core = {path="../guac_core"}
 failure = "0.1"

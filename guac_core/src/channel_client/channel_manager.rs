@@ -36,8 +36,13 @@ pub enum ChannelManager {
 }
 
 pub enum ChannelManagerAction {
+    // to blockchain
     SendNewChannelTransaction(Channel),
     SendChannelJoinTransaction(Channel),
+
+    // to counterparty
+    SendChannelCreatedUpdate(Channel),
+    SendUpdatedState(UpdateTx),
 
     None,
 }
@@ -50,6 +55,45 @@ fn is_channel_acceptable(state: &Channel) -> Result<bool, Error> {
 impl ChannelManager {
     fn new() -> ChannelManager {
         ChannelManager::New
+    }
+
+    // called periodically so ChannelManager can talk to the external world
+    pub fn tick(
+        &mut self,
+        my_address: EthAddress,
+        their_address: EthAddress,
+    ) -> Result<ChannelManagerAction, Error> {
+        match self.clone() {
+            ChannelManager::New
+            | ChannelManager::Proposed {
+                accepted: false, ..
+            } => self.propose_channel(my_address, their_address, 1000.into()),
+            ChannelManager::PendingCreation {
+                state,
+                pending_send,
+            } => {
+                // we wait for creation of our channel
+                // TODO: actually poll for stuff
+                *self = ChannelManager::Joined {
+                    state: CombinedState::new(&state),
+                };
+                self.pay_counterparty(pending_send);
+                Ok(ChannelManagerAction::SendChannelCreatedUpdate(state))
+            }
+            ChannelManager::PendingJoin {
+                state,
+                pending_send,
+            } => {
+                // TODO: actually poll for stuff
+                *self = ChannelManager::Joined { state };
+                self.pay_counterparty(pending_send);
+                Ok(ChannelManagerAction::None)
+            }
+            ChannelManager::Joined { state } | ChannelManager::Open { state } => Ok(
+                ChannelManagerAction::SendUpdatedState(self.create_payment()?),
+            ),
+            _ => Ok(ChannelManagerAction::None),
+        }
     }
 
     fn propose_channel(
@@ -102,19 +146,18 @@ impl ChannelManager {
         &mut self,
         channel: &Channel,
         our_address: EthAddress,
-    ) -> Result<ChannelManagerAction, Error> {
-        let ret;
+    ) -> Result<(), Error> {
         *self = match self {
             ChannelManager::Proposed { .. } | ChannelManager::PendingCreation { .. } => {
                 // TODO: verify it actually made it into the blockchain
                 if is_channel_acceptable(&channel)? {
                     if channel.address_a == our_address {
-                        ret = ChannelManagerAction::None;
+                        // we created this transaction
                         ChannelManager::Joined {
                             state: CombinedState::new(&channel),
                         }
                     } else {
-                        ret = ChannelManagerAction::None;
+                        // They created this transaction
                         ChannelManager::Open {
                             state: CombinedState::new(&channel.swap()),
                         }
@@ -125,11 +168,10 @@ impl ChannelManager {
             }
             _ => bail!("Channel creation when not in proposed state"),
         };
-
-        Ok(ret)
+        Ok(())
     }
 
-    fn proposal_result(&mut self, decision: bool) -> Result<(), Error> {
+    pub fn proposal_result(&mut self, decision: bool) -> Result<(), Error> {
         *self = match self {
             ChannelManager::Proposed { accepted, state } => {
                 if decision {

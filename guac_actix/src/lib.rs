@@ -8,6 +8,7 @@ extern crate guac_core;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
+extern crate qutex;
 extern crate serde;
 
 use std::fmt::Debug;
@@ -20,6 +21,7 @@ use failure::Error;
 use futures::Future;
 
 use guac_core::channel_client::types::UpdateTx;
+use guac_core::channel_client::ChannelManager;
 use guac_core::counterparty::Counterparty;
 use guac_core::STORAGE;
 
@@ -28,7 +30,7 @@ use serde::{Deserialize, Serialize};
 mod network_endpoints;
 mod network_requests;
 
-use network_requests::send_payment;
+use network_requests::tick;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetworkRequest<T> {
@@ -102,13 +104,13 @@ impl Handler<Tick> for PaymentController {
         // TODO: Send to bounty hunter
         Box::new(STORAGE.get_all_counterparties().and_then(|keys| {
             for i in keys {
-                Arbiter::handle().spawn(send_payment(i.clone()).then(move |res| {
+                Arbiter::spawn(tick(i.clone()).then(move |res| {
                     match res {
                         Ok(_) => {
-                            info!("payment request to {:?} was successful", i);
+                            info!("tick to {:?} was successful", i);
                         }
                         Err(e) => {
-                            error!("payment request to {:?} failed with {:?}", i, e);
+                            error!("tick to {:?} failed with {:?}", i, e);
                         }
                     };
                     Ok(())
@@ -119,9 +121,8 @@ impl Handler<Tick> for PaymentController {
     }
 }
 
-/*
 #[derive(Clone)]
-pub struct Register(EthAddress);
+pub struct Register(Counterparty);
 
 impl Message for Register {
     type Result = Result<(), Error>;
@@ -130,10 +131,10 @@ impl Message for Register {
 impl Handler<Register> for PaymentController {
     type Result = ResponseFuture<(), Error>;
 
-    fn handle(&mut self, _msg: Register, ctx: &mut Context<Self>) -> Self::Result {
-        Box::new(STORAGE.init_data())
+    fn handle(&mut self, msg: Register, ctx: &mut Context<Self>) -> Self::Result {
+        Box::new(STORAGE.init_data(msg.0, ChannelManager::New))
     }
-} */
+}
 
 #[derive(Message)]
 pub struct PaymentControllerUpdate;

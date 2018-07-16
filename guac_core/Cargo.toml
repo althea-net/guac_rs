@@ -23,7 +23,6 @@ web3 = "0.3.0"
 lazy_static = "1.0"
 ethcore-transaction = {git="https://github.com/paritytech/parity.git"}
 ethkey = {git="https://github.com/paritytech/parity.git"}
-rlp = {git="https://github.com/paritytech/parity.git", path="util/rlp"}
 ethereum-types = "0.3.1"
 ethabi-derive = "5.1.2"
 ethabi = "5.1.1"

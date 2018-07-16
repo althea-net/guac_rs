@@ -24,7 +24,6 @@ extern crate ethkey;
 extern crate hex;
 extern crate multihash;
 extern crate qutex;
-extern crate rlp;
 
 pub mod channel_client;
 pub mod counterparty;
