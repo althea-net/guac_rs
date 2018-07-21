@@ -6,7 +6,10 @@ use futures;
 use futures::future::join_all;
 use futures::Future;
 
-use qutex::{FutureGuard, FutureWriteGuard, Guard, QrwLock, Qutex};
+use crypto::CryptoService;
+use CRYPTO;
+
+use qutex::{FutureGuard, Guard, QrwLock, Qutex};
 use std::collections::HashMap;
 
 use channel_client::ChannelManager;
@@ -78,6 +81,7 @@ impl Storage {
         k: Counterparty,
         v: ChannelManager,
     ) -> impl Future<Item = (), Error = Error> {
+        assert!(k.address != CRYPTO.own_eth_addr());
         self.inner
             .clone()
             .write()

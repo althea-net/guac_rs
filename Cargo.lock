@@ -819,6 +819,7 @@ dependencies = [
  "actix 0.7.0 (git+https://github.com/kingoflolz/actix.git?branch=althea-mesh)",
  "actix-web 0.7.0 (git+https://github.com/actix/actix-web.git)",
  "althea_types 0.1.0 (git+https://github.com/althea-mesh/althea_rs.git)",
+ "bytes 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "guac_core 0.1.0",
@@ -827,6 +828,8 @@ dependencies = [
  "qutex 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.70 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.70 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

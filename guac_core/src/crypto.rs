@@ -1,21 +1,13 @@
-use althea_types::{Bytes32, EthAddress, EthPrivateKey, EthSignature};
+use althea_types::{Bytes32, EthAddress, EthSignature};
 use ethkey::{sign, Generator, KeyPair, Message, Random, Secret, Signature};
-use failure::Error;
 use multihash::{encode, Hash};
 use num256::Uint256;
-use std::collections::HashMap;
 
-use owning_ref::{RwLockReadGuardRef, RwLockWriteGuardRefMut};
+use owning_ref::RwLockWriteGuardRefMut;
 use std::sync::{Arc, RwLock};
 
 lazy_static! {
     pub static ref CRYPTO: Arc<RwLock<Crypto>> = Arc::new(RwLock::new(Crypto::new()));
-}
-
-#[derive(Debug, Fail)]
-enum CryptoError {
-    #[fail(display = "EthAddress not found in keystore.")]
-    EthAddressNotFound {},
 }
 
 pub struct Crypto {
@@ -64,7 +56,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         let sig = sign(&self.read().unwrap().key_pair.secret(), &msg).unwrap();
         sig
     }
-    fn hash_bytes(&self, x: &[&[u8]]) -> Bytes32 {
+    fn hash_bytes(&self, _x: &[&[u8]]) -> Bytes32 {
         0.into()
     }
     fn verify(_fingerprint: &Bytes32, _signature: &EthSignature, _address: EthAddress) -> bool {

@@ -1,10 +1,8 @@
-use althea_types::{Bytes32, EthAddress, EthSignature};
+use althea_types::EthAddress;
 use channel_client::types::{NewChannelTx, UpdateTx};
-use ethabi::{Bytes, Contract, Token};
+use ethabi::{Contract, Token};
 use ethcore_transaction::{Action, SignedTransaction, Transaction};
 use ethereum_types::{Address, U256};
-use hex;
-use serde_json;
 use std::io::Cursor;
 
 use crypto::CryptoService;

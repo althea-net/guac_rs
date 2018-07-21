@@ -1,6 +1,6 @@
 use failure::Error;
 
-use althea_types::{Bytes32, EthAddress, EthPrivateKey, EthSignature};
+use althea_types::EthAddress;
 use ethereum_types::U256;
 
 use channel_client::combined_state::CombinedState;
@@ -16,6 +16,11 @@ pub enum ChannelManager {
     },
     /// After counterparty accepts proposal, while blockchain tx to create channel is pending
     PendingCreation {
+        state: Channel,
+        pending_send: U256,
+    },
+    /// After we accepts proposal, while counterparty's blockchain tx to create channel is pending
+    PendingOtherCreation {
         state: Channel,
         pending_send: U256,
     },
@@ -35,6 +40,7 @@ pub enum ChannelManager {
     // TODO: close/dispute
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChannelManagerAction {
     // to blockchain
     SendNewChannelTransaction(Channel),
@@ -49,13 +55,42 @@ pub enum ChannelManagerAction {
 }
 
 /// If we should accept their proposal
-fn is_channel_acceptable(state: &Channel) -> Result<bool, Error> {
+fn is_channel_acceptable(_state: &Channel) -> Result<bool, Error> {
     Ok(true)
 }
 
 impl ChannelManager {
-    fn new() -> ChannelManager {
-        ChannelManager::New
+    fn sanity_check(&self, my_address: EthAddress) {
+        trace!(
+            "checking sanity of {:?}, my address: {:?}",
+            self,
+            my_address
+        );
+        match self {
+            ChannelManager::Proposed { state, .. }
+            | ChannelManager::PendingCreation { state, .. }
+            | ChannelManager::PendingOtherCreation { state, .. } => {
+                if state.is_a {
+                    assert_eq!(state.address_a, my_address);
+                } else {
+                    assert_eq!(state.address_b, my_address);
+                }
+            }
+            ChannelManager::PendingJoin { state, .. }
+            | ChannelManager::Joined { state }
+            | ChannelManager::Open { state } => {
+                if state.my_state().is_a {
+                    assert_eq!(state.their_state().is_a, true);
+                    assert_eq!(state.my_state().address_a, my_address);
+                    assert_eq!(state.their_state().address_a, my_address);
+                } else {
+                    assert_eq!(state.their_state().is_a, false);
+                    assert_eq!(state.my_state().address_b, my_address);
+                    assert_eq!(state.their_state().address_b, my_address);
+                }
+            }
+            _ => {}
+        }
     }
 
     // called periodically so ChannelManager can talk to the external world
@@ -64,9 +99,15 @@ impl ChannelManager {
         my_address: EthAddress,
         their_address: EthAddress,
     ) -> Result<ChannelManagerAction, Error> {
+        self.sanity_check(my_address);
         match self.clone() {
             ChannelManager::New | ChannelManager::Proposed { .. } => {
-                self.propose_channel(my_address, their_address, 1000.into())
+                self.propose_channel(my_address, their_address, 100_000_000_000_000u64.into())
+            }
+            ChannelManager::PendingOtherCreation { state, .. } => {
+                assert_eq!(state.is_a, false);
+                // twiddle our thumbs, they will tell us when the channel is created
+                Ok(ChannelManagerAction::None)
             }
             ChannelManager::PendingCreation {
                 state,
@@ -74,22 +115,40 @@ impl ChannelManager {
             } => {
                 // we wait for creation of our channel
                 // TODO: actually poll for stuff
+                assert_eq!(state.is_a, true);
                 *self = ChannelManager::Joined {
                     state: CombinedState::new(&state),
                 };
-                self.pay_counterparty(pending_send);
-                Ok(ChannelManagerAction::SendChannelCreatedUpdate(state))
+                self.sanity_check(my_address);
+                self.pay_counterparty(pending_send)?;
+                Ok(ChannelManagerAction::SendChannelCreatedUpdate(state.swap()))
             }
             ChannelManager::PendingJoin {
                 state,
                 pending_send,
             } => {
+                assert_eq!(state.my_state().is_a, false);
+                assert_eq!(state.their_state().is_a, false);
+
                 // TODO: actually poll for stuff
-                *self = ChannelManager::Joined { state };
-                self.pay_counterparty(pending_send);
-                Ok(ChannelManagerAction::None)
+                let mut state = state.clone();
+
+                *state.my_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
+                *state.my_state_mut().my_balance_mut() += 100_000_000_000_000u64.into();
+
+                *state.their_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
+                *state.their_state_mut().my_balance_mut() += 100_000_000_000_000u64.into();
+
+                state.pay_counterparty(pending_send)?;
+
+                *self = ChannelManager::Joined {
+                    state: state.clone(),
+                };
+                Ok(ChannelManagerAction::SendChannelJoinTransaction({
+                    state.my_state().clone()
+                }))
             }
-            ChannelManager::Joined { state } | ChannelManager::Open { state } => Ok(
+            ChannelManager::Joined { state: _ } | ChannelManager::Open { state: _ } => Ok(
                 ChannelManagerAction::SendUpdatedState(self.create_payment()?),
             ),
         }
@@ -101,6 +160,7 @@ impl ChannelManager {
         to: EthAddress,
         deposit: U256,
     ) -> Result<ChannelManagerAction, Error> {
+        ensure!(from != to, "cannot pay to self");
         let ret;
         *self = match self {
             ChannelManager::New => {
@@ -119,7 +179,7 @@ impl ChannelManager {
                     balance_b: 0.into(),
                     is_a: true,
                 };
-                ret = ChannelManagerAction::SendChannelProposal(proposal.clone());
+                ret = ChannelManagerAction::SendChannelProposal(proposal.swap());
                 ChannelManager::Proposed {
                     accepted: false,
                     state: proposal.clone(),
@@ -140,6 +200,7 @@ impl ChannelManager {
                 state,
             } => {
                 ret = ChannelManagerAction::SendNewChannelTransaction(state.clone());
+                assert_eq!(state.is_a, true);
                 ChannelManager::PendingCreation {
                     state: state.clone(),
                     pending_send: 0.into(),
@@ -154,22 +215,31 @@ impl ChannelManager {
     pub fn channel_created(
         &mut self,
         channel: &Channel,
-        our_address: EthAddress,
+        my_address: EthAddress,
     ) -> Result<(), Error> {
+        trace!("checking proposal {:?}", channel);
+        self.sanity_check(my_address);
+        let mut channel = channel.clone();
         *self = match self {
-            ChannelManager::Proposed { .. } | ChannelManager::PendingCreation { .. } => {
+            ChannelManager::Proposed { .. }
+            | ChannelManager::PendingOtherCreation { .. }
+            | ChannelManager::PendingCreation { .. } => {
                 // TODO: verify it actually made it into the blockchain
                 if is_channel_acceptable(&channel)? {
-                    if channel.address_a == our_address {
+                    if channel.address_a == my_address {
                         // we created this transaction
+                        channel.is_a = true;
                         ChannelManager::Joined {
                             state: CombinedState::new(&channel),
                         }
-                    } else {
+                    } else if channel.address_b == my_address {
                         // They created this transaction
+                        channel.is_a = false;
                         ChannelManager::Open {
-                            state: CombinedState::new(&channel.swap()),
+                            state: CombinedState::new(&channel),
                         }
+                    } else {
+                        bail!("This channel is not related to us")
                     }
                 } else {
                     bail!("Unacceptable channel created")
@@ -177,6 +247,7 @@ impl ChannelManager {
             }
             _ => bail!("Channel creation when not in proposed state"),
         };
+        self.sanity_check(my_address);
         Ok(())
     }
 
@@ -184,6 +255,7 @@ impl ChannelManager {
         *self = match self {
             ChannelManager::Proposed { accepted, state } => {
                 if decision {
+                    assert_eq!(state.is_a, true);
                     ChannelManager::PendingCreation {
                         state: state.clone(),
                         pending_send: 0.into(),
@@ -202,8 +274,8 @@ impl ChannelManager {
     }
 
     pub fn check_proposal(&mut self, their_prop: &Channel) -> Result<bool, Error> {
-        if is_channel_acceptable(&their_prop.swap())? {
-            *self = match self {
+        if is_channel_acceptable(&their_prop)? {
+            match self.clone() {
                 ChannelManager::Proposed {
                     accepted: false,
                     state,
@@ -212,47 +284,97 @@ impl ChannelManager {
                     assert_ne!(their_prop.address_a, our_prop.address_a);
                     // smallest address wins
                     if their_prop.address_a > our_prop.address_a {
-                        bail!("our address is lower, rejecting")
+                        trace!("our address is lower, rejecting");
+                        Ok(false)
                     } else {
                         // use their proposal
-                        ChannelManager::Proposed {
+                        *self = ChannelManager::Proposed {
                             accepted: true,
-                            state: their_prop.swap(),
-                        }
+                            state: their_prop.clone(),
+                        };
+                        Ok(true)
                     }
                 }
                 // accept if new
-                ChannelManager::New => ChannelManager::PendingCreation {
-                    state: their_prop.swap().clone(),
-                    pending_send: 0.into(),
-                },
-                _ => bail!("cannot accept proposal if not in New or Proposed"),
+                ChannelManager::New => {
+                    assert_eq!(their_prop.is_a, false);
+                    *self = ChannelManager::PendingOtherCreation {
+                        state: their_prop.clone(),
+                        pending_send: 0.into(),
+                    };
+                    Ok(true)
+                }
+                _ => {
+                    trace!("cannot accept proposal if not in New or Proposed");
+                    Ok(false)
+                }
             }
         } else {
-            bail!("Cannot accept proposal")
+            trace!("Cannot accept proposal");
+            Ok(false)
         }
-        Ok(true)
     }
 
-    fn new_open_pair(deposit_a: U256, deposit_b: U256) -> (ChannelManager, ChannelManager) {
-        let (channel_a, channel_b) = Channel::new_pair(deposit_a, deposit_b);
+    /// called when counterparty joined channel
+    pub fn channel_joined(&mut self, chan: &Channel) -> Result<(), Error> {
+        trace!("counterparty joined channel");
+        match self {
+            ChannelManager::Joined { state } => {
+                ensure!(
+                    chan.address_a == state.my_state().address_a,
+                    "Channel for wrong address"
+                );
+                ensure!(
+                    chan.address_b == state.my_state().address_b,
+                    "Channel for wrong address"
+                );
+                ensure!(
+                    chan.channel_id == state.my_state().channel_id,
+                    "Wrong channelID"
+                );
+                ensure!(
+                    chan.challenge == state.my_state().challenge,
+                    "Conflicting challenge period"
+                );
 
-        let m_a = ChannelManager::Open {
-            state: CombinedState::new(&channel_a),
+                // we must be a because we joined, check our deposit stays the same
+                ensure!(
+                    chan.deposit_a == state.my_state().deposit_a,
+                    "our deposit must stay constant"
+                );
+
+                ensure!(
+                    state.my_state().deposit_b == 0.into(),
+                    "Their deposit must be 0 to begin with"
+                );
+
+                ensure!(
+                    state.their_state().deposit_b == 0.into(),
+                    "Their deposit must be 0 to begin with"
+                );
+
+                *state.my_state_mut().their_deposit_mut() += chan.deposit_b;
+                *state.my_state_mut().their_balance_mut() += chan.deposit_b;
+
+                *state.their_state_mut().their_deposit_mut() += chan.deposit_b;
+                *state.their_state_mut().their_balance_mut() += chan.deposit_b;
+            }
+            _ => bail!("must be in state joined before counterparty joins"),
         };
-
-        let m_b = ChannelManager::Open {
-            state: CombinedState::new(&channel_b),
-        };
-
-        (m_a, m_b)
+        trace!("counterparty joined successful");
+        Ok(())
     }
 
     pub fn pay_counterparty(&mut self, amount: U256) -> Result<(), Error> {
+        trace!("paying counterparty in channelmanager");
         *self = match self {
             ChannelManager::Open { ref mut state } => {
+                assert_eq!(state.my_state().is_a, false);
+                assert_eq!(state.their_state().is_a, false);
                 let overflow = state.pay_counterparty(amount)?;
-                if overflow != 0.into() {
+                trace!("got overflow of {:?}", overflow);
+                if overflow > 0.into() {
+                    trace!("not enough to pay, joining channel");
                     ChannelManager::PendingJoin {
                         state: state.clone(),
                         pending_send: overflow,
@@ -265,8 +387,9 @@ impl ChannelManager {
             }
             ChannelManager::Joined { ref mut state } => {
                 let overflow = state.pay_counterparty(amount)?;
-                if overflow != 0.into() {
+                if overflow > 0.into() {
                     // TODO: Handle reopening channel
+                    trace!("not enough money to pay them");
                     bail!("not enough money to pay them")
                 } else {
                     ChannelManager::Joined {
@@ -293,33 +416,46 @@ impl ChannelManager {
 
     pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
         match self {
-            ChannelManager::Open { ref mut state }
-            | ChannelManager::Joined { ref mut state }
+            ChannelManager::Open { ref mut state } => {
+                assert_eq!(state.my_state().is_a, false);
+                assert_eq!(state.their_state().is_a, false);
+                Ok(state.create_payment()?)
+            }
+            ChannelManager::Joined { ref mut state }
             | ChannelManager::PendingJoin { ref mut state, .. } => Ok(state.create_payment()?),
             // TODO: Handle close and dispute
             _ => bail!("we can only create payments in open or joined"),
         }
     }
 
-    pub fn rec_payment(&mut self, payment: &UpdateTx) -> Result<UpdateTx, Error> {
+    pub fn received_payment(&mut self, payment: &UpdateTx) -> Result<UpdateTx, Error> {
+        trace!("received payment {:?} state {:?}", payment, self);
         match self {
-            ChannelManager::Open { ref mut state }
-            | ChannelManager::Joined { ref mut state }
+            ChannelManager::Open { ref mut state } => {
+                assert_eq!(state.my_state().is_a, false);
+                assert_eq!(state.their_state().is_a, false);
+                Ok(state.rec_payment(payment)?)
+            }
+            ChannelManager::Joined { ref mut state }
             | ChannelManager::PendingJoin { ref mut state, .. } => Ok(state.rec_payment(payment)?),
             // TODO: Handle close and dispute
-            _ => bail!("we can only recieve payments in open or joined"),
+            _ => bail!("we can only receive payments in open or joined"),
         }
     }
 
-    pub fn rec_updated_state(&mut self, rec_update: &UpdateTx) -> Result<(), Error> {
+    pub fn received_updated_state(&mut self, rec_update: &UpdateTx) -> Result<(), Error> {
         match self {
-            ChannelManager::Open { ref mut state }
-            | ChannelManager::Joined { ref mut state }
+            ChannelManager::Open { ref mut state } => {
+                assert_eq!(state.my_state().is_a, false);
+                assert_eq!(state.their_state().is_a, false);
+                Ok(state.received_updated_state(rec_update)?)
+            }
+            ChannelManager::Joined { ref mut state }
             | ChannelManager::PendingJoin { ref mut state, .. } => {
-                Ok(state.rec_updated_state(rec_update)?)
+                Ok(state.received_updated_state(rec_update)?)
             }
             // TODO: Handle close and dispute
-            _ => bail!("we can only recieve updated state in open or joined"),
+            _ => bail!("we can only receive updated state in open or joined"),
         }
     }
 }
@@ -327,7 +463,6 @@ impl ChannelManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
     /*
     #[test]
     fn serialize() {
@@ -379,7 +514,7 @@ mod tests {
 
         assert_eq!(
             manager_b,
-            ChannelManager::PendingCreation {
+            ChannelManager::PendingOtherCreation {
                 state: channel_b.clone(),
                 pending_send: 0.into(),
             }
@@ -410,14 +545,14 @@ mod tests {
         };
 
         assert!(manager_b.check_proposal(&channel_prop_a).unwrap());
-        assert!(manager_a.check_proposal(&channel_prop_b).is_err());
+        assert!(!manager_a.check_proposal(&channel_prop_b).unwrap());
         manager_a.proposal_result(true).unwrap();
         manager_b.proposal_result(false).unwrap();
 
         assert_eq!(
             manager_a,
             ChannelManager::PendingCreation {
-                state: channel_prop_a.clone(),
+                state: channel_prop_a.swap(),
                 pending_send: 0.into(),
             }
         );
@@ -432,14 +567,14 @@ mod tests {
         assert_eq!(
             manager_a,
             ChannelManager::Joined {
-                state: CombinedState::new(&channel_prop_a)
+                state: CombinedState::new(&channel_prop_a.swap())
             }
         );
 
         assert_eq!(
             manager_b,
             ChannelManager::Open {
-                state: CombinedState::new(&channel_prop_a.swap())
+                state: CombinedState::new(&channel_prop_a)
             }
         )
     }

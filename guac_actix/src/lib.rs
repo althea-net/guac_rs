@@ -1,6 +1,8 @@
 extern crate actix;
 extern crate actix_web;
 extern crate althea_types;
+extern crate bytes;
+#[macro_use]
 extern crate failure;
 extern crate futures;
 extern crate guac_core;
@@ -11,8 +13,8 @@ extern crate serde_derive;
 extern crate num256;
 extern crate qutex;
 extern crate serde;
-
-use std::fmt::Debug;
+extern crate serde_json;
+extern crate tokio;
 
 use num256::Uint256;
 
@@ -23,33 +25,40 @@ use althea_types::PaymentTx;
 use failure::Error;
 use futures::Future;
 
-use guac_core::channel_client::types::UpdateTx;
 use guac_core::channel_client::ChannelManager;
-use guac_core::counterparty::Counterparty;
+pub use guac_core::counterparty::Counterparty;
 use guac_core::STORAGE;
 
-use guac_core::crypto::CryptoService;
-use guac_core::CRYPTO;
-
-use serde::{Deserialize, Serialize};
+pub use guac_core::crypto::CryptoService;
+pub use guac_core::CRYPTO;
 
 mod network_endpoints;
 mod network_requests;
+
+pub use network_endpoints::init_server;
 
 use network_requests::tick;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetworkRequest<T> {
     pub from_addr: EthAddress,
-    pub from_counterparty: Counterparty,
     pub data: T,
+}
+
+impl<T> NetworkRequest<T> {
+    pub fn wrap(data: T) -> NetworkRequest<T> {
+        NetworkRequest {
+            from_addr: CRYPTO.own_eth_addr(),
+            data,
+        }
+    }
 }
 
 pub struct PaymentController {}
 
 impl Default for PaymentController {
     fn default() -> PaymentController {
-        unimplemented!()
+        PaymentController {}
     }
 }
 
@@ -63,18 +72,7 @@ impl SystemService for PaymentController {
     }
 }
 
-#[derive(Message)]
-pub struct PaymentReceived(pub UpdateTx);
-
-impl Handler<PaymentReceived> for PaymentController {
-    type Result = ();
-
-    fn handle(&mut self, msg: PaymentReceived, _: &mut Context<Self>) -> Self::Result {
-        ()
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MakePayment(pub PaymentTx);
 
 impl Message for MakePayment {
@@ -84,7 +82,9 @@ impl Message for MakePayment {
 impl Handler<MakePayment> for PaymentController {
     type Result = ResponseFuture<(), Error>;
 
-    fn handle(&mut self, msg: MakePayment, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: MakePayment, _ctx: &mut Context<Self>) -> Self::Result {
+        trace!("sending payment {:?}", msg);
+        *CRYPTO.get_balance_mut() -= msg.0.amount;
         Box::new(
             STORAGE
                 .get_channel(msg.0.to.eth_address)
@@ -106,7 +106,7 @@ impl Message for Tick {
 impl Handler<Tick> for PaymentController {
     type Result = ResponseFuture<(), Error>;
 
-    fn handle(&mut self, _msg: Tick, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, _msg: Tick, _ctx: &mut Context<Self>) -> Self::Result {
         // TODO: Send to bounty hunter
         Box::new(STORAGE.get_all_counterparties().and_then(|keys| {
             for i in keys {
@@ -128,7 +128,7 @@ impl Handler<Tick> for PaymentController {
 }
 
 #[derive(Clone)]
-pub struct Register(Counterparty);
+pub struct Register(pub Counterparty);
 
 impl Message for Register {
     type Result = Result<(), Error>;
@@ -137,21 +137,12 @@ impl Message for Register {
 impl Handler<Register> for PaymentController {
     type Result = ResponseFuture<(), Error>;
 
-    fn handle(&mut self, msg: Register, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Register, _ctx: &mut Context<Self>) -> Self::Result {
         Box::new(STORAGE.init_data(msg.0, ChannelManager::New))
     }
 }
 
-#[derive(Message)]
-pub struct PaymentControllerUpdate;
-
-impl Handler<PaymentControllerUpdate> for PaymentController {
-    type Result = ();
-
-    fn handle(&mut self, msg: PaymentControllerUpdate, ctx: &mut Context<Self>) -> Self::Result {}
-}
-
-pub struct Withdraw;
+pub struct Withdraw(pub EthAddress);
 
 impl Message for Withdraw {
     type Result = Result<Uint256, Error>;
@@ -159,17 +150,26 @@ impl Message for Withdraw {
 
 impl Handler<Withdraw> for PaymentController {
     type Result = ResponseFuture<Uint256, Error>;
-    fn handle(&mut self, _msg: Withdraw, _: &mut Context<Self>) -> Self::Result {
-        Box::new(STORAGE.get_all_channel_managers_mut().and_then(|mut keys| {
-            let mut out = 0.into();
+    fn handle(&mut self, msg: Withdraw, _: &mut Context<Self>) -> Self::Result {
+        Box::new(STORAGE.get_channel(msg.0).and_then(move |mut i| {
+            let withdraw = i.withdraw()?;
+            trace!("withdrew {:?} from {:?}", withdraw, msg.0);
+            *CRYPTO.get_balance_mut() += withdraw;
 
-            for mut i in keys {
-                let single_withdraw = i.withdraw()?;
-                out += single_withdraw;
-                *CRYPTO.get_balance_mut() += single_withdraw;
-            }
-
-            Ok(out)
+            Ok(withdraw)
         }))
+    }
+}
+
+pub struct GetOwnBalance;
+
+impl Message for GetOwnBalance {
+    type Result = Result<Uint256, Error>;
+}
+
+impl Handler<GetOwnBalance> for PaymentController {
+    type Result = Result<Uint256, Error>;
+    fn handle(&mut self, _msg: GetOwnBalance, _: &mut Context<Self>) -> Self::Result {
+        Ok(CRYPTO.get_balance().clone())
     }
 }
