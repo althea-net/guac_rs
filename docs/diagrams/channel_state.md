@@ -1,3 +1,5 @@
+![](channel_state.png "exit channel state diagram")
+# Graphviz code to generate diagram
 ```
 digraph channel_state {
     rankdir=TB
@@ -8,6 +10,7 @@ digraph channel_state {
     node [shape = circle, label="Joined", fontsize=12] joined;
     node [shape = circle, label="Pending join", fontsize=12] pendj;
     node [shape = circle, label="Open", fontsize=12] open;
+    node [shape = circle, label="Open", fontsize=12] pendingoc;
 
     node [shape = circle, label="Closed", fontsize=12] closed;
     node [shape = circle, label="Challenging counterparty", fontsize=12] initchall;
@@ -17,7 +20,8 @@ digraph channel_state {
 
     new  -> prop [label="when we recieve a payment ot want to create a payment"];
     prop -> pendc [label="If we are the proposing node"];
-    prop -> open [label="If they are the proposing node"];
+    prop -> pendingoc [label="If they are the proposing node"];
+    pendingoc -> open [label="When they tell us the new channel TX goes through"];
     pendc -> joined [label="When new channel TX goes through"];
     open -> pendj [label="When we run out of money in channel (and have not joined yet)"];
     pendj -> joined [label="When new joining TX goes through"];
