@@ -6,6 +6,7 @@ use num256::Uint256;
 use owning_ref::RwLockWriteGuardRefMut;
 use std::sync::{Arc, RwLock};
 
+/// A global object which stores per node crypto state
 lazy_static! {
     pub static ref CRYPTO: Arc<RwLock<Crypto>> = Arc::new(RwLock::new(Crypto::new()));
 }

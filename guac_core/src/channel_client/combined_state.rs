@@ -4,11 +4,23 @@ use ethereum_types::U256;
 
 use channel_client::types::{Channel, UpdateTx};
 
+/// A struct which represents the core payment logic/state of a payment channel. It contains both
+/// our current state as well as the last confirmed state of our counterparty, which is used to
+/// ensure multiple in flight payments will resolve successfully and requests can be lost in either
+/// direction without losing money or losing track of how much they paid us/we are going to pay them
+///
+/// NOTE: In both states the is_a bool is constant, instead of being flipped on `their_state`
+/// This is because the numerous `.my_...` and `.their_...` methods on the `Channel` structs rely on
+/// that to work, and the code would be a lot more confusing if it was flipped
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CombinedState {
+    /// This represents our current state
     their_state: Channel,
+    /// This represents the last confirmed state we have from them
     my_state: Channel,
 
+    /// This represents the amount of money we have confirmed we will recieve from them, but have
+    /// not been `withdraw`n yet
     pending_receive: U256,
 }
 
@@ -37,8 +49,10 @@ impl CombinedState {
         &mut self.their_state
     }
 
-    /// Function to pay counterparty, doesn't actually send anything, returning the "overflow" if we
-    /// don't have enough monty in the channel
+    /// Function to pay counterparty by updating our state. This doesn't actually create any state
+    /// updates, mearly ensures that the next state update we create will give the counterparty the
+    /// amount sent. This function returns the "overflow" (amount - current balance in channel) if
+    /// we don't have enough monty in the channel
     pub fn pay_counterparty(&mut self, amount: U256) -> Result<U256, Error> {
         if amount > *self.my_state.my_balance_mut() {
             let remaining_amount = amount - *self.my_state.my_balance();
@@ -60,7 +74,9 @@ impl CombinedState {
         Ok(withdraw)
     }
 
-    /// This sums up the pending amount and returns a channel update
+    /// This function creates a state update from our current state, which takes into account
+    /// all the `pay_counterparty`'s which have happened between the last invocation of this
+    /// function
     pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
         let mut state = self.my_state.clone();
 
@@ -69,16 +85,19 @@ impl CombinedState {
         Ok(state.create_update())
     }
 
-    /// This is called by send_payment
+    /// This is what processes the `UpdateTx` created by the `create_payment` on the counterparty.
     pub fn rec_payment(&mut self, update: &UpdateTx) -> Result<UpdateTx, Error> {
         trace!("applying update {:?} on top of {:?}", update, self);
 
         ensure!(
             self.my_state.my_balance() <= self.their_state.my_balance(),
-            "cannot take money"
+            "Our state needs to be worse for us than their state"
         );
+
         let pending_pay = self.their_state.my_balance() - self.my_state.my_balance();
 
+        // by applying their state update on top of their state, we can know how much they are going
+        // to pay us, if we didn't do any transactions
         let our_prev_bal = self.their_state.my_balance().clone();
         self.their_state.apply_update(&update, false)?;
 
@@ -91,17 +110,19 @@ impl CombinedState {
 
         self.pending_receive += transfer;
 
+        // This essentially "rolls back" any payments we have done
         self.my_state = self.their_state.clone();
 
         assert!(&pending_pay <= self.their_state.my_balance());
 
+        // so here we put it back
         *self.my_state.my_balance_mut() -= pending_pay;
         *self.my_state.their_balance_mut() += pending_pay;
 
         Ok(self.create_payment()?)
     }
 
-    /// This is called on the response to rec_payment
+    /// This is what processes the `UpdateTx` created by the `rec_payment` on the counterparty.
     pub fn received_updated_state(&mut self, rec_update: &UpdateTx) -> Result<(), Error> {
         ensure!(
             self.my_state.my_balance() <= self.their_state.my_balance(),
@@ -118,8 +139,8 @@ impl CombinedState {
         assert!(self.my_state.my_balance() <= self.their_state.my_balance());
 
         if our_prev_bal >= *our_new_bal {
-            let payment = our_prev_bal - our_new_bal;
             // net effect was we payed them
+            let payment = our_prev_bal - our_new_bal;
             if payment > pending_pay {
                 bail!("we paid them too much somehow");
             }

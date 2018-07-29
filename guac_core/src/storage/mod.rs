@@ -20,13 +20,23 @@ lazy_static! {
     };
 }
 
+/// Storage contains a futures aware RwLock (QrwLock) which controls access to the inner data
+/// This outer Rwlock should only be mutated very rarely, only to insert and remove counterparties
 pub struct Storage {
     inner: QrwLock<Data>,
 }
 
 #[derive(Default)]
 struct Data {
+    /// This stores a mapping from eth address to channel managers which manage the eth address
+    /// The ChannelManagers are wrapped in a futures aware Mutex (a Qutex) to achieve inner
+    /// mutability (the outer Data struct and this the outer RwLock does not have to be locked for
+    /// writing to mutate a single ChannelManager)
     addr_to_channel: HashMap<EthAddress, Qutex<ChannelManager>>,
+    /// This stores a mapping from eth address to counterparty, with no fancy interior mutability
+    /// for the counterparty, as the the frequency of mutations to the counterparty will be
+    /// very low (comparable to the addition and deletions of channels, in which case the outer
+    /// RwLock needs to be locked for writing anyways)
     addr_to_counterparty: HashMap<EthAddress, Counterparty>,
 }
 

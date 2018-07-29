@@ -39,6 +39,8 @@ pub use network_endpoints::init_server;
 
 use network_requests::tick;
 
+/// A data type which wraps all network requests that guac makes, to check who the request is from
+/// easily without request specific pattern matching
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetworkRequest<T> {
     pub from_addr: EthAddress,
@@ -142,6 +144,9 @@ impl Handler<Register> for PaymentController {
     }
 }
 
+/// This message needs to be sent periodically for every single address the application is
+/// interested in, and it returns the amount of money we can consider to have "received"
+/// from a counterparty
 pub struct Withdraw(pub EthAddress);
 
 impl Message for Withdraw {

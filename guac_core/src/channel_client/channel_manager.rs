@@ -60,6 +60,7 @@ fn is_channel_acceptable(_state: &Channel) -> Result<bool, Error> {
 }
 
 impl ChannelManager {
+    // does some sanity checks on our current state to ensure nothing dodgy happened/will happen
     fn sanity_check(&self, my_address: EthAddress) {
         trace!(
             "checking sanity of {:?}, my address: {:?}",
@@ -139,6 +140,7 @@ impl ChannelManager {
                 *state.their_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
                 *state.their_state_mut().my_balance_mut() += 100_000_000_000_000u64.into();
 
+                // now we have balance in our channel, we can pay what we owe them
                 state.pay_counterparty(pending_send)?;
 
                 *self = ChannelManager::Joined {
@@ -255,7 +257,6 @@ impl ChannelManager {
         *self = match self {
             ChannelManager::Proposed { accepted, state } => {
                 if decision {
-                    assert_eq!(state.is_a, true);
                     ChannelManager::PendingCreation {
                         state: state.clone(),
                         pending_send: 0.into(),
@@ -366,7 +367,6 @@ impl ChannelManager {
     }
 
     pub fn pay_counterparty(&mut self, amount: U256) -> Result<(), Error> {
-        trace!("paying counterparty in channelmanager");
         *self = match self {
             ChannelManager::Open { ref mut state } => {
                 assert_eq!(state.my_state().is_a, false);
@@ -397,8 +397,22 @@ impl ChannelManager {
                     }
                 }
             }
+            // we can still actually pay when we are joining the channel
+            ChannelManager::PendingJoin {
+                ref mut state,
+                mut pending_send,
+            } => {
+                let overflow = state.pay_counterparty(amount)?;
+                if overflow > 0.into() {
+                    pending_send += overflow;
+                }
+                ChannelManager::PendingJoin {
+                    state: state.clone(),
+                    pending_send,
+                }
+            }
             // TODO: Handle close and dispute
-            _ => bail!("can only pay in open state"),
+            _ => bail!("Invalid state for payment"),
         };
 
         Ok(())
@@ -416,12 +430,8 @@ impl ChannelManager {
 
     pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
         match self {
-            ChannelManager::Open { ref mut state } => {
-                assert_eq!(state.my_state().is_a, false);
-                assert_eq!(state.their_state().is_a, false);
-                Ok(state.create_payment()?)
-            }
-            ChannelManager::Joined { ref mut state }
+            ChannelManager::Open { ref mut state }
+            | ChannelManager::Joined { ref mut state }
             | ChannelManager::PendingJoin { ref mut state, .. } => Ok(state.create_payment()?),
             // TODO: Handle close and dispute
             _ => bail!("we can only create payments in open or joined"),
@@ -431,12 +441,8 @@ impl ChannelManager {
     pub fn received_payment(&mut self, payment: &UpdateTx) -> Result<UpdateTx, Error> {
         trace!("received payment {:?} state {:?}", payment, self);
         match self {
-            ChannelManager::Open { ref mut state } => {
-                assert_eq!(state.my_state().is_a, false);
-                assert_eq!(state.their_state().is_a, false);
-                Ok(state.rec_payment(payment)?)
-            }
-            ChannelManager::Joined { ref mut state }
+            ChannelManager::Open { ref mut state }
+            | ChannelManager::Joined { ref mut state }
             | ChannelManager::PendingJoin { ref mut state, .. } => Ok(state.rec_payment(payment)?),
             // TODO: Handle close and dispute
             _ => bail!("we can only receive payments in open or joined"),
@@ -445,12 +451,8 @@ impl ChannelManager {
 
     pub fn received_updated_state(&mut self, rec_update: &UpdateTx) -> Result<(), Error> {
         match self {
-            ChannelManager::Open { ref mut state } => {
-                assert_eq!(state.my_state().is_a, false);
-                assert_eq!(state.their_state().is_a, false);
-                Ok(state.received_updated_state(rec_update)?)
-            }
-            ChannelManager::Joined { ref mut state }
+            ChannelManager::Open { ref mut state }
+            | ChannelManager::Joined { ref mut state }
             | ChannelManager::PendingJoin { ref mut state, .. } => {
                 Ok(state.received_updated_state(rec_update)?)
             }

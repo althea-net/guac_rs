@@ -20,10 +20,19 @@ use tokio::net::TcpStream as TokioTcpStream;
 use guac_core::channel_client::{ChannelManager, ChannelManagerAction};
 use guac_core::counterparty::Counterparty;
 
+/// This function needs to be called periodically for every counterparty to to do things which
+/// happen on a cycle.
 pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error> {
     STORAGE
         .get_channel(counterparty.address)
         .and_then(move |mut channel_manager| {
+            // The channel_manager here is a mutex guard of a ChannelManager, which ensures that
+            // the data within is not tampered with in the rest of the program while these requests
+            // are outstanding
+
+            // we copy the channel_manager and do all the mutations on the clone because we only
+            // "commit" the changes when the tick is successful (could include network requests,
+            // etc.
             let mut temp_channel_manager = channel_manager.clone();
             trace!(
                 "counterparty {:?} is in state {:?}",
@@ -40,10 +49,16 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                 action
             );
 
+            // All the methods which are called per action take a channel manager, which may or may
+            // not be mutated during the lifecycle of the request
             match action {
                 ChannelManagerAction::SendChannelProposal(channel) => Box::new(
                     send_proposal_request(channel, counterparty.url, temp_channel_manager)
+                        // we move the mutex guarded channel manager through to the closure, which
+                        // ensures nothing else tampers with it
                         .and_then(move |cm| {
+                            // only when the request is successful, we `commit` it to `channel_manager`
+                            // (which makes the state change permanent)
                             *channel_manager = cm;
                             Ok(())
                         }),
