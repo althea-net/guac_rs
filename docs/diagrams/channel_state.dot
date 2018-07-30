@@ -1,6 +1,4 @@
-![](channel_state.png "exit channel state diagram")
-# Graphviz code to generate diagram
-```
+// command to render: dot channel_state.dot -Tsvg -o channel_state.svg
 digraph channel_state {
     rankdir=TB
 
@@ -10,7 +8,7 @@ digraph channel_state {
     node [shape = circle, label="Joined", fontsize=12] joined;
     node [shape = circle, label="Pending join", fontsize=12] pendj;
     node [shape = circle, label="Open", fontsize=12] open;
-    node [shape = circle, label="Open", fontsize=12] pendingoc;
+    node [shape = circle, label="Pending Other Creation", fontsize=12] pendingoc;
 
     node [shape = circle, label="Closed", fontsize=12] closed;
     node [shape = circle, label="Challenging counterparty", fontsize=12] initchall;
@@ -37,4 +35,3 @@ digraph channel_state {
     closetx -> closed [label="when TX done"];
     updatetx -> closed [label="when TX done"];
 }
-```

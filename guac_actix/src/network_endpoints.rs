@@ -20,39 +20,35 @@ use std::net::SocketAddr;
 pub fn init_server(port: u16) {
     server::new(|| {
         App::new()
-            .resource("/update", |r| r.method(Method::POST).with(update_endpoint))
-            .resource("/propose", |r| {
-                r.method(Method::POST).with(propose_channel_endpoint)
-            })
-            .resource("/channel_created", |r| {
-                r.method(Method::POST).with(channel_created_endpoint)
-            })
-            .resource("/channel_joined", |r| {
-                r.method(Method::POST).with(channel_joined_endpoint)
+            .resource("/update", |r| {
+                r.method(Method::POST).with_async(update_endpoint)
+            }).resource("/propose", |r| {
+                r.method(Method::POST).with_async(propose_channel_endpoint)
+            }).resource("/channel_created", |r| {
+                r.method(Method::POST).with_async(channel_created_endpoint)
+            }).resource("/channel_joined", |r| {
+                r.method(Method::POST).with_async(channel_joined_endpoint)
             })
     }).bind(&format!("[::0]:{}", port))
-        .unwrap()
-        .start();
+    .unwrap()
+    .start();
 }
 
 pub fn update_endpoint(
     update: Json<NetworkRequest<UpdateTx>>,
-) -> Box<Future<Item = Json<UpdateTx>, Error = Error>> {
+) -> impl Future<Item = Json<UpdateTx>, Error = Error> {
     trace!("got state update {:?}", update);
-    Box::new(
-        STORAGE
-            .get_channel(update.from_addr.clone())
-            .and_then(move |mut channel_manager| {
-                channel_manager.received_payment(&update.data)?;
-                Ok(Json(channel_manager.create_payment()?))
-            })
-            .responder(),
-    )
+    STORAGE
+        .get_channel(update.from_addr.clone())
+        .and_then(move |mut channel_manager| {
+            channel_manager.received_payment(&update.data)?;
+            Ok(Json(channel_manager.create_payment()?))
+        }).responder()
 }
 
 pub fn propose_channel_endpoint(
     (req, channel): (HttpRequest, Json<NetworkRequest<Channel>>),
-) -> Box<Future<Item = Json<bool>, Error = Error>> {
+) -> impl Future<Item = Json<bool>, Error = Error> {
     trace!(
         "got channel proposal {:?}, {:?}",
         channel,
@@ -67,46 +63,37 @@ pub fn propose_channel_endpoint(
         url: to_url,
     };
     trace!("inserting state {:?}", counterparty);
-    Box::new(
-        STORAGE
-            .init_data(counterparty, ChannelManager::New)
-            .then(|_| {
-                STORAGE
-                    .get_channel(channel.from_addr.clone())
-                    .and_then(move |mut channel_manager| {
-                        Ok(Json(channel_manager.check_proposal(&channel.data)?))
-                    })
-                    .responder()
-            }),
-    )
+    STORAGE
+        .init_data(counterparty, ChannelManager::New)
+        .then(|_| {
+            STORAGE
+                .get_channel(channel.from_addr.clone())
+                .and_then(move |mut channel_manager| {
+                    Ok(Json(channel_manager.check_proposal(&channel.data)?))
+                }).responder()
+        })
 }
 
 pub fn channel_created_endpoint(
     channel: Json<NetworkRequest<Channel>>,
-) -> Box<Future<Item = Json<bool>, Error = Error>> {
+) -> impl Future<Item = Json<bool>, Error = Error> {
     trace!("got channel created update {:?}", channel);
-    Box::new(
-        STORAGE
-            .get_channel(channel.from_addr.clone())
-            .and_then(move |mut channel_manager| {
-                channel_manager.channel_created(&channel.data, CRYPTO.own_eth_addr())?;
-                Ok(Json(true))
-            })
-            .responder(),
-    )
+    STORAGE
+        .get_channel(channel.from_addr.clone())
+        .and_then(move |mut channel_manager| {
+            channel_manager.channel_created(&channel.data, CRYPTO.own_eth_addr())?;
+            Ok(Json(true))
+        }).responder()
 }
 
 pub fn channel_joined_endpoint(
     channel: Json<NetworkRequest<Channel>>,
-) -> Box<Future<Item = Json<bool>, Error = Error>> {
+) -> impl Future<Item = Json<bool>, Error = Error> {
     trace!("got channel joined update {:?}", channel);
-    Box::new(
-        STORAGE
-            .get_channel(channel.from_addr.clone())
-            .and_then(move |mut channel_manager| {
-                channel_manager.channel_joined(&channel.data)?;
-                Ok(Json(true))
-            })
-            .responder(),
-    )
+    STORAGE
+        .get_channel(channel.from_addr.clone())
+        .and_then(move |mut channel_manager| {
+            channel_manager.channel_joined(&channel.data)?;
+            Ok(Json(true))
+        }).responder()
 }

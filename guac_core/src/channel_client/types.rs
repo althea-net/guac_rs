@@ -204,7 +204,7 @@ impl UpdateTx {
             false => self.signature_b = Some(*signature),
         }
     }
-    pub fn val_their_signature(&self, _is_a: bool) -> bool {
+    pub fn validate_their_signature(&self, _is_a: bool) -> bool {
         // TODO: actually do validation
         true
     }

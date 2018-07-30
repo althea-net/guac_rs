@@ -1,4 +1,4 @@
-# This file documents the requests which guac makes to contacts another guac node
+# This file documents the requests which guac makes to contact another guac node
 
 ## Propose Channel
 Tells a neighbor if you would like to accept a channel from them
@@ -17,7 +17,7 @@ Tells your counterparty about your new state
 Endpoint: /update
 
 Request data type: `UpdateTx`
-Return data type: `UpdateTx` (containing rebased transaction data from their local state)
+Return data type: `UpdateTx` (containing the newest transaction data from their local state)
 
 ## Channel Created
 Tells your neighbor who has previously accepted your proposal that the your channel creation transaction

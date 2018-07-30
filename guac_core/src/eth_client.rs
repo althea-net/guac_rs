@@ -43,8 +43,7 @@ fn create_update_tx(update: UpdateTx) -> SignedTransaction {
             Token::String(update.signature_a.unwrap().to_string()),
             // SigB
             Token::String(update.signature_b.unwrap().to_string()),
-        ])
-        .unwrap();
+        ]).unwrap();
 
     Transaction {
         action: Action::Call(Address::default()),
@@ -56,7 +55,7 @@ fn create_update_tx(update: UpdateTx) -> SignedTransaction {
         gas: U256::from(50_000),
         value: U256::from(0),
         data,
-    }.sign(&CRYPTO.own_secret(), None)
+    }.sign(&CRYPTO.secret(), None)
 }
 
 fn create_new_channel_tx(update: NewChannelTx) -> SignedTransaction {
@@ -72,8 +71,7 @@ fn create_new_channel_tx(update: NewChannelTx) -> SignedTransaction {
             Token::Uint(U256::from(0)),
             // SigA
             Token::Uint(update.challenge),
-        ])
-        .unwrap();
+        ]).unwrap();
 
     Transaction {
         action: Action::Call(Address::default()),
@@ -85,7 +83,7 @@ fn create_new_channel_tx(update: NewChannelTx) -> SignedTransaction {
         gas: U256::from(50_000),
         value: update.deposit.into(),
         data,
-    }.sign(&CRYPTO.own_secret(), None)
+    }.sign(&CRYPTO.secret(), None)
 }
 
 #[test]
@@ -104,7 +102,7 @@ fn test_create_update_tx() {
         signature_a: Some(1.into()),
         signature_b: Some(2.into()),
     });
-    println!("tx: {:?}", tx);
+    trace!("tx: {:?}", tx);
 }
 
 #[test]
@@ -114,5 +112,5 @@ fn test_new_channel_tx() {
         challenge: 23.into(),
         deposit: 100.into(),
     });
-    println!("tx: {:?}", tx);
+    trace!("tx: {:?}", tx);
 }

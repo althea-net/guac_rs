@@ -1,6 +1,4 @@
-![](happy_path_flow.png "flow diagram of happy path")
-
-```msc
+// command to render: mscgen -Tsvg -o happy_path_flow.svg happy_path_flow.msc
 msc {
   hscale = "2";
 
@@ -62,4 +60,3 @@ msc {
     ---  [ label = "repeat to heart's content" ];
 
 }
-```

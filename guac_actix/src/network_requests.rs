@@ -32,7 +32,7 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
 
             // we copy the channel_manager and do all the mutations on the clone because we only
             // "commit" the changes when the tick is successful (could include network requests,
-            // etc.
+            // etc.)
             let mut temp_channel_manager = channel_manager.clone();
             trace!(
                 "counterparty {:?} is in state {:?}",

@@ -13,12 +13,14 @@ lazy_static! {
 
 pub struct Crypto {
     pub key_pair: KeyPair,
+
+    /// This is a local balance which is just a hack for testing things
     pub balance: Uint256,
 }
 
 pub trait CryptoService {
     fn own_eth_addr(&self) -> EthAddress;
-    fn own_secret(&self) -> Secret;
+    fn secret(&self) -> Secret;
     fn get_balance_mut<'ret, 'me: 'ret>(&'me self)
         -> RwLockWriteGuardRefMut<'ret, Crypto, Uint256>;
     fn get_balance(&self) -> Uint256;
@@ -40,7 +42,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
     fn own_eth_addr(&self) -> EthAddress {
         self.read().unwrap().key_pair.address()
     }
-    fn own_secret(&self) -> Secret {
+    fn secret(&self) -> Secret {
         self.read().unwrap().key_pair.secret().clone()
     }
     fn get_balance_mut<'ret, 'me: 'ret>(
