@@ -146,7 +146,7 @@ impl Channel {
             bail!("update not for the right channel")
         }
 
-        if !update.val_their_signature(self.is_a) {
+        if !update.validate_their_signature(self.is_a) {
             bail!("sig is bad")
         }
 
