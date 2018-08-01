@@ -4,7 +4,7 @@ before_install:
   - sudo add-apt-repository universe
   - sudo apt-get -qq update
 env:
-  - TEST_COMMAND="rustup component add rustfmt-preview --toolchain nightly && cargo fmt --all -- --check"
+  - TEST_COMMAND="cargo install rustfmt-nightly --force && cargo fmt --all -- --check"
   - TEST_COMMAND="cargo build --verbose --all"
   - TEST_COMMAND="cargo test --verbose --all" RUST_TEST_THREADS=1
 rust:
@@ -19,7 +19,3 @@ matrix:
     env: TEST_COMMAND="cargo install rustfmt-nightly --force && cargo fmt --all -- --check"
   - rust: beta
     env: TEST_COMMAND="cargo install rustfmt-nightly --force && cargo fmt --all -- --check"
-  - rust: stable
-    env: TEST_COMMAND="rustup component add rustfmt-preview --toolchain nightly && cargo fmt --all -- --check"
-  - rust: beta
-    env: TEST_COMMAND="rustup component add rustfmt-preview --toolchain nightly && cargo fmt --all -- --check"
