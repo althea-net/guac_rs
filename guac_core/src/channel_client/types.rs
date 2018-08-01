@@ -1,9 +1,12 @@
-use althea_types::{Bytes32, EthAddress, EthSignature};
+use althea_types::{Bytes32, EthAddress, EthPrivateKey, EthSignature};
 use failure::Error;
+
+use futures::Future;
 
 use ethereum_types::U256;
 
-use crypto::CryptoService;
+use counterparty::Counterparty;
+
 use CRYPTO;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -104,30 +107,6 @@ impl Channel {
             false => &mut self.balance_a,
         }
     }
-    pub fn my_deposit(&self) -> &U256 {
-        match self.is_a {
-            true => &self.deposit_a,
-            false => &self.deposit_b,
-        }
-    }
-    pub fn their_deposit(&self) -> &U256 {
-        match self.is_a {
-            true => &self.deposit_b,
-            false => &self.deposit_a,
-        }
-    }
-    pub fn my_deposit_mut(&mut self) -> &mut U256 {
-        match self.is_a {
-            true => &mut self.deposit_a,
-            false => &mut self.deposit_b,
-        }
-    }
-    pub fn their_deposit_mut(&mut self) -> &mut U256 {
-        match self.is_a {
-            true => &mut self.deposit_b,
-            false => &mut self.deposit_a,
-        }
-    }
     pub fn create_update(&self) -> UpdateTx {
         let mut update_tx = UpdateTx {
             channel_id: self.channel_id.clone(),
@@ -146,7 +125,7 @@ impl Channel {
             bail!("update not for the right channel")
         }
 
-        if !update.validate_their_signature(self.is_a) {
+        if !update.val_their_signature(self.is_a) {
             bail!("sig is bad")
         }
 
@@ -204,7 +183,7 @@ impl UpdateTx {
             false => self.signature_b = Some(*signature),
         }
     }
-    pub fn validate_their_signature(&self, _is_a: bool) -> bool {
+    pub fn val_their_signature(&self, is_a: bool) -> bool {
         // TODO: actually do validation
         true
     }

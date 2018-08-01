@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate diesel;
 extern crate env_logger;
 extern crate futures;
 extern crate serde;
@@ -16,13 +18,13 @@ extern crate uuid;
 extern crate lazy_static;
 extern crate ethabi;
 extern crate ethcore_transaction;
+#[macro_use]
+extern crate ethabi_derive;
 extern crate ethkey;
 extern crate hex;
 extern crate multihash;
-extern crate owning_ref;
 extern crate qutex;
-#[macro_use]
-extern crate log;
+extern crate rlp;
 
 pub mod channel_client;
 pub mod counterparty;
