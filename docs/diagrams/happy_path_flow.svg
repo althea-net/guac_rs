@@ -1,0 +1,327 @@
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+ "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1"
+ width="1200px" height="801px"
+ viewBox="0 0 1200 801"
+ xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"
+ stroke-width="1" text-rendering="geometricPrecision">
+<polygon fill="white" points="179,7 219,7 219,16 179,16"/>
+<text x="200" y="16" textLength="39" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+guac_a
+</text>
+<polygon fill="white" points="579,7 619,7 619,16 579,16"/>
+<text x="600" y="16" textLength="39" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+guac_b
+</text>
+<polygon fill="white" points="970,7 1028,7 1028,16 970,16"/>
+<text x="1000" y="16" textLength="57" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+blockchain
+</text>
+<line x1="200" y1="22" x2="200" y2="39" stroke="black"/>
+<line x1="600" y1="22" x2="600" y2="39" stroke="black"/>
+<line x1="1000" y1="22" x2="1000" y2="39" stroke="black"/>
+<line x1="100" y1="27" x2="1100" y2="27" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="white" points="447,23 752,23 752,32 447,32"/>
+<text x="448" y="32" textLength="303" font-family="Helvetica" font-size="12" fill="black">
+Assuming both parties have each other as counterparties
+</text>
+<line x1="200" y1="39" x2="200" y2="61" stroke="black"/>
+<line x1="600" y1="39" x2="600" y2="61" stroke="black"/>
+<line x1="1000" y1="39" x2="1000" y2="61" stroke="black"/>
+<polygon fill="white" points="8,39 392,39 392,55 8,55"/>
+<line x1="8" y1="39" x2="392" y2="39" stroke="black"/>
+<line x1="8" y1="55" x2="392" y2="55" stroke="black"/>
+<line x1="8" y1="39" x2="8" y2="55" stroke="black"/>
+<line x1="392" y1="39" x2="392" y2="55" stroke="black"/>
+<polygon fill="white" points="172,43 227,43 227,52 172,52"/>
+<text x="173" y="52" textLength="53" font-family="Helvetica" font-size="12" fill="black">
+state New
+</text>
+<polygon fill="white" points="408,39 792,39 792,55 408,55"/>
+<line x1="408" y1="39" x2="792" y2="39" stroke="black"/>
+<line x1="408" y1="55" x2="792" y2="55" stroke="black"/>
+<line x1="408" y1="39" x2="408" y2="55" stroke="black"/>
+<line x1="792" y1="39" x2="792" y2="55" stroke="black"/>
+<polygon fill="white" points="572,43 627,43 627,52 572,52"/>
+<text x="573" y="52" textLength="53" font-family="Helvetica" font-size="12" fill="black">
+state New
+</text>
+<line x1="200" y1="61" x2="200" y2="89" stroke="black"/>
+<line x1="600" y1="61" x2="600" y2="89" stroke="black"/>
+<line x1="1000" y1="61" x2="1000" y2="89" stroke="black"/>
+<line x1="200" y1="72" x2="600" y2="72" stroke="black"/>
+<line x1="600" y1="72" x2="590" y2="78" stroke="black"/>
+<polygon fill="white" points="303,62 496,62 496,71 303,71"/>
+<text x="304" y="71" textLength="191" font-family="Helvetica" font-size="12" fill="black">
+POST ChannelProposal to /propose
+</text>
+<line x1="200" y1="89" x2="200" y2="117" stroke="black"/>
+<line x1="600" y1="89" x2="600" y2="117" stroke="black"/>
+<line x1="1000" y1="89" x2="1000" y2="117" stroke="black"/>
+<polygon fill="white" points="8,89 392,89 392,111 8,111"/>
+<line x1="8" y1="89" x2="392" y2="89" stroke="black"/>
+<line x1="8" y1="111" x2="392" y2="111" stroke="black"/>
+<line x1="8" y1="89" x2="8" y2="111" stroke="black"/>
+<line x1="392" y1="89" x2="392" y2="111" stroke="black"/>
+<polygon fill="white" points="106,96 292,96 292,105 106,105"/>
+<text x="107" y="105" textLength="184" font-family="Helvetica" font-size="12" fill="black">
+state Proposed and accepted True
+</text>
+<line x1="200" y1="117" x2="200" y2="145" stroke="black"/>
+<line x1="600" y1="117" x2="600" y2="145" stroke="black"/>
+<line x1="1000" y1="117" x2="1000" y2="145" stroke="black"/>
+<line x1="600" y1="128" x2="200" y2="128" stroke="black"/>
+<line x1="200" y1="128" x2="210" y2="134" stroke="black"/>
+<polygon fill="white" points="380,118 419,118 419,127 380,127"/>
+<text x="381" y="127" textLength="37" font-family="Helvetica" font-size="12" fill="black">
+Accept
+</text>
+<line x1="200" y1="145" x2="200" y2="173" stroke="black"/>
+<line x1="600" y1="145" x2="600" y2="173" stroke="black"/>
+<line x1="1000" y1="145" x2="1000" y2="173" stroke="black"/>
+<polygon fill="white" points="408,145 792,145 792,167 408,167"/>
+<line x1="408" y1="145" x2="792" y2="145" stroke="black"/>
+<line x1="408" y1="167" x2="792" y2="167" stroke="black"/>
+<line x1="408" y1="145" x2="408" y2="167" stroke="black"/>
+<line x1="792" y1="145" x2="792" y2="167" stroke="black"/>
+<polygon fill="white" points="524,152 675,152 675,161 524,161"/>
+<text x="525" y="161" textLength="149" font-family="Helvetica" font-size="12" fill="black">
+state PendingOtherCreation
+</text>
+<line x1="200" y1="173" x2="200" y2="201" stroke="black"/>
+<line x1="600" y1="173" x2="600" y2="201" stroke="black"/>
+<line x1="1000" y1="173" x2="1000" y2="201" stroke="black"/>
+<line x1="200" y1="184" x2="1000" y2="184" stroke="black"/>
+<line x1="1000" y1="184" x2="990" y2="190" stroke="black"/>
+<polygon fill="white" points="533,174 666,174 666,183 533,183"/>
+<text x="534" y="183" textLength="131" font-family="Helvetica" font-size="12" fill="black">
+NewChannelTransaction
+</text>
+<line x1="200" y1="201" x2="200" y2="229" stroke="black"/>
+<line x1="600" y1="201" x2="600" y2="229" stroke="black"/>
+<line x1="1000" y1="201" x2="1000" y2="229" stroke="black"/>
+<polygon fill="white" points="8,201 392,201 392,223 8,223"/>
+<line x1="8" y1="201" x2="392" y2="201" stroke="black"/>
+<line x1="8" y1="223" x2="392" y2="223" stroke="black"/>
+<line x1="8" y1="201" x2="8" y2="223" stroke="black"/>
+<line x1="392" y1="201" x2="392" y2="223" stroke="black"/>
+<polygon fill="white" points="139,208 260,208 260,217 139,217"/>
+<text x="140" y="217" textLength="119" font-family="Helvetica" font-size="12" fill="black">
+state PendingCreation
+</text>
+<line x1="200" y1="229" x2="200" y2="246" stroke="black"/>
+<line x1="600" y1="229" x2="600" y2="246" stroke="black"/>
+<line x1="1000" y1="229" x2="1000" y2="246" stroke="black"/>
+<line x1="100" y1="234" x2="1100" y2="234" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="white" points="545,230 653,230 653,239 545,239"/>
+<text x="546" y="239" textLength="106" font-family="Helvetica" font-size="12" fill="black">
+After some polling...
+</text>
+<line x1="200" y1="246" x2="200" y2="274" stroke="black"/>
+<line x1="600" y1="246" x2="600" y2="274" stroke="black"/>
+<line x1="1000" y1="246" x2="1000" y2="274" stroke="black"/>
+<line x1="1000" y1="257" x2="200" y2="257" stroke="black"/>
+<line x1="200" y1="257" x2="210" y2="263" stroke="black"/>
+<polygon fill="white" points="503,247 695,247 695,256 503,256"/>
+<text x="504" y="256" textLength="190" font-family="Helvetica" font-size="12" fill="black">
+NewChannelTransaction processed
+</text>
+<line x1="200" y1="274" x2="200" y2="302" stroke="black"/>
+<line x1="600" y1="274" x2="600" y2="302" stroke="black"/>
+<line x1="1000" y1="274" x2="1000" y2="302" stroke="black"/>
+<polygon fill="white" points="8,274 392,274 392,296 8,296"/>
+<line x1="8" y1="274" x2="392" y2="274" stroke="black"/>
+<line x1="8" y1="296" x2="392" y2="296" stroke="black"/>
+<line x1="8" y1="274" x2="8" y2="296" stroke="black"/>
+<line x1="392" y1="274" x2="392" y2="296" stroke="black"/>
+<polygon fill="white" points="166,281 233,281 233,290 166,290"/>
+<text x="167" y="290" textLength="65" font-family="Helvetica" font-size="12" fill="black">
+state Joined
+</text>
+<line x1="200" y1="302" x2="200" y2="330" stroke="black"/>
+<line x1="600" y1="302" x2="600" y2="330" stroke="black"/>
+<line x1="1000" y1="302" x2="1000" y2="330" stroke="black"/>
+<line x1="200" y1="313" x2="600" y2="313" stroke="black"/>
+<line x1="600" y1="313" x2="590" y2="319" stroke="black"/>
+<polygon fill="white" points="263,303 536,303 536,312 263,312"/>
+<text x="264" y="312" textLength="271" font-family="Helvetica" font-size="12" fill="black">
+POST ChannelCreatedUpdate to /channel_created
+</text>
+<line x1="200" y1="330" x2="200" y2="358" stroke="black"/>
+<line x1="600" y1="330" x2="600" y2="358" stroke="black"/>
+<line x1="1000" y1="330" x2="1000" y2="358" stroke="black"/>
+<polygon fill="white" points="408,330 792,330 792,352 408,352"/>
+<line x1="408" y1="330" x2="792" y2="330" stroke="black"/>
+<line x1="408" y1="352" x2="792" y2="352" stroke="black"/>
+<line x1="408" y1="330" x2="408" y2="352" stroke="black"/>
+<line x1="792" y1="330" x2="792" y2="352" stroke="black"/>
+<polygon fill="white" points="569,337 630,337 630,346 569,346"/>
+<text x="570" y="346" textLength="59" font-family="Helvetica" font-size="12" fill="black">
+state Open
+</text>
+<line x1="200" y1="358" x2="200" y2="386" stroke="black"/>
+<line x1="600" y1="358" x2="600" y2="386" stroke="black"/>
+<line x1="1000" y1="358" x2="1000" y2="386" stroke="black"/>
+<line x1="200" y1="369" x2="600" y2="369" stroke="black"/>
+<line x1="600" y1="369" x2="590" y2="375" stroke="black"/>
+<polygon fill="white" points="315,359 483,359 483,368 315,368"/>
+<text x="316" y="368" textLength="166" font-family="Helvetica" font-size="12" fill="black">
+POST UpdatedState to /update
+</text>
+<line x1="200" y1="386" x2="200" y2="414" stroke="black"/>
+<line x1="600" y1="386" x2="600" y2="414" stroke="black"/>
+<line x1="1000" y1="386" x2="1000" y2="414" stroke="black"/>
+<line x1="600" y1="397" x2="200" y2="397" stroke="black"/>
+<line x1="200" y1="397" x2="210" y2="403" stroke="black"/>
+<polygon fill="white" points="313,387 486,387 486,396 313,396"/>
+<text x="314" y="396" textLength="171" font-family="Helvetica" font-size="12" fill="black">
+send back rebased state update
+</text>
+<line x1="200" y1="414" x2="200" y2="442" stroke="black"/>
+<line x1="600" y1="414" x2="600" y2="442" stroke="black"/>
+<line x1="1000" y1="414" x2="1000" y2="442" stroke="black"/>
+<line x1="600" y1="425" x2="200" y2="425" stroke="black"/>
+<line x1="200" y1="425" x2="210" y2="431" stroke="black"/>
+<polygon fill="white" points="315,415 483,415 483,424 315,424"/>
+<text x="316" y="424" textLength="166" font-family="Helvetica" font-size="12" fill="black">
+POST UpdatedState to /update
+</text>
+<line x1="200" y1="442" x2="200" y2="470" stroke="black"/>
+<line x1="600" y1="442" x2="600" y2="470" stroke="black"/>
+<line x1="1000" y1="442" x2="1000" y2="470" stroke="black"/>
+<line x1="200" y1="453" x2="600" y2="453" stroke="black"/>
+<line x1="600" y1="453" x2="590" y2="459" stroke="black"/>
+<polygon fill="white" points="313,443 486,443 486,452 313,452"/>
+<text x="314" y="452" textLength="171" font-family="Helvetica" font-size="12" fill="black">
+send back rebased state update
+</text>
+<line x1="200" y1="470" x2="200" y2="487" stroke="black"/>
+<line x1="600" y1="470" x2="600" y2="487" stroke="black"/>
+<line x1="1000" y1="470" x2="1000" y2="487" stroke="black"/>
+<line x1="100" y1="475" x2="1100" y2="475" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="white" points="502,471 697,471 697,480 502,480"/>
+<text x="503" y="480" textLength="193" font-family="Helvetica" font-size="12" fill="black">
+Until guac b wants to deposit as well
+</text>
+<line x1="200" y1="487" x2="200" y2="515" stroke="black"/>
+<line x1="600" y1="487" x2="600" y2="515" stroke="black"/>
+<line x1="1000" y1="487" x2="1000" y2="515" stroke="black"/>
+<line x1="600" y1="498" x2="1000" y2="498" stroke="black"/>
+<line x1="1000" y1="498" x2="990" y2="504" stroke="black"/>
+<polygon fill="white" points="734,488 865,488 865,497 734,497"/>
+<text x="735" y="497" textLength="129" font-family="Helvetica" font-size="12" fill="black">
+ChannelJoinTransaction
+</text>
+<line x1="200" y1="515" x2="200" y2="543" stroke="black"/>
+<line x1="600" y1="515" x2="600" y2="543" stroke="black"/>
+<line x1="1000" y1="515" x2="1000" y2="543" stroke="black"/>
+<polygon fill="white" points="408,515 792,515 792,537 408,537"/>
+<line x1="408" y1="515" x2="792" y2="515" stroke="black"/>
+<line x1="408" y1="537" x2="792" y2="537" stroke="black"/>
+<line x1="408" y1="515" x2="408" y2="537" stroke="black"/>
+<line x1="792" y1="515" x2="792" y2="537" stroke="black"/>
+<polygon fill="white" points="551,522 648,522 648,531 551,531"/>
+<text x="552" y="531" textLength="95" font-family="Helvetica" font-size="12" fill="black">
+state PendingJoin
+</text>
+<line x1="200" y1="543" x2="200" y2="560" stroke="black"/>
+<line x1="600" y1="543" x2="600" y2="560" stroke="black"/>
+<line x1="1000" y1="543" x2="1000" y2="560" stroke="black"/>
+<line x1="100" y1="548" x2="1100" y2="548" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="white" points="545,544 653,544 653,553 545,553"/>
+<text x="546" y="553" textLength="106" font-family="Helvetica" font-size="12" fill="black">
+After some polling...
+</text>
+<line x1="200" y1="560" x2="200" y2="588" stroke="black"/>
+<line x1="600" y1="560" x2="600" y2="588" stroke="black"/>
+<line x1="1000" y1="560" x2="1000" y2="588" stroke="black"/>
+<line x1="1000" y1="571" x2="600" y2="571" stroke="black"/>
+<line x1="600" y1="571" x2="610" y2="577" stroke="black"/>
+<polygon fill="white" points="704,561 894,561 894,570 704,570"/>
+<text x="705" y="570" textLength="188" font-family="Helvetica" font-size="12" fill="black">
+ChannelJoinTransaction processed
+</text>
+<line x1="200" y1="588" x2="200" y2="616" stroke="black"/>
+<line x1="600" y1="588" x2="600" y2="616" stroke="black"/>
+<line x1="1000" y1="588" x2="1000" y2="616" stroke="black"/>
+<polygon fill="white" points="408,588 792,588 792,610 408,610"/>
+<line x1="408" y1="588" x2="792" y2="588" stroke="black"/>
+<line x1="408" y1="610" x2="792" y2="610" stroke="black"/>
+<line x1="408" y1="588" x2="408" y2="610" stroke="black"/>
+<line x1="792" y1="588" x2="792" y2="610" stroke="black"/>
+<polygon fill="white" points="497,595 702,595 702,604 497,604"/>
+<text x="498" y="604" textLength="203" font-family="Helvetica" font-size="12" fill="black">
+state Joined (and balances increased)
+</text>
+<line x1="200" y1="616" x2="200" y2="644" stroke="black"/>
+<line x1="600" y1="616" x2="600" y2="644" stroke="black"/>
+<line x1="1000" y1="616" x2="1000" y2="644" stroke="black"/>
+<line x1="600" y1="627" x2="200" y2="627" stroke="black"/>
+<line x1="200" y1="627" x2="210" y2="633" stroke="black"/>
+<polygon fill="white" points="338,617 460,617 460,626 338,626"/>
+<text x="339" y="626" textLength="120" font-family="Helvetica" font-size="12" fill="black">
+POST /channel_joined
+</text>
+<line x1="200" y1="644" x2="200" y2="672" stroke="black"/>
+<line x1="600" y1="644" x2="600" y2="672" stroke="black"/>
+<line x1="1000" y1="644" x2="1000" y2="672" stroke="black"/>
+<polygon fill="white" points="8,644 392,644 392,666 8,666"/>
+<line x1="8" y1="644" x2="392" y2="644" stroke="black"/>
+<line x1="8" y1="666" x2="392" y2="666" stroke="black"/>
+<line x1="8" y1="644" x2="8" y2="666" stroke="black"/>
+<line x1="392" y1="644" x2="392" y2="666" stroke="black"/>
+<polygon fill="white" points="97,651 302,651 302,660 97,660"/>
+<text x="98" y="660" textLength="203" font-family="Helvetica" font-size="12" fill="black">
+state Joined (and balances increased)
+</text>
+<line x1="200" y1="672" x2="200" y2="700" stroke="black"/>
+<line x1="600" y1="672" x2="600" y2="700" stroke="black"/>
+<line x1="1000" y1="672" x2="1000" y2="700" stroke="black"/>
+<line x1="200" y1="683" x2="600" y2="683" stroke="black"/>
+<line x1="600" y1="683" x2="590" y2="689" stroke="black"/>
+<polygon fill="white" points="315,673 483,673 483,682 315,682"/>
+<text x="316" y="682" textLength="166" font-family="Helvetica" font-size="12" fill="black">
+POST UpdatedState to /update
+</text>
+<line x1="200" y1="700" x2="200" y2="728" stroke="black"/>
+<line x1="600" y1="700" x2="600" y2="728" stroke="black"/>
+<line x1="1000" y1="700" x2="1000" y2="728" stroke="black"/>
+<line x1="600" y1="711" x2="200" y2="711" stroke="black"/>
+<line x1="200" y1="711" x2="210" y2="717" stroke="black"/>
+<polygon fill="white" points="313,701 486,701 486,710 313,710"/>
+<text x="314" y="710" textLength="171" font-family="Helvetica" font-size="12" fill="black">
+send back rebased state update
+</text>
+<line x1="200" y1="728" x2="200" y2="756" stroke="black"/>
+<line x1="600" y1="728" x2="600" y2="756" stroke="black"/>
+<line x1="1000" y1="728" x2="1000" y2="756" stroke="black"/>
+<line x1="600" y1="739" x2="200" y2="739" stroke="black"/>
+<line x1="200" y1="739" x2="210" y2="745" stroke="black"/>
+<polygon fill="white" points="315,729 483,729 483,738 315,738"/>
+<text x="316" y="738" textLength="166" font-family="Helvetica" font-size="12" fill="black">
+POST UpdatedState to /update
+</text>
+<line x1="200" y1="756" x2="200" y2="784" stroke="black"/>
+<line x1="600" y1="756" x2="600" y2="784" stroke="black"/>
+<line x1="1000" y1="756" x2="1000" y2="784" stroke="black"/>
+<line x1="200" y1="767" x2="600" y2="767" stroke="black"/>
+<line x1="600" y1="767" x2="590" y2="773" stroke="black"/>
+<polygon fill="white" points="313,757 486,757 486,766 313,766"/>
+<text x="314" y="766" textLength="171" font-family="Helvetica" font-size="12" fill="black">
+send back rebased state update
+</text>
+<line x1="200" y1="784" x2="200" y2="801" stroke="black"/>
+<line x1="600" y1="784" x2="600" y2="801" stroke="black"/>
+<line x1="1000" y1="784" x2="1000" y2="801" stroke="black"/>
+<line x1="100" y1="789" x2="1100" y2="789" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="white" points="534,785 665,785 665,794 534,794"/>
+<text x="535" y="794" textLength="129" font-family="Helvetica" font-size="12" fill="black">
+repeat to heart's content
+</text>
+<line x1="200" y1="795" x2="200" y2="801" stroke="black"/>
+<line x1="600" y1="795" x2="600" y2="801" stroke="black"/>
+<line x1="1000" y1="795" x2="1000" y2="801" stroke="black"/>
+</svg>

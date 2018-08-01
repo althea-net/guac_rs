@@ -1,13 +1,11 @@
-use althea_types::{Bytes32, EthAddress, EthSignature};
+use althea_types::EthAddress;
 use channel_client::types::{NewChannelTx, UpdateTx};
-use ethabi::{Bytes, Contract, Token};
+use ethabi::{Contract, Token};
 use ethcore_transaction::{Action, SignedTransaction, Transaction};
 use ethereum_types::{Address, U256};
-use hex;
-use rlp::Encodable;
-use serde_json;
 use std::io::Cursor;
 
+use crypto::CryptoService;
 use CRYPTO;
 
 pub struct Fullnode {
@@ -45,8 +43,7 @@ fn create_update_tx(update: UpdateTx) -> SignedTransaction {
             Token::String(update.signature_a.unwrap().to_string()),
             // SigB
             Token::String(update.signature_b.unwrap().to_string()),
-        ])
-        .unwrap();
+        ]).unwrap();
 
     Transaction {
         action: Action::Call(Address::default()),
@@ -58,7 +55,7 @@ fn create_update_tx(update: UpdateTx) -> SignedTransaction {
         gas: U256::from(50_000),
         value: U256::from(0),
         data,
-    }.sign(&CRYPTO.key_pair.secret(), None)
+    }.sign(&CRYPTO.secret(), None)
 }
 
 fn create_new_channel_tx(update: NewChannelTx) -> SignedTransaction {
@@ -74,8 +71,7 @@ fn create_new_channel_tx(update: NewChannelTx) -> SignedTransaction {
             Token::Uint(U256::from(0)),
             // SigA
             Token::Uint(update.challenge),
-        ])
-        .unwrap();
+        ]).unwrap();
 
     Transaction {
         action: Action::Call(Address::default()),
@@ -87,7 +83,7 @@ fn create_new_channel_tx(update: NewChannelTx) -> SignedTransaction {
         gas: U256::from(50_000),
         value: update.deposit.into(),
         data,
-    }.sign(&CRYPTO.key_pair.secret(), None)
+    }.sign(&CRYPTO.secret(), None)
 }
 
 #[test]
@@ -106,7 +102,7 @@ fn test_create_update_tx() {
         signature_a: Some(1.into()),
         signature_b: Some(2.into()),
     });
-    println!("tx: 0x{}", hex::encode(&(*tx.rlp_bytes())));
+    trace!("tx: {:?}", tx);
 }
 
 #[test]
@@ -116,5 +112,5 @@ fn test_new_channel_tx() {
         challenge: 23.into(),
         deposit: 100.into(),
     });
-    println!("tx: {:?}", tx);
+    trace!("tx: {:?}", tx);
 }

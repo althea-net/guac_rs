@@ -23,7 +23,6 @@ web3 = "0.3.0"
 lazy_static = "1.0"
 ethcore-transaction = {git="https://github.com/paritytech/parity.git"}
 ethkey = {git="https://github.com/paritytech/parity.git"}
-rlp = {git="https://github.com/paritytech/parity.git", path="util/rlp"}
 ethereum-types = "0.3.1"
 ethabi-derive = "5.1.2"
 ethabi = "5.1.1"
@@ -32,6 +31,7 @@ hex = "0.3.2"
 diesel = { version = "=1.2", features = ["sqlite"] }
 dotenv = "0.10"
 qutex = "^0.2"
+owning_ref = {git="https://github.com/kingoflolz/owning-ref-rs/", branch="fix-bug"}
 
 [patch.crates-io]
 ethereum-types = {git="https://github.com/paritytech/primitives.git"}
