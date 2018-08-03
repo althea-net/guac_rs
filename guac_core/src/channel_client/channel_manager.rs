@@ -94,6 +94,16 @@ impl ChannelManager {
         }
     }
 
+    pub fn my_balance(&self) -> U256 {
+        match self {
+            // TODO: how should we handle pending sends? can channel balances go negative?
+            ChannelManager::PendingJoin { state, .. }
+            | ChannelManager::Joined { state }
+            | ChannelManager::Open { state } => state.my_state().my_balance().clone(),
+            _ => 0.into(),
+        }
+    }
+
     // called periodically so ChannelManager can talk to the external world
     pub fn tick(
         &mut self,
@@ -103,7 +113,7 @@ impl ChannelManager {
         self.sanity_check(my_address);
         match self.clone() {
             ChannelManager::New | ChannelManager::Proposed { .. } => {
-                self.propose_channel(my_address, their_address, 100_000_000_000_000u64.into())
+                self.propose_channel(my_address, their_address, 10_000_000_000_000u64.into())
             }
             ChannelManager::PendingOtherCreation { state, .. } => {
                 assert_eq!(state.is_a, false);
@@ -134,11 +144,11 @@ impl ChannelManager {
                 // TODO: actually poll for stuff
                 let mut state = state.clone();
 
-                *state.my_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
-                *state.my_state_mut().my_balance_mut() += 100_000_000_000_000u64.into();
+                *state.my_state_mut().my_deposit_mut() = 10_000_000_000_000u64.into();
+                *state.my_state_mut().my_balance_mut() += 10_000_000_000_000u64.into();
 
-                *state.their_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
-                *state.their_state_mut().my_balance_mut() += 100_000_000_000_000u64.into();
+                *state.their_state_mut().my_deposit_mut() = 10_000_000_000_000u64.into();
+                *state.their_state_mut().my_balance_mut() += 10_000_000_000_000u64.into();
 
                 // now we have balance in our channel, we can pay what we owe them
                 state.pay_counterparty(pending_send)?;

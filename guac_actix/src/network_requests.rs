@@ -72,6 +72,8 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                     Box::new(
                         send_channel_joined(channel, counterparty.url, temp_channel_manager)
                             .and_then(move |cm| {
+                                trace!("balance subtracted for channel join");
+                                *CRYPTO.get_balance_mut() -= 10_000_000_000_000u64.into();
                                 *channel_manager = cm;
                                 Ok(())
                             }),
@@ -82,6 +84,8 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                     send_channel_created_request(channel, counterparty.url, temp_channel_manager)
                         .and_then(move |cm| {
                             *channel_manager = cm;
+                            trace!("balance subtracted for new channel");
+                            *CRYPTO.get_balance_mut() -= 10_000_000_000_000u64.into();
                             Ok(())
                         }),
                 )

@@ -14,7 +14,7 @@ lazy_static! {
 pub struct Crypto {
     pub key_pair: KeyPair,
 
-    /// This is a local balance which is just a hack for testing things
+    /// This is a stand in for the "balance" in our eth account
     pub balance: Uint256,
 }
 
@@ -33,7 +33,8 @@ impl Crypto {
     fn new() -> Crypto {
         Crypto {
             key_pair: Random::generate(&mut Random {}).unwrap(),
-            balance: 1_000_000_000_000u64.into(),
+            // This means we can only open or join 100 channels before running out of money
+            balance: 1_000_000_000_000_000u64.into(),
         }
     }
 }
