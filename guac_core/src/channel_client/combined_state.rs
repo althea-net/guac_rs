@@ -138,13 +138,30 @@ impl CombinedState {
 
         assert!(self.my_state.my_balance() <= self.their_state.my_balance());
 
+        // This essentially "rolls back" any payments we have done
+        self.my_state = self.their_state.clone();
+
         if our_prev_bal >= *our_new_bal {
             // net effect was we payed them
             let payment = our_prev_bal - our_new_bal;
             if payment > pending_pay {
                 bail!("we paid them too much somehow");
             }
+
+            let pending_pay = pending_pay - payment;
+
+            assert!(&pending_pay <= self.their_state.my_balance());
+
+            // so here we put it back
+            *self.my_state.my_balance_mut() -= pending_pay;
+            *self.my_state.their_balance_mut() += pending_pay;
         } else {
+            assert!(&pending_pay <= self.their_state.my_balance());
+
+            // so here we put it back
+            *self.my_state.my_balance_mut() -= pending_pay;
+            *self.my_state.their_balance_mut() += pending_pay;
+
             let payment = our_new_bal - our_prev_bal;
             self.pending_receive += payment;
         }

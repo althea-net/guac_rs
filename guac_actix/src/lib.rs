@@ -86,7 +86,6 @@ impl Handler<MakePayment> for PaymentController {
 
     fn handle(&mut self, msg: MakePayment, _ctx: &mut Context<Self>) -> Self::Result {
         trace!("sending payment {:?}", msg);
-        *CRYPTO.get_balance_mut() -= msg.0.amount;
         Box::new(
             STORAGE
                 .get_channel(msg.0.to.eth_address)
@@ -159,7 +158,6 @@ impl Handler<Withdraw> for PaymentController {
         Box::new(STORAGE.get_channel(msg.0).and_then(move |mut i| {
             let withdraw = i.withdraw()?;
             trace!("withdrew {:?} from {:?}", withdraw, msg.0);
-            *CRYPTO.get_balance_mut() += withdraw;
 
             Ok(withdraw)
         }))
@@ -173,8 +171,21 @@ impl Message for GetOwnBalance {
 }
 
 impl Handler<GetOwnBalance> for PaymentController {
-    type Result = Result<Uint256, Error>;
+    type Result = FutureResponse<Uint256, Error>;
     fn handle(&mut self, _msg: GetOwnBalance, _: &mut Context<Self>) -> Self::Result {
-        Ok(CRYPTO.get_balance().clone())
+        Box::new(STORAGE.get_all_channel_managers_mut().and_then(|channels| {
+            let mut total_balance = 0.into();
+            for channel_manager in channels {
+                trace!(
+                    "got balance {:?} from {:?}",
+                    channel_manager.my_balance(),
+                    *channel_manager
+                );
+                total_balance += channel_manager.my_balance();
+            }
+            total_balance += CRYPTO.get_balance().clone();
+
+            Ok(total_balance)
+        }))
     }
 }
