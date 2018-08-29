@@ -2,6 +2,7 @@ extern crate actix;
 extern crate actix_web;
 extern crate althea_types;
 extern crate bytes;
+extern crate ethereum_types;
 #[macro_use]
 extern crate failure;
 extern crate futures;
@@ -10,17 +11,13 @@ extern crate guac_core;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-extern crate num256;
 extern crate qutex;
 extern crate serde;
 extern crate serde_json;
 extern crate tokio;
 
-use num256::Uint256;
-
 use actix::prelude::*;
 use actix_web::*;
-use althea_types::EthAddress;
 use althea_types::PaymentTx;
 use failure::Error;
 use futures::Future;
@@ -39,12 +36,13 @@ pub use network_endpoints::init_server;
 
 use network_requests::tick;
 use std::ops::{Add, Sub};
+use ethereum_types::{U256, Address};
 
 /// A data type which wraps all network requests that guac makes, to check who the request is from
 /// easily without request specific pattern matching
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetworkRequest<T> {
-    pub from_addr: EthAddress,
+    pub from_addr: Address,
     pub data: T,
 }
 
@@ -148,14 +146,14 @@ impl Handler<Register> for PaymentController {
 /// This message needs to be sent periodically for every single address the application is
 /// interested in, and it returns the amount of money we can consider to have "received"
 /// from a counterparty
-pub struct Withdraw(pub EthAddress);
+pub struct Withdraw(pub Address);
 
 impl Message for Withdraw {
-    type Result = Result<Uint256, Error>;
+    type Result = Result<U256, Error>;
 }
 
 impl Handler<Withdraw> for PaymentController {
-    type Result = ResponseFuture<Uint256, Error>;
+    type Result = ResponseFuture<U256, Error>;
     fn handle(&mut self, msg: Withdraw, _: &mut Context<Self>) -> Self::Result {
         Box::new(STORAGE.get_channel(msg.0).and_then(move |mut i| {
             let withdraw = i.withdraw()?;
@@ -170,11 +168,11 @@ impl Handler<Withdraw> for PaymentController {
 pub struct GetOwnBalance;
 
 impl Message for GetOwnBalance {
-    type Result = Result<Uint256, Error>;
+    type Result = Result<U256, Error>;
 }
 
 impl Handler<GetOwnBalance> for PaymentController {
-    type Result = Result<Uint256, Error>;
+    type Result = Result<U256, Error>;
     fn handle(&mut self, _msg: GetOwnBalance, _: &mut Context<Self>) -> Self::Result {
         Ok(CRYPTO.get_balance().clone())
     }

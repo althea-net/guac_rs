@@ -1,7 +1,6 @@
 use failure::Error;
 
-use althea_types::EthAddress;
-use ethereum_types::U256;
+use ethereum_types::{Address, U256};
 
 use channel_client::combined_state::CombinedState;
 use channel_client::types::{ChannelStatus, UpdateTx};
@@ -62,7 +61,7 @@ fn is_channel_acceptable(_state: &Channel) -> Result<bool, Error> {
 
 impl ChannelManager {
     // does some sanity checks on our current state to ensure nothing dodgy happened/will happen
-    fn sanity_check(&self, my_address: EthAddress) {
+    fn sanity_check(&self, my_address: Address) {
         trace!(
             "checking sanity of {:?}, my address: {:?}",
             self,
@@ -98,8 +97,8 @@ impl ChannelManager {
     // called periodically so ChannelManager can talk to the external world
     pub fn tick(
         &mut self,
-        my_address: EthAddress,
-        their_address: EthAddress,
+        my_address: Address,
+        their_address: Address,
     ) -> Result<ChannelManagerAction, Error> {
         self.sanity_check(my_address);
         match self.clone() {
@@ -159,8 +158,8 @@ impl ChannelManager {
 
     fn propose_channel(
         &mut self,
-        from: EthAddress,
-        to: EthAddress,
+        from: Address,
+        to: Address,
         deposit: U256,
     ) -> Result<ChannelManagerAction, Error> {
         ensure!(from != to, "cannot pay to self");
@@ -218,7 +217,7 @@ impl ChannelManager {
     pub fn channel_created(
         &mut self,
         channel: &Channel,
-        my_address: EthAddress,
+        my_address: Address,
     ) -> Result<(), Error> {
         trace!("checking proposal {:?}", channel);
         self.sanity_check(my_address);
