@@ -4,5 +4,3 @@ members = ["guac_core", "guac_actix", "guac_http"]
 [patch.crates-io]
 ethereum-types = {git="https://github.com/paritytech/primitives.git", rev="6f5f681"}
 actix = { git = "https://github.com/kingoflolz/actix.git", branch = "althea-mesh" }
-althea_types = {git="https://github.com/mpapierski/althea_rs.git", branch="236-guac-integration"}
-num256 = {git="https://github.com/mpapierski/althea_rs.git", branch="236-guac-integration"}

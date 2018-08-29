@@ -1,4 +1,4 @@
-use althea_types::EthAddress;
+use ethereum_types::Address;
 use counterparty::Counterparty;
 use failure::Error;
 
@@ -32,12 +32,12 @@ struct Data {
     /// The ChannelManagers are wrapped in a futures aware Mutex (a Qutex) to achieve inner
     /// mutability (the outer Data struct and this the outer RwLock does not have to be locked for
     /// writing to mutate a single ChannelManager)
-    addr_to_channel: HashMap<EthAddress, Qutex<ChannelManager>>,
+    addr_to_channel: HashMap<Address, Qutex<ChannelManager>>,
     /// This stores a mapping from eth address to counterparty, with no fancy interior mutability
     /// for the counterparty, as the the frequency of mutations to the counterparty will be
     /// very low (comparable to the addition and deletions of channels, in which case the outer
     /// RwLock needs to be locked for writing anyways)
-    addr_to_counterparty: HashMap<EthAddress, Counterparty>,
+    addr_to_counterparty: HashMap<Address, Counterparty>,
 }
 
 impl Storage {
@@ -71,7 +71,7 @@ impl Storage {
 
     pub fn get_channel(
         &self,
-        k: EthAddress,
+        k: Address,
     ) -> impl Future<Item = Guard<ChannelManager>, Error = Error> {
         self.inner
             .clone()

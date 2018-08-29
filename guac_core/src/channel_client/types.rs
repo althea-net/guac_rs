@@ -1,7 +1,5 @@
-use althea_types::{Bytes32, EthAddress, EthSignature};
+use ethereum_types::{Address, Signature, U256};
 use failure::Error;
-
-use ethereum_types::U256;
 
 use crypto::CryptoService;
 use CRYPTO;
@@ -17,9 +15,9 @@ pub enum ChannelStatus {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Channel {
-    pub channel_id: Bytes32,
-    pub address_a: EthAddress,
-    pub address_b: EthAddress,
+    pub channel_id: U256,
+    pub address_a: Address,
+    pub address_b: Address,
     pub channel_status: ChannelStatus,
     pub deposit_a: U256,
     pub deposit_b: U256,
@@ -69,13 +67,13 @@ impl Channel {
 }
 
 impl Channel {
-    pub fn get_my_address(&self) -> EthAddress {
+    pub fn get_my_address(&self) -> Address {
         match self.is_a {
             true => self.address_a,
             false => self.address_b,
         }
     }
-    pub fn get_their_address(&self) -> EthAddress {
+    pub fn get_their_address(&self) -> Address {
         match self.is_a {
             true => self.address_b,
             false => self.address_a,
@@ -181,25 +179,25 @@ impl Channel {
 
 #[derive(Serialize, Deserialize)]
 pub struct NewChannelTx {
-    pub to: EthAddress,
+    pub to: Address,
     pub challenge: U256,
     pub deposit: U256,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct UpdateTx {
-    pub channel_id: Bytes32,
+    pub channel_id: U256,
     pub nonce: U256,
 
     pub balance_a: U256,
     pub balance_b: U256,
 
-    pub signature_a: Option<EthSignature>,
-    pub signature_b: Option<EthSignature>,
+    pub signature_a: Option<Signature>,
+    pub signature_b: Option<Signature>,
 }
 
 impl UpdateTx {
-    pub fn set_my_signature(&mut self, is_a: bool, signature: &EthSignature) {
+    pub fn set_my_signature(&mut self, is_a: bool, signature: &Signature) {
         match is_a {
             true => self.signature_a = Some(*signature),
             false => self.signature_b = Some(*signature),
@@ -221,14 +219,14 @@ impl UpdateTx {
             false => &self.balance_b,
         }
     }
-    pub fn set_their_signature(&mut self, is_a: bool, signature: &EthSignature) {
+    pub fn set_their_signature(&mut self, is_a: bool, signature: &Signature) {
         match is_a {
             true => self.signature_b = Some(*signature),
             false => self.signature_a = Some(*signature),
         }
     }
 
-    pub fn sign(&mut self, is_a: bool, channel_id: Bytes32) {
+    pub fn sign(&mut self, is_a: bool, channel_id: U256) {
         let mut nonce = [0u8; 32];
         self.nonce.to_big_endian(&mut nonce);
         let mut balance_a = [0u8; 32];

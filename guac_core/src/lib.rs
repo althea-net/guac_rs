@@ -8,7 +8,6 @@ extern crate base64;
 #[macro_use]
 extern crate failure;
 extern crate ethereum_types;
-extern crate num256;
 extern crate serde_json;
 extern crate tiny_keccak;
 extern crate uuid;

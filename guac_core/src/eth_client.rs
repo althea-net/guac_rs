@@ -1,4 +1,3 @@
-use althea_types::EthAddress;
 use channel_client::types::{NewChannelTx, UpdateTx};
 use ethabi::{Contract, Token};
 use ethcore_transaction::{Action, SignedTransaction, Transaction};
@@ -9,7 +8,7 @@ use crypto::CryptoService;
 use CRYPTO;
 
 pub struct Fullnode {
-    pub address: EthAddress,
+    pub address: Address,
     pub url: String,
 }
 
