@@ -34,9 +34,9 @@ mod network_requests;
 
 pub use network_endpoints::init_server;
 
+use ethereum_types::{Address, U256};
 use network_requests::tick;
 use std::ops::{Add, Sub};
-use ethereum_types::{U256, Address};
 
 /// A data type which wraps all network requests that guac makes, to check who the request is from
 /// easily without request specific pattern matching

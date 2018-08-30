@@ -21,8 +21,7 @@ pub struct Crypto {
 pub trait CryptoService {
     fn own_eth_addr(&self) -> Address;
     fn secret(&self) -> Secret;
-    fn get_balance_mut<'ret, 'me: 'ret>(&'me self)
-        -> RwLockWriteGuardRefMut<'ret, Crypto, U256>;
+    fn get_balance_mut<'ret, 'me: 'ret>(&'me self) -> RwLockWriteGuardRefMut<'ret, Crypto, U256>;
     fn get_balance(&self) -> U256;
     fn eth_sign(&self, data: &[u8]) -> Signature;
     fn hash_bytes(&self, x: &[&[u8]]) -> U256;
@@ -45,9 +44,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
     fn secret(&self) -> Secret {
         self.read().unwrap().key_pair.secret().clone()
     }
-    fn get_balance_mut<'ret, 'me: 'ret>(
-        &'me self,
-    ) -> RwLockWriteGuardRefMut<'ret, Crypto, U256> {
+    fn get_balance_mut<'ret, 'me: 'ret>(&'me self) -> RwLockWriteGuardRefMut<'ret, Crypto, U256> {
         RwLockWriteGuardRefMut::new(self.write().unwrap()).map_mut(|c| &mut c.balance)
     }
     fn get_balance(&self) -> U256 {

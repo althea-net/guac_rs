@@ -135,10 +135,16 @@ impl ChannelManager {
                 let mut state = state.clone();
 
                 *state.my_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
-                *state.my_state_mut().my_balance_mut() = state.my_state_mut().my_balance_mut().add(100_000_000_000_000u64.into());
+                *state.my_state_mut().my_balance_mut() = state
+                    .my_state_mut()
+                    .my_balance_mut()
+                    .add(100_000_000_000_000u64.into());
 
                 *state.their_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
-                *state.their_state_mut().my_balance_mut() = state.their_state_mut().my_balance_mut().add(100_000_000_000_000u64.into());
+                *state.their_state_mut().my_balance_mut() = state
+                    .their_state_mut()
+                    .my_balance_mut()
+                    .add(100_000_000_000_000u64.into());
 
                 // now we have balance in our channel, we can pay what we owe them
                 state.pay_counterparty(pending_send)?;
@@ -214,11 +220,7 @@ impl ChannelManager {
         Ok(ret)
     }
 
-    pub fn channel_created(
-        &mut self,
-        channel: &Channel,
-        my_address: Address,
-    ) -> Result<(), Error> {
+    pub fn channel_created(&mut self, channel: &Channel, my_address: Address) -> Result<(), Error> {
         trace!("checking proposal {:?}", channel);
         self.sanity_check(my_address);
         let mut channel = channel.clone();
@@ -354,11 +356,23 @@ impl ChannelManager {
                     "Their deposit must be 0 to begin with"
                 );
 
-                *state.my_state_mut().their_deposit_mut() = state.my_state_mut().their_deposit_mut().add(chan.deposit_b.clone());
-                *state.my_state_mut().their_balance_mut() = state.my_state_mut().their_balance_mut().add(chan.deposit_b.clone());
+                *state.my_state_mut().their_deposit_mut() = state
+                    .my_state_mut()
+                    .their_deposit_mut()
+                    .add(chan.deposit_b.clone());
+                *state.my_state_mut().their_balance_mut() = state
+                    .my_state_mut()
+                    .their_balance_mut()
+                    .add(chan.deposit_b.clone());
 
-                *state.their_state_mut().their_deposit_mut() = state.their_state_mut().their_deposit_mut().add(chan.deposit_b.clone());
-                *state.their_state_mut().their_balance_mut() = state.their_state_mut().their_balance_mut().add(chan.deposit_b.clone());
+                *state.their_state_mut().their_deposit_mut() = state
+                    .their_state_mut()
+                    .their_deposit_mut()
+                    .add(chan.deposit_b.clone());
+                *state.their_state_mut().their_balance_mut() = state
+                    .their_state_mut()
+                    .their_balance_mut()
+                    .add(chan.deposit_b.clone());
             }
             _ => bail!("must be in state joined before counterparty joins"),
         };

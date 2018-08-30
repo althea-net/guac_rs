@@ -58,13 +58,17 @@ impl CombinedState {
         if amount > *self.my_state.my_balance_mut() {
             let remaining_amount = amount - *self.my_state.my_balance();
 
-            *self.my_state.their_balance_mut() = self.my_state.their_balance_mut().add(self.my_state.my_balance().clone());
+            *self.my_state.their_balance_mut() = self
+                .my_state
+                .their_balance_mut()
+                .add(self.my_state.my_balance().clone());
             *self.my_state.my_balance_mut() = 0.into();
 
             Ok(remaining_amount)
         } else {
             *self.my_state.my_balance_mut() = self.my_state.my_balance_mut().sub(amount.clone());
-            *self.my_state.their_balance_mut() = self.my_state.their_balance_mut().add(amount.clone());
+            *self.my_state.their_balance_mut() =
+                self.my_state.their_balance_mut().add(amount.clone());
             Ok(0.into())
         }
     }
@@ -95,7 +99,10 @@ impl CombinedState {
             "Our state needs to be worse for us than their state"
         );
 
-        let pending_pay = self.their_state.my_balance().sub(self.my_state.my_balance().clone());
+        let pending_pay = self
+            .their_state
+            .my_balance()
+            .sub(self.my_state.my_balance().clone());
 
         // by applying their state update on top of their state, we can know how much they are going
         // to pay us, if we didn't do any transactions
@@ -118,7 +125,8 @@ impl CombinedState {
 
         // so here we put it back
         *self.my_state.my_balance_mut() = self.my_state.my_balance_mut().sub(pending_pay.clone());
-        *self.my_state.their_balance_mut() = self.my_state.their_balance_mut().add(pending_pay.clone());
+        *self.my_state.their_balance_mut() =
+            self.my_state.their_balance_mut().add(pending_pay.clone());
 
         Ok(self.create_payment()?)
     }
@@ -131,7 +139,10 @@ impl CombinedState {
             self,
             rec_update
         );
-        let pending_pay = self.their_state.my_balance().sub(self.my_state.my_balance().clone());
+        let pending_pay = self
+            .their_state
+            .my_balance()
+            .sub(self.my_state.my_balance().clone());
 
         let our_prev_bal = self.their_state.my_balance().clone();
         self.their_state.apply_update(&rec_update, false)?;
