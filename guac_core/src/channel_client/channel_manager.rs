@@ -6,6 +6,7 @@ use ethereum_types::U256;
 use channel_client::combined_state::CombinedState;
 use channel_client::types::{ChannelStatus, UpdateTx};
 use channel_client::Channel;
+use std::ops::Add;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChannelManager {
@@ -135,10 +136,10 @@ impl ChannelManager {
                 let mut state = state.clone();
 
                 *state.my_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
-                *state.my_state_mut().my_balance_mut() += 100_000_000_000_000u64.into();
+                *state.my_state_mut().my_balance_mut() = state.my_state_mut().my_balance_mut().add(100_000_000_000_000u64.into());
 
                 *state.their_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
-                *state.their_state_mut().my_balance_mut() += 100_000_000_000_000u64.into();
+                *state.their_state_mut().my_balance_mut() = state.their_state_mut().my_balance_mut().add(100_000_000_000_000u64.into());
 
                 // now we have balance in our channel, we can pay what we owe them
                 state.pay_counterparty(pending_send)?;
@@ -354,11 +355,11 @@ impl ChannelManager {
                     "Their deposit must be 0 to begin with"
                 );
 
-                *state.my_state_mut().their_deposit_mut() += chan.deposit_b;
-                *state.my_state_mut().their_balance_mut() += chan.deposit_b;
+                *state.my_state_mut().their_deposit_mut() = state.my_state_mut().their_deposit_mut().add(chan.deposit_b.clone());
+                *state.my_state_mut().their_balance_mut() = state.my_state_mut().their_balance_mut().add(chan.deposit_b.clone());
 
-                *state.their_state_mut().their_deposit_mut() += chan.deposit_b;
-                *state.their_state_mut().their_balance_mut() += chan.deposit_b;
+                *state.their_state_mut().their_deposit_mut() = state.their_state_mut().their_deposit_mut().add(chan.deposit_b.clone());
+                *state.their_state_mut().their_balance_mut() = state.their_state_mut().their_balance_mut().add(chan.deposit_b.clone());
             }
             _ => bail!("must be in state joined before counterparty joins"),
         };
@@ -404,7 +405,7 @@ impl ChannelManager {
             } => {
                 let overflow = state.pay_counterparty(amount)?;
                 if overflow > 0.into() {
-                    pending_send += overflow;
+                    pending_send = pending_send.add(overflow.clone());
                 }
                 ChannelManager::PendingJoin {
                     state: state.clone(),

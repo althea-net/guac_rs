@@ -38,6 +38,7 @@ mod network_requests;
 pub use network_endpoints::init_server;
 
 use network_requests::tick;
+use std::ops::{Add, Sub};
 
 /// A data type which wraps all network requests that guac makes, to check who the request is from
 /// easily without request specific pattern matching
@@ -86,7 +87,7 @@ impl Handler<MakePayment> for PaymentController {
 
     fn handle(&mut self, msg: MakePayment, _ctx: &mut Context<Self>) -> Self::Result {
         trace!("sending payment {:?}", msg);
-        *CRYPTO.get_balance_mut() -= msg.0.amount;
+        *CRYPTO.get_balance_mut() = CRYPTO.get_balance_mut().sub(msg.0.amount.clone());
         Box::new(
             STORAGE
                 .get_channel(msg.0.to.eth_address)
@@ -159,7 +160,7 @@ impl Handler<Withdraw> for PaymentController {
         Box::new(STORAGE.get_channel(msg.0).and_then(move |mut i| {
             let withdraw = i.withdraw()?;
             trace!("withdrew {:?} from {:?}", withdraw, msg.0);
-            *CRYPTO.get_balance_mut() += withdraw;
+            *CRYPTO.get_balance_mut() = CRYPTO.get_balance_mut().add(withdraw.clone());
 
             Ok(withdraw)
         }))
