@@ -10,8 +10,8 @@ rand = "0.4.2"
 futures = "0.1"
 failure_derive = "*"
 uuid = { version = "0.5", features = ["serde", "v4"] }
-althea_types = {git="https://github.com/althea-mesh/althea_rs.git"}
-num256 = {git="https://github.com/althea-mesh/althea_rs.git"}
+althea_types = {git="https://github.com/mpapierski/althea_rs.git", branch="use-eth-types-0.3"}
+num256 = {git="https://github.com/mpapierski/althea_rs.git", branch="use-eth-types-0.3"}
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
@@ -25,7 +25,7 @@ ethcore-transaction = {git="https://github.com/paritytech/parity.git"}
 ethkey = {git="https://github.com/paritytech/parity.git"}
 ethereum-types = "0.3.1"
 ethabi-derive = "5.1.2"
-ethabi = "5.1.1"
+ethabi = "=5.1.1"
 multihash = "0.8.0"
 hex = "0.3.2"
 diesel = { version = "=1.2", features = ["sqlite"] }
