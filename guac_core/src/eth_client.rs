@@ -42,7 +42,8 @@ fn create_update_tx(update: UpdateTx) -> SignedTransaction {
             Token::String(update.signature_a.unwrap().to_string()),
             // SigB
             Token::String(update.signature_b.unwrap().to_string()),
-        ]).unwrap();
+        ])
+        .unwrap();
 
     Transaction {
         action: Action::Call(Address::default()),
@@ -70,7 +71,8 @@ fn create_new_channel_tx(update: NewChannelTx) -> SignedTransaction {
             Token::Uint(U256::from(0)),
             // SigA
             Token::Uint(update.challenge),
-        ]).unwrap();
+        ])
+        .unwrap();
 
     Transaction {
         action: Action::Call(Address::default()),

@@ -22,16 +22,19 @@ pub fn init_server(port: u16) {
         App::new()
             .resource("/update", |r| {
                 r.method(Method::POST).with_async(update_endpoint)
-            }).resource("/propose", |r| {
+            })
+            .resource("/propose", |r| {
                 r.method(Method::POST).with_async(propose_channel_endpoint)
-            }).resource("/channel_created", |r| {
+            })
+            .resource("/channel_created", |r| {
                 r.method(Method::POST).with_async(channel_created_endpoint)
-            }).resource("/channel_joined", |r| {
+            })
+            .resource("/channel_joined", |r| {
                 r.method(Method::POST).with_async(channel_joined_endpoint)
             })
     }).bind(&format!("[::0]:{}", port))
-    .unwrap()
-    .start();
+        .unwrap()
+        .start();
 }
 
 pub fn update_endpoint(
@@ -43,7 +46,8 @@ pub fn update_endpoint(
         .and_then(move |mut channel_manager| {
             channel_manager.received_payment(&update.data)?;
             Ok(Json(channel_manager.create_payment()?))
-        }).responder()
+        })
+        .responder()
 }
 
 pub fn propose_channel_endpoint(
@@ -70,7 +74,8 @@ pub fn propose_channel_endpoint(
                 .get_channel(channel.from_addr.clone())
                 .and_then(move |mut channel_manager| {
                     Ok(Json(channel_manager.check_proposal(&channel.data)?))
-                }).responder()
+                })
+                .responder()
         })
 }
 
@@ -83,7 +88,8 @@ pub fn channel_created_endpoint(
         .and_then(move |mut channel_manager| {
             channel_manager.channel_created(&channel.data, CRYPTO.own_eth_addr())?;
             Ok(Json(true))
-        }).responder()
+        })
+        .responder()
 }
 
 pub fn channel_joined_endpoint(
@@ -95,5 +101,6 @@ pub fn channel_joined_endpoint(
         .and_then(move |mut channel_manager| {
             channel_manager.channel_joined(&channel.data)?;
             Ok(Json(true))
-        }).responder()
+        })
+        .responder()
 }
