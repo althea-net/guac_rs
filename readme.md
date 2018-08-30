@@ -14,3 +14,12 @@ update logic as well as interaction with the blockchain through bounty hunters. 
 interface over guac_core which sends and receives messages from the external world via HTTP, but
 receives commands via actix. guac_http makes the command interface HTTP instead to provide wider
 interoperability.
+
+# Development
+
+Set up git hooks:
+
+```sh
+cd .git/hooks/
+ln -s ../../.git-hooks/pre-commit
+```
