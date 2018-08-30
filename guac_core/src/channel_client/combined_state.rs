@@ -3,6 +3,7 @@ use failure::Error;
 use ethereum_types::U256;
 
 use channel_client::types::{Channel, UpdateTx};
+use std::ops::{Add, Sub};
 
 /// A struct which represents the core payment logic/state of a payment channel. It contains both
 /// our current state as well as the last confirmed state of our counterparty, which is used to
@@ -57,13 +58,13 @@ impl CombinedState {
         if amount > *self.my_state.my_balance_mut() {
             let remaining_amount = amount - *self.my_state.my_balance();
 
-            *self.my_state.their_balance_mut() += *self.my_state.my_balance();
+            *self.my_state.their_balance_mut() = self.my_state.their_balance_mut().add(self.my_state.my_balance().clone());
             *self.my_state.my_balance_mut() = 0.into();
 
             Ok(remaining_amount)
         } else {
-            *self.my_state.my_balance_mut() -= amount;
-            *self.my_state.their_balance_mut() += amount;
+            *self.my_state.my_balance_mut() = self.my_state.my_balance_mut().sub(amount.clone());
+            *self.my_state.their_balance_mut() = self.my_state.their_balance_mut().add(amount.clone());
             Ok(0.into())
         }
     }
@@ -80,7 +81,7 @@ impl CombinedState {
     pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
         let mut state = self.my_state.clone();
 
-        state.nonce += 1.into();
+        state.nonce = state.nonce.add(1.into());
 
         Ok(state.create_update())
     }
@@ -94,7 +95,7 @@ impl CombinedState {
             "Our state needs to be worse for us than their state"
         );
 
-        let pending_pay = self.their_state.my_balance() - self.my_state.my_balance();
+        let pending_pay = self.their_state.my_balance().sub(self.my_state.my_balance().clone());
 
         // by applying their state update on top of their state, we can know how much they are going
         // to pay us, if we didn't do any transactions
@@ -106,9 +107,9 @@ impl CombinedState {
             "My balance needs to be bigger than our previous balance"
         );
 
-        let transfer = self.their_state.my_balance() - our_prev_bal;
+        let transfer = self.their_state.my_balance().sub(our_prev_bal.clone());
 
-        self.pending_receive += transfer;
+        self.pending_receive = self.pending_receive.add(transfer.clone());
 
         // This essentially "rolls back" any payments we have done
         self.my_state = self.their_state.clone();
@@ -116,8 +117,8 @@ impl CombinedState {
         assert!(&pending_pay <= self.their_state.my_balance());
 
         // so here we put it back
-        *self.my_state.my_balance_mut() -= pending_pay;
-        *self.my_state.their_balance_mut() += pending_pay;
+        *self.my_state.my_balance_mut() = self.my_state.my_balance_mut().sub(pending_pay.clone());
+        *self.my_state.their_balance_mut() = self.my_state.their_balance_mut().add(pending_pay.clone());
 
         Ok(self.create_payment()?)
     }
@@ -130,7 +131,7 @@ impl CombinedState {
             self,
             rec_update
         );
-        let pending_pay = self.their_state.my_balance() - self.my_state.my_balance();
+        let pending_pay = self.their_state.my_balance().sub(self.my_state.my_balance().clone());
 
         let our_prev_bal = self.their_state.my_balance().clone();
         self.their_state.apply_update(&rec_update, false)?;
@@ -140,13 +141,13 @@ impl CombinedState {
 
         if our_prev_bal >= *our_new_bal {
             // net effect was we payed them
-            let payment = our_prev_bal - our_new_bal;
+            let payment = our_prev_bal.sub(our_new_bal.clone());
             if payment > pending_pay {
                 bail!("we paid them too much somehow");
             }
         } else {
-            let payment = our_new_bal - our_prev_bal;
-            self.pending_receive += payment;
+            let payment = our_new_bal.sub(our_prev_bal.clone());
+            self.pending_receive = self.pending_receive.add(payment.clone());
         }
 
         Ok(())

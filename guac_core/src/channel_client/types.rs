@@ -5,6 +5,7 @@ use ethereum_types::U256;
 
 use crypto::CryptoService;
 use CRYPTO;
+use std::ops::Add;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum ChannelStatus {
@@ -150,14 +151,14 @@ impl Channel {
             bail!("sig is bad")
         }
 
-        if update.their_balance(self.is_a) + update.my_balance(self.is_a)
-            != self.my_balance() + self.their_balance()
+        if update.their_balance(self.is_a).add(update.my_balance(self.is_a).clone())
+            != self.my_balance().add(self.their_balance().clone())
         {
             bail!("balance does not add up")
         }
 
-        if update.their_balance(self.is_a) + update.my_balance(self.is_a)
-            != self.deposit_a.clone() + self.deposit_b.clone()
+        if update.their_balance(self.is_a).add(update.my_balance(self.is_a).clone())
+            != self.deposit_a.add(self.deposit_b.clone())
         {
             bail!("balance does not add up")
         }
