@@ -24,6 +24,7 @@ ethcore-transaction = {git="https://github.com/paritytech/parity.git"}
 ethkey = {git="https://github.com/paritytech/parity.git"}
 ethereum-types = "0.3.2"
 ethabi-derive = "5.1.2"
+# XXX: Bumping to 5.1.2 or later brings ethereum-types 0.4 which we don't want to use because other deps use ethereum-types 0.3.
 ethabi = "=5.1.1"
 multihash = "0.8.0"
 hex = "0.3.2"
