@@ -9,5 +9,5 @@ actix-web = {version = "0.7",  default-features = false}
 futures = "0.1"
 guac_core = {path="../guac_core"}
 failure = "0.1"
-althea_types = {git="https://github.com/mpapierski/althea_rs.git", branch="236-guac-integration"}
-num256 = {git="https://github.com/mpapierski/althea_rs.git", branch="236-guac-integration"}
+althea_types = "0.1.0"
+num256 = "0.1.0"
