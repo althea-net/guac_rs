@@ -10,8 +10,8 @@ rand = "0.4.2"
 futures = "0.1"
 failure_derive = "*"
 uuid = { version = "0.5", features = ["serde", "v4"] }
-althea_types = {git="https://github.com/mpapierski/althea_rs.git", branch="use-eth-types-0.3"}
-num256 = {git="https://github.com/mpapierski/althea_rs.git", branch="use-eth-types-0.3"}
+althea_types = {git="https://github.com/mpapierski/althea_rs.git", branch="236-guac-integration"}
+num256 = {git="https://github.com/mpapierski/althea_rs.git", branch="236-guac-integration"}
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
