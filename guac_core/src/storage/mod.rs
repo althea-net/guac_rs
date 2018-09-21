@@ -51,8 +51,7 @@ impl Storage {
                     keys.push(i.clone());
                 }
                 Ok(keys)
-            })
-            .from_err()
+            }).from_err()
     }
 
     pub fn get_all_channel_managers_mut(
@@ -67,8 +66,7 @@ impl Storage {
                     keys.push(i.clone().lock());
                 }
                 join_all(keys)
-            })
-            .from_err()
+            }).from_err()
     }
 
     pub fn get_channel(
@@ -82,8 +80,7 @@ impl Storage {
             .and_then(move |data| match data.addr_to_channel.get(&k) {
                 Some(v) => futures::future::ok(v.clone().lock()),
                 None => futures::future::err(format_err!("node not found")),
-            })
-            .and_then(|v: FutureGuard<ChannelManager>| v.from_err().and_then(|v| Ok(v)))
+            }).and_then(|v: FutureGuard<ChannelManager>| v.from_err().and_then(|v| Ok(v)))
     }
 
     pub fn init_data(
