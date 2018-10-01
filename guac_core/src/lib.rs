@@ -7,15 +7,13 @@ extern crate althea_types;
 extern crate base64;
 #[macro_use]
 extern crate failure;
-extern crate ethereum_types;
+extern crate clarity;
+extern crate ethabi;
 extern crate serde_json;
 extern crate tiny_keccak;
 extern crate uuid;
 #[macro_use]
 extern crate lazy_static;
-extern crate ethabi;
-extern crate ethcore_transaction;
-extern crate ethkey;
 extern crate hex;
 extern crate multihash;
 extern crate owning_ref;

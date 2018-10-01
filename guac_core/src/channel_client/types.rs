@@ -1,11 +1,11 @@
-use ethereum_types::{Address, Signature, U256};
+use clarity::{Address, BigEndianInt, Signature};
 use failure::Error;
 
 use crypto::CryptoService;
 use std::ops::Add;
 use CRYPTO;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Serialize, Debug, PartialEq, Eq)]
 pub enum ChannelStatus {
     Open,
     Joined,
@@ -13,34 +13,38 @@ pub enum ChannelStatus {
     Closed,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Channel {
-    pub channel_id: U256,
+    pub channel_id: BigEndianInt,
     pub address_a: Address,
     pub address_b: Address,
     pub channel_status: ChannelStatus,
-    pub deposit_a: U256,
-    pub deposit_b: U256,
-    pub challenge: U256,
-    pub nonce: U256,
-    pub close_time: U256,
-    pub balance_a: U256,
-    pub balance_b: U256,
+    pub deposit_a: BigEndianInt,
+    pub deposit_b: BigEndianInt,
+    pub challenge: BigEndianInt,
+    pub nonce: BigEndianInt,
+    pub close_time: BigEndianInt,
+    pub balance_a: BigEndianInt,
+    pub balance_b: BigEndianInt,
     pub is_a: bool,
 }
 
 impl Channel {
-    pub fn new_pair(deposit_a: U256, deposit_b: U256) -> (Channel, Channel) {
+    pub fn new_pair(deposit_a: BigEndianInt, deposit_b: BigEndianInt) -> (Channel, Channel) {
         let channel_a = Channel {
-            channel_id: 0.into(),
-            address_a: 1.into(),
-            address_b: 2.into(),
+            channel_id: 0u64.into(),
+            address_a: "0x0000000000000000000000000000000000000001"
+                .parse()
+                .unwrap(),
+            address_b: "0x0000000000000000000000000000000000000002"
+                .parse()
+                .unwrap(),
             channel_status: ChannelStatus::Joined,
-            deposit_a,
-            deposit_b,
-            challenge: 0.into(),
-            nonce: 0.into(),
-            close_time: 10.into(),
+            deposit_a: deposit_a.clone(),
+            deposit_b: deposit_b.clone(),
+            challenge: 0u64.into(),
+            nonce: 0u64.into(),
+            close_time: 10u64.into(),
             balance_a: deposit_a,
             balance_b: deposit_b,
             is_a: true,
@@ -48,14 +52,14 @@ impl Channel {
 
         let channel_b = Channel {
             is_a: false,
-            ..channel_a
+            ..channel_a.clone()
         };
 
         (channel_a, channel_b)
     }
 
-    pub fn total_deposit(&self) -> U256 {
-        self.deposit_a + self.deposit_b
+    pub fn total_deposit(&self) -> BigEndianInt {
+        self.deposit_a.clone() + self.deposit_b.clone()
     }
 
     pub fn swap(&self) -> Self {
@@ -67,61 +71,61 @@ impl Channel {
 }
 
 impl Channel {
-    pub fn get_my_address(&self) -> Address {
+    pub fn get_my_address(&self) -> &Address {
         match self.is_a {
-            true => self.address_a,
-            false => self.address_b,
+            true => &self.address_a,
+            false => &self.address_b,
         }
     }
-    pub fn get_their_address(&self) -> Address {
+    pub fn get_their_address(&self) -> &Address {
         match self.is_a {
-            true => self.address_b,
-            false => self.address_a,
+            true => &self.address_b,
+            false => &self.address_a,
         }
     }
-    pub fn my_balance(&self) -> &U256 {
+    pub fn my_balance(&self) -> &BigEndianInt {
         match self.is_a {
             true => &self.balance_a,
             false => &self.balance_b,
         }
     }
-    pub fn their_balance(&self) -> &U256 {
+    pub fn their_balance(&self) -> &BigEndianInt {
         match self.is_a {
             true => &self.balance_b,
             false => &self.balance_a,
         }
     }
-    pub fn my_balance_mut(&mut self) -> &mut U256 {
+    pub fn my_balance_mut(&mut self) -> &mut BigEndianInt {
         match self.is_a {
             true => &mut self.balance_a,
             false => &mut self.balance_b,
         }
     }
-    pub fn their_balance_mut(&mut self) -> &mut U256 {
+    pub fn their_balance_mut(&mut self) -> &mut BigEndianInt {
         match self.is_a {
             true => &mut self.balance_b,
             false => &mut self.balance_a,
         }
     }
-    pub fn my_deposit(&self) -> &U256 {
+    pub fn my_deposit(&self) -> &BigEndianInt {
         match self.is_a {
             true => &self.deposit_a,
             false => &self.deposit_b,
         }
     }
-    pub fn their_deposit(&self) -> &U256 {
+    pub fn their_deposit(&self) -> &BigEndianInt {
         match self.is_a {
             true => &self.deposit_b,
             false => &self.deposit_a,
         }
     }
-    pub fn my_deposit_mut(&mut self) -> &mut U256 {
+    pub fn my_deposit_mut(&mut self) -> &mut BigEndianInt {
         match self.is_a {
             true => &mut self.deposit_a,
             false => &mut self.deposit_b,
         }
     }
-    pub fn their_deposit_mut(&mut self) -> &mut U256 {
+    pub fn their_deposit_mut(&mut self) -> &mut BigEndianInt {
         match self.is_a {
             true => &mut self.deposit_b,
             false => &mut self.deposit_a,
@@ -151,16 +155,18 @@ impl Channel {
 
         if update
             .their_balance(self.is_a)
+            .clone()
             .add(update.my_balance(self.is_a).clone())
-            != self.my_balance().add(self.their_balance().clone())
+            != self.my_balance().clone().add(self.their_balance().clone())
         {
             bail!("balance does not add up")
         }
 
         if update
             .their_balance(self.is_a)
+            .clone()
             .add(update.my_balance(self.is_a).clone())
-            != self.deposit_a.add(self.deposit_b.clone())
+            != self.deposit_a.clone().add(self.deposit_b.clone())
         {
             bail!("balance does not add up")
         }
@@ -173,28 +179,28 @@ impl Channel {
             bail!("balance validation failed")
         }
 
-        self.balance_a = update.balance_a;
-        self.balance_b = update.balance_b;
-        self.nonce = update.nonce;
+        self.balance_a = update.balance_a.clone();
+        self.balance_b = update.balance_b.clone();
+        self.nonce = update.nonce.clone();
 
         Ok(())
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct NewChannelTx {
     pub to: Address,
-    pub challenge: U256,
-    pub deposit: U256,
+    pub challenge: BigEndianInt,
+    pub deposit: BigEndianInt,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct UpdateTx {
-    pub channel_id: U256,
-    pub nonce: U256,
+    pub channel_id: BigEndianInt,
+    pub nonce: BigEndianInt,
 
-    pub balance_a: U256,
-    pub balance_b: U256,
+    pub balance_a: BigEndianInt,
+    pub balance_b: BigEndianInt,
 
     pub signature_a: Option<Signature>,
     pub signature_b: Option<Signature>,
@@ -203,21 +209,21 @@ pub struct UpdateTx {
 impl UpdateTx {
     pub fn set_my_signature(&mut self, is_a: bool, signature: &Signature) {
         match is_a {
-            true => self.signature_a = Some(*signature),
-            false => self.signature_b = Some(*signature),
+            true => self.signature_a = Some(signature.clone()),
+            false => self.signature_b = Some(signature.clone()),
         }
     }
     pub fn validate_their_signature(&self, _is_a: bool) -> bool {
         // TODO: actually do validation
         true
     }
-    pub fn their_balance(&self, is_a: bool) -> &U256 {
+    pub fn their_balance(&self, is_a: bool) -> &BigEndianInt {
         match is_a {
             true => &self.balance_b,
             false => &self.balance_a,
         }
     }
-    pub fn my_balance(&self, is_a: bool) -> &U256 {
+    pub fn my_balance(&self, is_a: bool) -> &BigEndianInt {
         match is_a {
             true => &self.balance_a,
             false => &self.balance_b,
@@ -225,23 +231,20 @@ impl UpdateTx {
     }
     pub fn set_their_signature(&mut self, is_a: bool, signature: &Signature) {
         match is_a {
-            true => self.signature_b = Some(*signature),
-            false => self.signature_a = Some(*signature),
+            true => self.signature_b = Some(signature.clone()),
+            false => self.signature_a = Some(signature.clone()),
         }
     }
 
-    pub fn sign(&mut self, is_a: bool, channel_id: U256) {
-        let mut nonce = [0u8; 32];
-        self.nonce.to_big_endian(&mut nonce);
-        let mut balance_a = [0u8; 32];
-        self.balance_a.to_big_endian(&mut balance_a);
-        let mut balance_b = [0u8; 32];
-        self.balance_b.to_big_endian(&mut balance_b);
+    pub fn sign(&mut self, is_a: bool, channel_id: BigEndianInt) {
+        let nonce: [u8; 32] = self.nonce.clone().into();
+        let balance_a: [u8; 32] = self.balance_a.clone().into();
+        let balance_b: [u8; 32] = self.balance_b.clone().into();
 
-        let channel_id: [u8; 32] = channel_id.into();
+        let channel_id: [u8; 32] = channel_id.clone().into();
 
         let fingerprint = CRYPTO.hash_bytes(&[&channel_id, &nonce, &balance_a, &balance_b]);
-        let fingerprint: [u8; 32] = fingerprint.into();
+        let fingerprint: [u8; 32] = fingerprint.clone().into();
 
         let my_sig = CRYPTO.eth_sign(&fingerprint);
 

@@ -2,7 +2,7 @@ extern crate actix;
 extern crate actix_web;
 extern crate althea_types;
 extern crate bytes;
-extern crate ethereum_types;
+extern crate clarity;
 #[macro_use]
 extern crate failure;
 extern crate futures;
@@ -34,7 +34,7 @@ mod network_requests;
 
 pub use network_endpoints::init_server;
 
-use ethereum_types::{Address, U256};
+use clarity::{Address, BigEndianInt};
 use network_requests::tick;
 use std::ops::{Add, Sub};
 
@@ -149,11 +149,11 @@ impl Handler<Register> for PaymentController {
 pub struct Withdraw(pub Address);
 
 impl Message for Withdraw {
-    type Result = Result<U256, Error>;
+    type Result = Result<BigEndianInt, Error>;
 }
 
 impl Handler<Withdraw> for PaymentController {
-    type Result = ResponseFuture<U256, Error>;
+    type Result = ResponseFuture<BigEndianInt, Error>;
     fn handle(&mut self, msg: Withdraw, _: &mut Context<Self>) -> Self::Result {
         Box::new(STORAGE.get_channel(msg.0).and_then(move |mut i| {
             let withdraw = i.withdraw()?;
@@ -168,11 +168,11 @@ impl Handler<Withdraw> for PaymentController {
 pub struct GetOwnBalance;
 
 impl Message for GetOwnBalance {
-    type Result = Result<U256, Error>;
+    type Result = Result<BigEndianInt, Error>;
 }
 
 impl Handler<GetOwnBalance> for PaymentController {
-    type Result = Result<U256, Error>;
+    type Result = Result<BigEndianInt, Error>;
     fn handle(&mut self, _msg: GetOwnBalance, _: &mut Context<Self>) -> Self::Result {
         Ok(CRYPTO.get_balance().clone())
     }

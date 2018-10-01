@@ -1,6 +1,6 @@
-use ethereum_types::Address;
+use clarity::Address;
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Serialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Counterparty {
     pub address: Address,
     // assuming ipv6 socketaddr
