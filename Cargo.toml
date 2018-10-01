@@ -2,4 +2,5 @@
 members = ["guac_core", "guac_actix", "guac_http"]
 
 [patch.crates-io]
-althea_types = {git="https://github.com/althea-mesh/althea_rs.git"}
+althea_types = {git="https://github.com/mpapierski/althea_rs.git", branch="236-guac-integration"}
+clarity = {git="https://github.com/mpapierski/clarity", branch="23-hash"}
