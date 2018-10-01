@@ -85,15 +85,16 @@ impl Handler<MakePayment> for PaymentController {
 
     fn handle(&mut self, msg: MakePayment, _ctx: &mut Context<Self>) -> Self::Result {
         trace!("sending payment {:?}", msg);
-        *CRYPTO.get_balance_mut() = CRYPTO.get_balance_mut().sub(msg.0.amount.clone().into());
-        Box::new(
-            STORAGE
-                .get_channel(msg.0.to.eth_address)
-                .and_then(move |mut channel_manager| {
-                    channel_manager.pay_counterparty(msg.0.amount.clone().into())?;
-                    Ok(())
-                }),
-        )
+        *CRYPTO.get_balance_mut() = CRYPTO
+            .get_balance_mut()
+            .clone()
+            .sub(msg.0.amount.clone().into());
+        Box::new(STORAGE.get_channel(msg.0.to.eth_address.clone()).and_then(
+            move |mut channel_manager| {
+                channel_manager.pay_counterparty(msg.0.amount.clone().into())?;
+                Ok(())
+            },
+        ))
     }
 }
 
@@ -155,10 +156,10 @@ impl Message for Withdraw {
 impl Handler<Withdraw> for PaymentController {
     type Result = ResponseFuture<BigEndianInt, Error>;
     fn handle(&mut self, msg: Withdraw, _: &mut Context<Self>) -> Self::Result {
-        Box::new(STORAGE.get_channel(msg.0).and_then(move |mut i| {
+        Box::new(STORAGE.get_channel(msg.0.clone()).and_then(move |mut i| {
             let withdraw = i.withdraw()?;
-            trace!("withdrew {:?} from {:?}", withdraw, msg.0);
-            *CRYPTO.get_balance_mut() = CRYPTO.get_balance_mut().add(withdraw.clone());
+            trace!("withdrew {:?} from {:?}", withdraw, &msg.0);
+            *CRYPTO.get_balance_mut() = CRYPTO.get_balance().add(withdraw.clone());
 
             Ok(withdraw)
         }))

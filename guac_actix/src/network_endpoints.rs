@@ -19,17 +19,17 @@ use std::net::SocketAddr;
 
 pub fn init_server(port: u16) {
     server::new(|| {
-        App::new()
-            .resource("/update", |r| {
-                r.method(Method::POST).with_async(update_endpoint)
-            })
-            // .resource("/propose", |r| {
-            //     r.method(Method::POST).with_async(propose_channel_endpoint)
-            // }).resource("/channel_created", |r| {
-            //     r.method(Method::POST).with_async(channel_created_endpoint)
-            // }).resource("/channel_joined", |r| {
-            //     r.method(Method::POST).with_async(channel_joined_endpoint)
-            // })
+        App::new().resource("/update", |r| {
+            r.method(Method::POST).with_async(update_endpoint)
+        })
+        // TODO: Uncomment this code once other errors are fixed
+        // .resource("/propose", |r| {
+        //     r.method(Method::POST).with_async(propose_channel_endpoint)
+        // }).resource("/channel_created", |r| {
+        //     r.method(Method::POST).with_async(channel_created_endpoint)
+        // }).resource("/channel_joined", |r| {
+        //     r.method(Method::POST).with_async(channel_joined_endpoint)
+        // })
     }).bind(&format!("[::0]:{}", port))
     .unwrap()
     .start();
@@ -60,7 +60,7 @@ pub fn propose_channel_endpoint(
     let to_url = format!("[{}]:4874", from.ip());
 
     let counterparty = Counterparty {
-        address: channel.from_addr,
+        address: channel.from_addr.clone(),
         url: to_url,
     };
     trace!("inserting state {:?}", counterparty);
