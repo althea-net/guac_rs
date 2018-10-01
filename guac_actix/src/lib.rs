@@ -90,7 +90,7 @@ impl Handler<MakePayment> for PaymentController {
             STORAGE
                 .get_channel(msg.0.to.eth_address)
                 .and_then(move |mut channel_manager| {
-                    channel_manager.pay_counterparty(msg.0.amount)?;
+                    channel_manager.pay_counterparty(msg.0.amount.clone().into())?;
                     Ok(())
                 }),
         )
