@@ -5,7 +5,7 @@ use crypto::CryptoService;
 use std::ops::Add;
 use CRYPTO;
 
-#[derive(Copy, Clone, Serialize, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum ChannelStatus {
     Open,
     Joined,
@@ -13,7 +13,7 @@ pub enum ChannelStatus {
     Closed,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Channel {
     pub channel_id: BigEndianInt,
     pub address_a: Address,
