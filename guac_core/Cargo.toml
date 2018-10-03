@@ -29,3 +29,4 @@ dotenv = "0.10"
 qutex = "^0.2"
 owning_ref = "0.4"
 clarity = {git="https://github.com/mpapierski/clarity", branch="23-hash"}
+sha3 = "0.8"

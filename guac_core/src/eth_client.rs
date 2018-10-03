@@ -25,7 +25,7 @@ fn get_ethcalate_abi() -> Contract {
 
 fn create_update_tx(update: UpdateTx) -> Transaction {
     let channel_id: [u8; 32] = update.channel_id.into();
-    unimplemented!();
+    unimplemented!("Update tx");
 
     // let data = ABI
     //     .function("updateState")
@@ -59,7 +59,7 @@ fn create_update_tx(update: UpdateTx) -> Transaction {
 }
 
 fn create_new_channel_tx(update: NewChannelTx) -> Transaction {
-    unimplemented!();
+    unimplemented!("New channel");
     // let data = ABI
     //     .function("openChannel")
     //     .unwrap()
@@ -111,7 +111,9 @@ fn test_create_update_tx() {
 #[test]
 fn test_new_channel_tx() {
     let tx = create_new_channel_tx(NewChannelTx {
-        to: "0x0000000000000000000000000000007b".parse().unwrap(),
+        to: "0x000000000000000000000000000000000000007b"
+            .parse()
+            .expect("Unable to parse address"),
         challenge: 23u32.into(),
         deposit: 100u32.into(),
     });

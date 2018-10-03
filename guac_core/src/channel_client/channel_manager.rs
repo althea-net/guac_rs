@@ -518,9 +518,15 @@ mod tests {
 
         let proposal = manager_a
             .propose_channel(
-                "0x00000000000000000000000000000001".parse().unwrap(),
-                "0x00000000000000000000000000000002".parse().unwrap(),
-                "0x00000000000000000000000000000064".parse().unwrap(),
+                "0x0000000000000000000000000000000000000001"
+                    .parse()
+                    .unwrap(),
+                "0x0000000000000000000000000000000000000002"
+                    .parse()
+                    .unwrap(),
+                "0x0000000000000000000000000000000000000064"
+                    .parse()
+                    .unwrap(),
             ).unwrap();
 
         let channel_prop = match proposal {
@@ -557,9 +563,15 @@ mod tests {
 
         let proposal_a = manager_a
             .propose_channel(
-                "0x00000000000000000000000000000001".parse().unwrap(),
-                "0x00000000000000000000000000000002".parse().unwrap(),
-                "0x00000000000000000000000000000064".parse().unwrap(),
+                "0x0000000000000000000000000000000000000001"
+                    .parse()
+                    .unwrap(),
+                "0x0000000000000000000000000000000000000002"
+                    .parse()
+                    .unwrap(),
+                "0x0000000000000000000000000000000000000064"
+                    .parse()
+                    .unwrap(),
             ).unwrap();
 
         let channel_prop_a = match proposal_a {
@@ -569,9 +581,15 @@ mod tests {
 
         let proposal_b = manager_b
             .propose_channel(
-                "0x00000000000000000000000000000002".parse().unwrap(),
-                "0x00000000000000000000000000000001".parse().unwrap(),
-                "0x00000000000000000000000000000064".parse().unwrap(),
+                "0x0000000000000000000000000000000000000002"
+                    .parse()
+                    .unwrap(),
+                "0x0000000000000000000000000000000000000001"
+                    .parse()
+                    .unwrap(),
+                "0x0000000000000000000000000000000000000064"
+                    .parse()
+                    .unwrap(),
             ).unwrap();
 
         let channel_prop_b = match proposal_b {
@@ -595,12 +613,16 @@ mod tests {
         manager_a
             .channel_created(
                 &channel_prop_a,
-                "0x00000000000000000000000000000001".parse().unwrap(),
+                "0x0000000000000000000000000000000000000001"
+                    .parse()
+                    .unwrap(),
             ).unwrap();
         manager_b
             .channel_created(
                 &channel_prop_a,
-                "0x00000000000000000000000000000002".parse().unwrap(),
+                "0x0000000000000000000000000000000000000002"
+                    .parse()
+                    .unwrap(),
             ).unwrap();
 
         assert_eq!(

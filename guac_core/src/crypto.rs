@@ -2,6 +2,7 @@ use clarity::{Address, BigEndianInt, PrivateKey, Signature};
 use multihash::{encode, Hash};
 
 use owning_ref::RwLockWriteGuardRefMut;
+use sha3::{Digest, Keccak256};
 use std::sync::{Arc, RwLock};
 
 /// A global object which stores per node crypto state
@@ -57,12 +58,17 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         self.read().unwrap().balance.clone()
     }
     fn eth_sign(&self, data: &[u8]) -> Signature {
-        unimplemented!();
+        unimplemented!("eth sign");
     }
-    fn hash_bytes(&self, _x: &[&[u8]]) -> BigEndianInt {
-        "0x00000000000000000000000000000000".parse().unwrap()
+    fn hash_bytes(&self, x: &[&[u8]]) -> BigEndianInt {
+        let mut hasher = Keccak256::new();
+        for buffer in x {
+            hasher.input(*buffer)
+        }
+        let bytes = hasher.result();
+        BigEndianInt::from_bytes_be(&bytes)
     }
     fn verify(_fingerprint: &BigEndianInt, _signature: &Signature, _address: Address) -> bool {
-        true
+        unimplemented!("verify")
     }
 }
