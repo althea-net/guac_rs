@@ -32,7 +32,9 @@ pub trait CryptoService {
 impl Crypto {
     fn new() -> Crypto {
         Crypto {
-            secret: PrivateKey::new(),
+            secret: "1010101010101010101010101010101010101010101010101010101010101010"
+                .parse()
+                .unwrap(),
             balance: 1_000_000_000_000u64.into(),
         }
     }
@@ -58,7 +60,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         self.read().unwrap().balance.clone()
     }
     fn eth_sign(&self, data: &[u8]) -> Signature {
-        unimplemented!("eth sign");
+        self.read().unwrap().secret.sign_hash(data)
     }
     fn hash_bytes(&self, x: &[&[u8]]) -> BigEndianInt {
         let mut hasher = Keccak256::new();
