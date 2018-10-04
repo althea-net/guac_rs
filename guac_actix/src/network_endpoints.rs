@@ -19,16 +19,16 @@ use std::net::SocketAddr;
 
 pub fn init_server(port: u16) {
     server::new(|| {
-        App::new().resource("/update", |r| {
-            r.method(Method::POST).with_async(update_endpoint)
-        })
-        .resource("/propose", |r| {
-            r.method(Method::POST).with_async(propose_channel_endpoint)
-        }).resource("/channel_created", |r| {
-            r.method(Method::POST).with_async(channel_created_endpoint)
-        }).resource("/channel_joined", |r| {
-            r.method(Method::POST).with_async(channel_joined_endpoint)
-        })
+        App::new()
+            .resource("/update", |r| {
+                r.method(Method::POST).with_async(update_endpoint)
+            }).resource("/propose", |r| {
+                r.method(Method::POST).with_async(propose_channel_endpoint)
+            }).resource("/channel_created", |r| {
+                r.method(Method::POST).with_async(channel_created_endpoint)
+            }).resource("/channel_joined", |r| {
+                r.method(Method::POST).with_async(channel_joined_endpoint)
+            })
     }).bind(&format!("[::0]:{}", port))
     .unwrap()
     .start();
