@@ -1,5 +1,2 @@
 [workspace]
 members = ["guac_core", "guac_actix", "guac_http"]
-
-[patch.crates-io]
-althea_types = {git="https://github.com/althea-mesh/althea_rs.git"}

@@ -24,7 +24,7 @@ use guac_core::counterparty::Counterparty;
 /// happen on a cycle.
 pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error> {
     STORAGE
-        .get_channel(counterparty.address)
+        .get_channel(counterparty.address.clone())
         .and_then(move |mut channel_manager| {
             // The channel_manager here is a mutex guard of a ChannelManager, which ensures that
             // the data within is not tampered with in the rest of the program while these requests
@@ -36,15 +36,15 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
             let mut temp_channel_manager = channel_manager.clone();
             trace!(
                 "counterparty {:?} is in state {:?}",
-                counterparty,
+                counterparty.clone(),
                 temp_channel_manager
             );
             let action = temp_channel_manager
-                .tick(CRYPTO.own_eth_addr(), counterparty.address)
+                .tick(CRYPTO.own_eth_addr(), counterparty.address.clone())
                 .unwrap();
             trace!(
                 "counterparty {:?} is in state {:?} after update, returning action {:?}",
-                counterparty,
+                counterparty.clone(),
                 temp_channel_manager,
                 action
             );

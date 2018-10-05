@@ -1,6 +1,6 @@
 use failure::Error;
 
-use ethereum_types::U256;
+use clarity::BigEndianInt;
 
 use channel_client::types::{Channel, UpdateTx};
 use std::ops::{Add, Sub};
@@ -13,7 +13,7 @@ use std::ops::{Add, Sub};
 /// NOTE: In both states the is_a bool is constant, instead of being flipped on `their_state`
 /// This is because the numerous `.my_...` and `.their_...` methods on the `Channel` structs rely on
 /// that to work, and the code would be a lot more confusing if it was flipped
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct CombinedState {
     /// This represents our current state
     their_state: Channel,
@@ -22,7 +22,7 @@ pub struct CombinedState {
 
     /// This represents the amount of money we have confirmed we will recieve from them, but have
     /// not been `withdraw`n yet
-    pending_receive: U256,
+    pending_receive: BigEndianInt,
 }
 
 impl CombinedState {
@@ -30,7 +30,7 @@ impl CombinedState {
         CombinedState {
             their_state: channel.clone(),
             my_state: channel.clone(),
-            pending_receive: 0.into(),
+            pending_receive: 0u32.into(),
         }
     }
 
@@ -54,28 +54,33 @@ impl CombinedState {
     /// updates, mearly ensures that the next state update we create will give the counterparty the
     /// amount sent. This function returns the "overflow" (amount - current balance in channel) if
     /// we don't have enough monty in the channel
-    pub fn pay_counterparty(&mut self, amount: U256) -> Result<U256, Error> {
+    pub fn pay_counterparty(&mut self, amount: BigEndianInt) -> Result<BigEndianInt, Error> {
         if amount > *self.my_state.my_balance_mut() {
-            let remaining_amount = amount - *self.my_state.my_balance();
+            let remaining_amount = amount.clone() - self.my_state.my_balance().clone();
 
             *self.my_state.their_balance_mut() = self
                 .my_state
                 .their_balance_mut()
+                .clone()
                 .add(self.my_state.my_balance().clone());
-            *self.my_state.my_balance_mut() = 0.into();
+            *self.my_state.my_balance_mut() = 0u32.into();
 
             Ok(remaining_amount)
         } else {
-            *self.my_state.my_balance_mut() = self.my_state.my_balance_mut().sub(amount.clone());
-            *self.my_state.their_balance_mut() =
-                self.my_state.their_balance_mut().add(amount.clone());
-            Ok(0.into())
+            *self.my_state.my_balance_mut() =
+                self.my_state.my_balance_mut().clone().sub(amount.clone());
+            *self.my_state.their_balance_mut() = self
+                .my_state
+                .their_balance_mut()
+                .clone()
+                .add(amount.clone());
+            Ok(0u32.into())
         }
     }
 
-    pub fn withdraw(&mut self) -> Result<U256, Error> {
-        let withdraw = self.pending_receive;
-        self.pending_receive = 0.into();
+    pub fn withdraw(&mut self) -> Result<BigEndianInt, Error> {
+        let withdraw = self.pending_receive.clone();
+        self.pending_receive = 0u32.into();
         Ok(withdraw)
     }
 
@@ -85,7 +90,7 @@ impl CombinedState {
     pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
         let mut state = self.my_state.clone();
 
-        state.nonce = state.nonce.add(1.into());
+        state.nonce = state.nonce.add(1u8.into());
 
         Ok(state.create_update())
     }
@@ -102,6 +107,7 @@ impl CombinedState {
         let pending_pay = self
             .their_state
             .my_balance()
+            .clone()
             .sub(self.my_state.my_balance().clone());
 
         // by applying their state update on top of their state, we can know how much they are going
@@ -114,9 +120,13 @@ impl CombinedState {
             "My balance needs to be bigger than our previous balance"
         );
 
-        let transfer = self.their_state.my_balance().sub(our_prev_bal.clone());
+        let transfer = self
+            .their_state
+            .my_balance()
+            .clone()
+            .sub(our_prev_bal.clone());
 
-        self.pending_receive = self.pending_receive.add(transfer.clone());
+        self.pending_receive = self.pending_receive.clone().add(transfer.clone());
 
         // This essentially "rolls back" any payments we have done
         self.my_state = self.their_state.clone();
@@ -124,9 +134,16 @@ impl CombinedState {
         assert!(&pending_pay <= self.their_state.my_balance());
 
         // so here we put it back
-        *self.my_state.my_balance_mut() = self.my_state.my_balance_mut().sub(pending_pay.clone());
-        *self.my_state.their_balance_mut() =
-            self.my_state.their_balance_mut().add(pending_pay.clone());
+        *self.my_state.my_balance_mut() = self
+            .my_state
+            .my_balance_mut()
+            .clone()
+            .sub(pending_pay.clone());
+        *self.my_state.their_balance_mut() = self
+            .my_state
+            .their_balance_mut()
+            .clone()
+            .add(pending_pay.clone());
 
         Ok(self.create_payment()?)
     }
@@ -142,6 +159,7 @@ impl CombinedState {
         let pending_pay = self
             .their_state
             .my_balance()
+            .clone()
             .sub(self.my_state.my_balance().clone());
 
         let our_prev_bal = self.their_state.my_balance().clone();
@@ -157,8 +175,8 @@ impl CombinedState {
                 bail!("we paid them too much somehow");
             }
         } else {
-            let payment = our_new_bal.sub(our_prev_bal.clone());
-            self.pending_receive = self.pending_receive.add(payment.clone());
+            let payment = our_new_bal.clone().sub(our_prev_bal.clone());
+            self.pending_receive = self.pending_receive.clone().add(payment.clone());
         }
 
         Ok(())
@@ -169,7 +187,10 @@ impl CombinedState {
 mod tests {
     use super::*;
 
-    fn new_pair(deposit_a: U256, deposit_b: U256) -> (CombinedState, CombinedState) {
+    fn new_pair(
+        deposit_a: BigEndianInt,
+        deposit_b: BigEndianInt,
+    ) -> (CombinedState, CombinedState) {
         let (channel_a, channel_b) = Channel::new_pair(deposit_a, deposit_b);
         (
             CombinedState::new(&channel_a),
@@ -179,7 +200,7 @@ mod tests {
 
     #[test]
     fn test_channel_manager_unidirectional_empty() {
-        let (mut a, mut b) = new_pair(100.into(), 100.into());
+        let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         let payment = a.create_payment().unwrap();
 
@@ -188,17 +209,17 @@ mod tests {
 
         a.received_updated_state(&response).unwrap();
 
-        assert_eq!(a.withdraw().unwrap(), 0.into());
-        assert_eq!(b.withdraw().unwrap(), 0.into());
+        assert_eq!(a.withdraw().unwrap(), 0u32.into());
+        assert_eq!(b.withdraw().unwrap(), 0u32.into());
     }
 
     #[test]
     fn test_channel_manager_unidirectional_overpay() {
-        let (mut a, mut b) = new_pair(100.into(), 100.into());
+        let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
-        let overflow = a.pay_counterparty(150.into()).unwrap();
+        let overflow = a.pay_counterparty(150u32.into()).unwrap();
 
-        assert_eq!(overflow, 50.into());
+        assert_eq!(overflow, 50u32.into());
 
         let payment = a.create_payment().unwrap();
 
@@ -207,15 +228,15 @@ mod tests {
 
         a.received_updated_state(&response).unwrap();
 
-        assert_eq!(a.withdraw().unwrap(), 0.into());
-        assert_eq!(b.withdraw().unwrap(), 100.into());
+        assert_eq!(a.withdraw().unwrap(), 0u32.into());
+        assert_eq!(b.withdraw().unwrap(), 100u32.into());
     }
 
     #[test]
     fn test_channel_manager_unidirectional() {
-        let (mut a, mut b) = new_pair(100.into(), 100.into());
+        let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
-        a.pay_counterparty(20.into()).unwrap();
+        a.pay_counterparty(20u32.into()).unwrap();
 
         let payment = a.create_payment().unwrap();
 
@@ -224,17 +245,17 @@ mod tests {
 
         a.received_updated_state(&&response).unwrap();
 
-        assert_eq!(b.withdraw().unwrap(), 20.into());
-        assert_eq!(b.withdraw().unwrap(), 0.into());
-        assert_eq!(a.withdraw().unwrap(), 0.into());
+        assert_eq!(b.withdraw().unwrap(), 20u32.into());
+        assert_eq!(b.withdraw().unwrap(), 0u32.into());
+        assert_eq!(a.withdraw().unwrap(), 0u32.into());
     }
 
     #[test]
     fn test_channel_manager_bidirectional() {
-        let (mut a, mut b) = new_pair(100.into(), 100.into());
+        let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 5
-        a.pay_counterparty(5.into()).unwrap();
+        a.pay_counterparty(5u32.into()).unwrap();
 
         let payment = a.create_payment().unwrap();
 
@@ -244,7 +265,7 @@ mod tests {
         a.received_updated_state(&response).unwrap();
 
         // B -> A 3
-        b.pay_counterparty(3.into()).unwrap();
+        b.pay_counterparty(3u32.into()).unwrap();
 
         let payment = b.create_payment().unwrap();
 
@@ -252,17 +273,17 @@ mod tests {
 
         b.received_updated_state(&response).unwrap();
 
-        assert_eq!(a.withdraw().unwrap(), 3.into());
-        assert_eq!(b.withdraw().unwrap(), 5.into());
+        assert_eq!(a.withdraw().unwrap(), 3u32.into());
+        assert_eq!(b.withdraw().unwrap(), 5u32.into());
     }
 
     #[test]
     fn test_channel_manager_bidirectional_race() {
-        let (mut a, mut b) = new_pair(100.into(), 100.into());
+        let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 3 and B -> A 5 at the same time
-        a.pay_counterparty(3.into()).unwrap();
-        b.pay_counterparty(5.into()).unwrap();
+        a.pay_counterparty(3u32.into()).unwrap();
+        b.pay_counterparty(5u32.into()).unwrap();
 
         let payment_a = a.create_payment().unwrap();
         let payment_b = b.create_payment().unwrap();
@@ -281,17 +302,17 @@ mod tests {
 
         a.received_updated_state(&response).unwrap();
 
-        assert_eq!(a.withdraw().unwrap(), 5.into());
-        assert_eq!(b.withdraw().unwrap(), 3.into());
+        assert_eq!(a.withdraw().unwrap(), 5u32.into());
+        assert_eq!(b.withdraw().unwrap(), 3u32.into());
     }
 
     #[test]
     fn test_channel_manager_bidirectional_race_resume() {
-        let (mut a, mut b) = new_pair(100.into(), 100.into());
+        let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 3 and B -> A 5 at the same time
-        a.pay_counterparty(3.into()).unwrap();
-        b.pay_counterparty(5.into()).unwrap();
+        a.pay_counterparty(3u32.into()).unwrap();
+        b.pay_counterparty(5u32.into()).unwrap();
 
         let payment_a = a.create_payment().unwrap();
         let payment_b = b.create_payment().unwrap();
@@ -305,7 +326,7 @@ mod tests {
         b.received_updated_state(&response_a).unwrap();
 
         // A -> B 1
-        a.pay_counterparty(1.into()).unwrap();
+        a.pay_counterparty(1u8.into()).unwrap();
 
         let payment = a.create_payment().unwrap();
 
@@ -314,22 +335,22 @@ mod tests {
 
         a.received_updated_state(&response).unwrap();
 
-        assert_eq!(a.withdraw().unwrap(), 5.into());
-        assert_eq!(b.withdraw().unwrap(), 4.into());
+        assert_eq!(a.withdraw().unwrap(), 5u32.into());
+        assert_eq!(b.withdraw().unwrap(), 4u32.into());
     }
 
     #[test]
     fn test_channel_manager_bidirectional_race_multi() {
-        let (mut a, mut b) = new_pair(100.into(), 100.into());
+        let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 1, B offline
         // A -> B 2, B -> A 4
-        a.pay_counterparty(1.into()).unwrap();
+        a.pay_counterparty(1u8.into()).unwrap();
 
         let payment_a1 = a.create_payment().unwrap();
 
-        a.pay_counterparty(2.into()).unwrap();
-        b.pay_counterparty(4.into()).unwrap();
+        a.pay_counterparty(2u32.into()).unwrap();
+        b.pay_counterparty(4u32.into()).unwrap();
 
         let payment_a2 = a.create_payment().unwrap();
         let payment_b = b.create_payment().unwrap();
@@ -362,22 +383,22 @@ mod tests {
 
         b.received_updated_state(&response).unwrap();
 
-        assert_eq!(a.withdraw().unwrap(), 4.into());
-        assert_eq!(b.withdraw().unwrap(), 3.into());
+        assert_eq!(a.withdraw().unwrap(), 4u32.into());
+        assert_eq!(b.withdraw().unwrap(), 3u32.into());
     }
 
     #[test]
     fn test_channel_manager_bidirectional_race_multi_resume() {
-        let (mut a, mut b) = new_pair(100.into(), 100.into());
+        let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 3, B no response
         // A -> B 3, B -> A 5
-        a.pay_counterparty(3.into()).unwrap();
+        a.pay_counterparty(3u32.into()).unwrap();
 
         let payment_a1 = a.create_payment().unwrap();
 
-        a.pay_counterparty(3.into()).unwrap();
-        b.pay_counterparty(5.into()).unwrap();
+        a.pay_counterparty(3u32.into()).unwrap();
+        b.pay_counterparty(5u32.into()).unwrap();
 
         let payment_a2 = a.create_payment().unwrap();
         let payment_b = b.create_payment().unwrap();
@@ -394,7 +415,7 @@ mod tests {
         b.received_updated_state(&response_a).unwrap();
 
         // A -> B 10
-        a.pay_counterparty(10.into()).unwrap();
+        a.pay_counterparty(10u32.into()).unwrap();
 
         let payment = a.create_payment().unwrap();
 
@@ -403,7 +424,7 @@ mod tests {
 
         a.received_updated_state(&response).unwrap();
 
-        assert_eq!(a.withdraw().unwrap(), 5.into());
-        assert_eq!(b.withdraw().unwrap(), 16.into());
+        assert_eq!(a.withdraw().unwrap(), 5u32.into());
+        assert_eq!(b.withdraw().unwrap(), 16u32.into());
     }
 }

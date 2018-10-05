@@ -1,5 +1,5 @@
+use clarity::Address;
 use counterparty::Counterparty;
-use ethereum_types::Address;
 use failure::Error;
 
 use futures;
@@ -95,8 +95,10 @@ impl Storage {
             .from_err()
             .and_then(move |mut data| {
                 if !data.addr_to_counterparty.contains_key(&k.address) {
-                    data.addr_to_counterparty.insert(k.address, k.clone());
-                    data.addr_to_channel.insert(k.address, Qutex::new(v));
+                    data.addr_to_counterparty
+                        .insert(k.address.clone(), k.clone());
+                    data.addr_to_channel
+                        .insert(k.address.clone(), Qutex::new(v));
                 } else {
                     bail!("Already exists");
                 }

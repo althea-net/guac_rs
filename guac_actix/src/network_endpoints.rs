@@ -59,7 +59,7 @@ pub fn propose_channel_endpoint(
     let to_url = format!("[{}]:4874", from.ip());
 
     let counterparty = Counterparty {
-        address: channel.from_addr,
+        address: channel.from_addr.clone(),
         url: to_url,
     };
     trace!("inserting state {:?}", counterparty);
