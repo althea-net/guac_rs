@@ -360,27 +360,10 @@ impl ChannelManager {
                     "Their deposit must be 0 to begin with"
                 );
 
-                *state.my_state_mut().their_deposit_mut() = state
-                    .my_state_mut()
-                    .their_deposit_mut()
-                    .clone()
-                    .add(chan.deposit_b.clone());
-                *state.my_state_mut().their_balance_mut() = state
-                    .my_state_mut()
-                    .their_balance_mut()
-                    .clone()
-                    .add(chan.deposit_b.clone());
-
-                *state.their_state_mut().their_deposit_mut() = state
-                    .their_state_mut()
-                    .their_deposit_mut()
-                    .clone()
-                    .add(chan.deposit_b.clone());
-                *state.their_state_mut().their_balance_mut() = state
-                    .their_state_mut()
-                    .their_balance_mut()
-                    .clone()
-                    .add(chan.deposit_b.clone());
+                *state.my_state_mut().their_deposit_mut() += chan.clone().deposit_b;
+                *state.my_state_mut().their_balance_mut() += chan.clone().deposit_b;
+                *state.their_state_mut().their_deposit_mut() += chan.clone().deposit_b;
+                *state.their_state_mut().their_balance_mut() += chan.clone().deposit_b;
             }
             _ => bail!("must be in state joined before counterparty joins"),
         };
