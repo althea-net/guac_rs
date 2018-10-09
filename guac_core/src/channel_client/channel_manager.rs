@@ -105,7 +105,7 @@ impl ChannelManager {
         self.sanity_check(&my_address);
         match self.clone() {
             ChannelManager::New | ChannelManager::Proposed { .. } => {
-                self.propose_channel(my_address, their_address, 100_000_000_000_000u64.into())
+                self.propose_channel(my_address, their_address, 100_000_000_000_000u64.into()) // 0.0001ETH
             }
             ChannelManager::PendingOtherCreation { state, .. } => {
                 assert_eq!(state.is_a, false);

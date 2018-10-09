@@ -50,7 +50,11 @@ fn create_update_tx(update: UpdateTx) -> Transaction {
     }.sign(&CRYPTO.secret(), None)
 }
 
-fn create_new_channel_tx(update: NewChannelTx) -> Transaction {
+pub fn create_new_channel_tx(
+    contract: Address,
+    network_id: Option<u64>,
+    update: NewChannelTx,
+) -> Transaction {
     let challenge: [u8; 32] = update.challenge.into();
 
     let data = encode_call(
@@ -58,7 +62,7 @@ fn create_new_channel_tx(update: NewChannelTx) -> Transaction {
         &[
             // to
             update.to.into(),
-            // tokenContract
+            // tokenContract (we use ETH)
             Address::default().into(),
             // tokenAmount
             0u32.into(),
@@ -67,14 +71,14 @@ fn create_new_channel_tx(update: NewChannelTx) -> Transaction {
         ],
     );
     Transaction {
-        to: Address::default(),
+        to: contract,
         // action: Action::Call(Address::default()),
         // TODO: Get nonce from eth full node
         nonce: 42u32.into(),
         // TODO: set this semi automatically
-        gas_price: 3000u32.into(),
+        gas_price: 1_000_000_000u64.into(),
         // TODO: find out how much gas this contract acutally takes
-        gas_limit: 50_000u32.into(),
+        gas_limit: 21_000u64.into(),
         value: update.deposit.into(),
         data,
         signature: None,
@@ -96,12 +100,16 @@ fn test_create_update_tx() {
 
 #[test]
 fn test_new_channel_tx() {
-    let tx = create_new_channel_tx(NewChannelTx {
-        to: "0x000000000000000000000000000000000000007b"
-            .parse()
-            .expect("Unable to parse address"),
-        challenge: 23u32.into(),
-        deposit: 100u32.into(),
-    });
+    let tx = create_new_channel_tx(
+        Address::default(),
+        None,
+        NewChannelTx {
+            to: "0x000000000000000000000000000000000000007b"
+                .parse()
+                .expect("Unable to parse address"),
+            challenge: 23u32.into(),
+            deposit: 100u32.into(),
+        },
+    );
     trace!("tx: {:?}", tx);
 }

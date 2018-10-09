@@ -18,7 +18,7 @@ failure = "0.1.1"
 base64 = "0.9.0"
 tiny-keccak = "1.4.1"
 mockito = "0.9.1"
-web3 = "0.3.0"
+web3 = "0.4"
 lazy_static = "1.0"
 # XXX: Bumping to 5.1.2 or later brings ethereum-types 0.4 which we don't want to use because other deps use ethereum-types 0.3.
 ethabi = "=5.1.1"
@@ -30,3 +30,7 @@ qutex = "^0.2"
 owning_ref = "0.4"
 clarity = "0.1"
 sha3 = "0.8"
+
+[dev-dependencies]
+lazy_static = "1.0"
+rand = "0.3"
