@@ -337,10 +337,16 @@ fn contract() {
         signature: None,
     }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
 
+    let event_future = poll_for_event("ChannelUpdateState(bytes32,uint256,uint256,uint256)");
+
     let call_future = WEB3
         .eth()
         .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
 
-    let tx = call_future.wait().expect("Unable to wait for call future");
+    let (tx, log) = call_future
+        .join(event_future)
+        .wait()
+        .expect("Unable to wait for call future");
     println!("tx {:?}", tx);
+    println!("ChannelUpdateState {:?}", log);
 }
