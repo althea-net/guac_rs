@@ -114,6 +114,31 @@ fn make_seeded_key() -> PrivateKey {
     key
 }
 
+/// Waits for a single occurence of an event call and returns the log data
+fn poll_for_event(event: &str) -> web3::Result<Log> {
+    let filter = FilterBuilder::default()
+        .address(vec![CONTRACT_ADDRESS.to_string().parse().unwrap()])
+        .topics(Some(vec![derive_signature(event).into()]), None, None, None)
+        .build();
+
+    Box::new(
+        WEB3.eth_filter()
+            .create_logs_filter(filter)
+            .then(|filter| {
+                filter
+                    .unwrap()
+                    .stream(time::Duration::from_secs(0))
+                    .into_future()
+                    .map(|(head, _tail)| {
+                        // Throw away rest of the stream
+                        head
+                    })
+            }).map_err(|(e, _)| e)
+            .map(|maybe_log| maybe_log.expect("Expected log data but None found"))
+            .into_future(),
+    )
+}
+
 #[test]
 fn contract() {
     println!("Address {:?}", &*CONTRACT_ADDRESS);
@@ -179,41 +204,14 @@ fn contract() {
     // Subscribe for ChannelOpen events
 
     let address_h160: H160 = CONTRACT_ADDRESS.to_string().parse().unwrap();
-    // Filter for Hello event in our contract
-    let filter = FilterBuilder::default()
-        .address(vec![address_h160])
-        .topics(
-            Some(vec![
-                derive_signature("ChannelOpen(bytes32,address,address,address,uint256,uint256)")
-                    .into(),
-            ]),
-            None,
-            None,
-            None,
-        ).build();
-
-    let event_future = WEB3
-        .eth_filter()
-        .create_logs_filter(filter)
-        .then(|filter| {
-            filter
-                .unwrap()
-                .stream(time::Duration::from_secs(0))
-                .into_future()
-                .map(|(head, _tail)| {
-                    // Throw away rest of the stream
-                    head
-                })
-        }).map_err(|(e, _)| e);
-
+    let event_future =
+        poll_for_event("ChannelOpen(bytes32,address,address,address,uint256,uint256)");
     let call_future = WEB3
         .eth()
         .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
 
     // Wait for both TX and ChannelOpen event
     let (_tx, log) = call_future.join(event_future).wait().unwrap();
-    let log = log.unwrap();
-    println!("ChannelOpen {:?}", log);
 
     // Extract ChannelOpen event arguments
     let _token_contract = &log.data.0[0..32];
@@ -256,12 +254,18 @@ fn contract() {
         signature: None,
     }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
 
+    let event_future = poll_for_event("ChannelJoin(bytes32,address,address,uint256,uint256)");
+
     let call_future = WEB3
         .eth()
         .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
 
-    let tx = call_future.wait().expect("Unable to wait for call future");
+    let (tx, _log) = event_future
+        .join(call_future)
+        .wait()
+        .expect("Unable to wait for call future");
     println!("tx {:?}", tx);
+    println!("ChannelJoin {:?}", log);
 
     // This has to be updated on every state update
     let mut channel_nonce = 0u32;
