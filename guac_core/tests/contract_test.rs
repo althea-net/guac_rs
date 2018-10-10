@@ -7,7 +7,7 @@ extern crate rand;
 #[macro_use]
 extern crate failure;
 
-use clarity::abi::{derive_signature, encode_call, Token};
+use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
 use clarity::{Address, BigEndianInt, PrivateKey, Transaction};
 use failure::Error;
 use guac_core::channel_client::channel_manager::ChannelManager;
@@ -18,6 +18,7 @@ use guac_core::eth_client::create_new_channel_tx;
 use rand::{OsRng, Rng};
 use std::env;
 use std::ops::Deref;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time;
 use web3::futures::future::ok;
@@ -251,6 +252,83 @@ fn contract() {
         // TODO: find out how much gas this contract acutally takes
         gas_limit: 6721975u32.into(),
         value: "42".parse().unwrap(),
+        data,
+        signature: None,
+    }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
+
+    let call_future = WEB3
+        .eth()
+        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
+
+    let tx = call_future.wait().expect("Unable to wait for call future");
+    println!("tx {:?}", tx);
+
+    // This has to be updated on every state update
+    let mut channel_nonce = 0u32;
+
+    //
+    // Alice calls updateState
+    //
+    channel_nonce += 1;
+    let data = encode_call(
+        "updateState(bytes32,uint256,uint256,uint256,string,string)",
+        &[
+            // channelId
+            Token::Bytes(channel_id.to_vec()),
+            // nonce
+            channel_nonce.into(),
+            // balanceA
+            {
+                let bal: BigEndianInt = "999999999999999950".parse().unwrap(); // adds 99
+                bal.into()
+            },
+            // balanceB
+            {
+                let bal: BigEndianInt = "92".parse().unwrap(); // keeps same
+                bal.into()
+            },
+            // sigA
+            {
+                let payload = encode_tokens(&[
+                    Token::Bytes(channel_id.to_vec()),
+                    channel_nonce.into(),
+                    BigEndianInt::from_str("999999999999999950").unwrap().into(),
+                    BigEndianInt::from_str("92").unwrap().into(), // keeps same
+                ]);
+                let sig = alice.sign_msg(&payload);
+                sig.to_string().as_str().into()
+            },
+            // sigB
+            {
+                let payload = encode_tokens(&[
+                    Token::Bytes(channel_id.to_vec()),
+                    channel_nonce.into(),
+                    BigEndianInt::from_str("999999999999999950").unwrap().into(), // adds 99
+                    BigEndianInt::from_str("92").unwrap().into(),                 // keeps same
+                ]);
+                let sig = alice.sign_msg(&payload);
+                sig.to_string().as_str().into()
+            },
+        ],
+    );
+
+    // Switch to alice
+    *CRYPTO.secret_mut() = alice.clone();
+    assert_eq!(CRYPTO.secret(), alice);
+
+    //
+    // Call joinChannel(bytes32 id, uint tokenAmount)
+    //
+    let tx = Transaction {
+        to: CONTRACT_ADDRESS.clone(),
+        // action: Action::Call(Address::default()),
+        // TODO: Get nonce from eth full node
+        nonce: 1u32.into(),
+        // TODO: set this semi automatically
+        gas_price: gas_price.clone(),
+        // TODO: find out how much gas this contract acutally takes
+        gas_limit: 6721975u32.into(),
+        value: "0".parse().unwrap(),
         data,
         signature: None,
     }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
