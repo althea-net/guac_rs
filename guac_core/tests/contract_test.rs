@@ -4,9 +4,12 @@ extern crate web3;
 #[macro_use]
 extern crate lazy_static;
 extern crate rand;
+#[macro_use]
+extern crate failure;
 
-use clarity::abi::{encode_call, Token};
+use clarity::abi::{derive_signature, encode_call, Token};
 use clarity::{Address, BigEndianInt, PrivateKey, Transaction};
+use failure::Error;
 use guac_core::channel_client::channel_manager::ChannelManager;
 use guac_core::channel_client::types::NewChannelTx;
 use guac_core::crypto::CryptoService;
@@ -15,6 +18,7 @@ use guac_core::eth_client::create_new_channel_tx;
 use rand::{OsRng, Rng};
 use std::env;
 use std::ops::Deref;
+use std::sync::Arc;
 use std::time;
 use web3::futures::future::ok;
 use web3::futures::Async;
@@ -22,6 +26,7 @@ use web3::futures::{Future, IntoFuture, Stream};
 use web3::transports::{EventLoopHandle, Http};
 use web3::types::{Bytes, FilterBuilder, Log, TransactionRequest, H160, U256};
 use web3::Web3;
+
 /// A handle that contains event loop instance and a web3 instance
 ///
 /// EventLoop has to live at least as long as the "Web3" object, or
@@ -170,15 +175,6 @@ fn contract() {
         signature: None,
     }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
 
-    // let mut tx = create_new_channel_tx(CONTRACT_ADDRESS.clone(), Some(*NETWORK_ID), NewChannelTx {
-    //     to: bob.to_public_key().unwrap(),
-    //     challenge: 23u32.into(),
-    //     deposit: 100u32.into(),
-    // });
-    // tx.nonce = 0u32.into();
-    // TODO: A proper nonce calculator. With ganache and random keys we don't need to bother.
-    // println!("tx: {:?}", tx);
-
     // Subscribe for ChannelOpen events
 
     let address_h160: H160 = CONTRACT_ADDRESS.to_string().parse().unwrap();
@@ -187,10 +183,8 @@ fn contract() {
         .address(vec![address_h160])
         .topics(
             Some(vec![
-                // ChannelOpen(bytes32,address,address,address,uint256,uint256)
-                "8cd544d236a3435e48a657e78803d9a0663a99ca62c66c571908f4ab7ecf9586"
-                    .parse()
-                    .unwrap(),
+                derive_signature("ChannelOpen(bytes32,address,address,address,uint256,uint256)")
+                    .into(),
             ]),
             None,
             None,
@@ -209,12 +203,11 @@ fn contract() {
                     // Throw away rest of the stream
                     head
                 })
-        }).map_err(|_| ());
+        }).map_err(|(e, _)| e);
 
     let call_future = WEB3
         .eth()
-        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()))
-        .map_err(|_| ());
+        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
 
     // Wait for both TX and ChannelOpen event
     let (_tx, log) = call_future.join(event_future).wait().unwrap();
@@ -225,7 +218,47 @@ fn contract() {
     let _token_contract = &log.data.0[0..32];
     let deposit_a: BigEndianInt = log.data.0[32..64].into();
     let challenge: BigEndianInt = log.data.0[64..96].into();
-    let channel_id: BigEndianInt = format!("{:?}", log.topics[1]).parse().unwrap();
+    // let channel_id = log.topics
+    let channel_id: [u8; 32] = log.topics[1].into();
+    // let channel_id: BigEndianInt = format!("{:?}", log.topics[1]).parse().unwrap();
     assert_eq!(deposit_a, "1000000000000000000".parse().unwrap());
     assert_eq!(challenge, 42u32.into());
+
+    let data = encode_call(
+        "joinChannel(bytes32,uint256)",
+        &[
+            // id
+            Token::Bytes(channel_id.to_vec().into()),
+            // tokenAmount
+            0u32.into(), // should use `msg.value` ^
+        ],
+    );
+
+    // Switch to bob
+    *CRYPTO.secret_mut() = bob.clone();
+    assert_eq!(CRYPTO.secret(), bob);
+
+    //
+    // Call joinChannel(bytes32 id, uint tokenAmount)
+    //
+    let tx = Transaction {
+        to: CONTRACT_ADDRESS.clone(),
+        // action: Action::Call(Address::default()),
+        // TODO: Get nonce from eth full node
+        nonce: 0u32.into(),
+        // TODO: set this semi automatically
+        gas_price: gas_price.clone(),
+        // TODO: find out how much gas this contract acutally takes
+        gas_limit: 6721975u32.into(),
+        value: "42".parse().unwrap(),
+        data,
+        signature: None,
+    }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
+
+    let call_future = WEB3
+        .eth()
+        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
+
+    let tx = call_future.wait().expect("Unable to wait for call future");
+    println!("tx {:?}", tx);
 }
