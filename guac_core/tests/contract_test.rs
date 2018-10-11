@@ -396,4 +396,44 @@ fn contract() {
     println!("ChannelChallenge {:?}", log);
 
     //
+    // Switch to alice (keep in mind that Bob started the closing challenge)
+    //
+    *CRYPTO.secret_mut() = alice.clone();
+    assert_eq!(CRYPTO.secret(), alice);
+
+    let data = encode_call(
+        // function closeChannel(bytes32 channelId) public {
+        "closeChannel(bytes32)",
+        &[
+            // channel id
+            Token::Bytes(channel_id.to_vec().into()),
+        ],
+    );
+    let tx = Transaction {
+        to: CONTRACT_ADDRESS.clone(),
+        // action: Action::Call(Address::default()),
+        // TODO: Get nonce from eth full node
+        nonce: 2u32.into(),
+        // TODO: set this semi automatically
+        gas_price: gas_price.clone(),
+        // TODO: find out how much gas this contract acutally takes
+        gas_limit: 6721975u32.into(),
+        value: "0".parse().unwrap(),
+        data,
+        signature: None,
+    }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
+
+    let event_future = poll_for_event("ChannelClose(bytes32)");
+
+    let call_future = WEB3
+        .eth()
+        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
+
+    let (tx, log) = call_future
+        .join(event_future)
+        .wait()
+        .expect("Unable to wait for call future");
+
+    println!("tx {:?}", tx);
+    println!("ChannelClose {:?}", log);
 }
