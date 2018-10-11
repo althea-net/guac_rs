@@ -249,7 +249,7 @@ fn contract() {
         gas_price: gas_price.clone(),
         // TODO: find out how much gas this contract acutally takes
         gas_limit: 6721975u32.into(),
-        value: "42".parse().unwrap(),
+        value: "1000000000000000000".parse().unwrap(),
         data,
         signature: None,
     }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
@@ -283,12 +283,12 @@ fn contract() {
             channel_nonce.into(),
             // balanceA
             {
-                let bal: BigEndianInt = "999999999999999950".parse().unwrap(); // adds 99
+                let bal: BigEndianInt = "500000000000000000".parse().unwrap(); // adds 99
                 bal.into()
             },
             // balanceB
             {
-                let bal: BigEndianInt = "92".parse().unwrap(); // keeps same
+                let bal: BigEndianInt = "1500000000000000000".parse().unwrap(); // keeps same
                 bal.into()
             },
             // sigA
@@ -296,8 +296,10 @@ fn contract() {
                 let payload = encode_tokens(&[
                     Token::Bytes(channel_id.to_vec()),
                     channel_nonce.into(),
-                    BigEndianInt::from_str("999999999999999950").unwrap().into(),
-                    BigEndianInt::from_str("92").unwrap().into(), // keeps same
+                    BigEndianInt::from_str("500000000000000000").unwrap().into(),
+                    BigEndianInt::from_str("1500000000000000000")
+                        .unwrap()
+                        .into(), // keeps same
                 ]);
                 let sig = alice.sign_msg(&payload);
                 sig.to_string().as_str().into()
@@ -307,8 +309,10 @@ fn contract() {
                 let payload = encode_tokens(&[
                     Token::Bytes(channel_id.to_vec()),
                     channel_nonce.into(),
-                    BigEndianInt::from_str("999999999999999950").unwrap().into(), // adds 99
-                    BigEndianInt::from_str("92").unwrap().into(),                 // keeps same
+                    BigEndianInt::from_str("500000000000000000").unwrap().into(), // adds 99
+                    BigEndianInt::from_str("1500000000000000000")
+                        .unwrap()
+                        .into(), // keeps same
                 ]);
                 let sig = alice.sign_msg(&payload);
                 sig.to_string().as_str().into()
@@ -398,6 +402,20 @@ fn contract() {
     //
     // Switch to alice (keep in mind that Bob started the closing challenge)
     //
+
+    let res = WEB3
+        .eth()
+        .balance(alice.to_public_key().unwrap().as_bytes().into(), None)
+        .wait()
+        .unwrap();
+    println!("Alice {:?}", res);
+    let res = WEB3
+        .eth()
+        .balance(bob.to_public_key().unwrap().as_bytes().into(), None)
+        .wait()
+        .unwrap();
+    println!("Bob {:?}", res);
+
     *CRYPTO.secret_mut() = alice.clone();
     assert_eq!(CRYPTO.secret(), alice);
 
@@ -436,4 +454,17 @@ fn contract() {
 
     println!("tx {:?}", tx);
     println!("ChannelClose {:?}", log);
+
+    let res = WEB3
+        .eth()
+        .balance(alice.to_public_key().unwrap().as_bytes().into(), None)
+        .wait()
+        .unwrap();
+    println!("Alice {:?}", res);
+    let res = WEB3
+        .eth()
+        .balance(bob.to_public_key().unwrap().as_bytes().into(), None)
+        .wait()
+        .unwrap();
+    println!("Bob {:?}", res);
 }
