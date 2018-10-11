@@ -455,16 +455,27 @@ fn contract() {
     println!("tx {:?}", tx);
     println!("ChannelClose {:?}", log);
 
-    let res = WEB3
+    let alice_balance: BigEndianInt = WEB3
         .eth()
         .balance(alice.to_public_key().unwrap().as_bytes().into(), None)
         .wait()
+        .unwrap()
+        // Convert U256 to BigEndianInt
+        .to_string()
+        .parse()
         .unwrap();
-    println!("Alice {:?}", res);
-    let res = WEB3
+    println!("Alice {:?}", alice_balance);
+    let bob_balance: BigEndianInt = WEB3
         .eth()
         .balance(bob.to_public_key().unwrap().as_bytes().into(), None)
         .wait()
+        .unwrap()
+        // Convert U256 to BigEndianInt
+        .to_string()
+        .parse()
         .unwrap();
-    println!("Bob {:?}", res);
+    println!("Bob {:?}", bob_balance);
+
+    assert!(alice_balance < BigEndianInt::from_str("9500000000000000000").unwrap());
+    assert!(bob_balance >= BigEndianInt::from_str("10490000000000000000").unwrap());
 }
