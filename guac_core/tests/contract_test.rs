@@ -11,10 +11,9 @@ use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
 use clarity::{Address, BigEndianInt, PrivateKey, Transaction};
 use failure::Error;
 use guac_core::channel_client::channel_manager::ChannelManager;
-use guac_core::channel_client::types::NewChannelTx;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
-use guac_core::eth_client::create_new_channel_tx;
+use guac_core::eth_client::create_open_channel_payload;
 use rand::{OsRng, Rng};
 use std::env;
 use std::ops::Deref;
@@ -166,21 +165,11 @@ fn contract() {
     println!("action {:?}", action);
     println!("cm {:?}", cm);
 
-    let challenge: [u8; 32] = BigEndianInt::from(42u32).into();
+    let challenge = BigEndianInt::from(42u32);
 
-    let data = encode_call(
-        "openChannel(address,address,uint256,uint256)",
-        &[
-            // to
-            bob.to_public_key().unwrap().into(),
-            // tokenContract (we use ETH)
-            Address::default().into(),
-            // tokenAmount
-            0u32.into(),
-            // SigA
-            Token::Bytes(challenge.to_vec().into()),
-        ],
-    );
+    // Call openChannel
+
+    let data = create_open_channel_payload(bob.to_public_key().unwrap(), challenge.clone());
 
     // Get gas price
     let gas_price = WEB3.eth().gas_price().wait().unwrap();

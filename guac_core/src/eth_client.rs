@@ -1,4 +1,4 @@
-use channel_client::types::{NewChannelTx, UpdateTx};
+use channel_client::types::UpdateTx;
 use clarity::abi::{encode_call, Token};
 use clarity::Transaction;
 use clarity::{Address, BigEndianInt, Signature};
@@ -12,7 +12,7 @@ pub struct Fullnode {
     pub url: String,
 }
 
-fn create_update_tx(update: UpdateTx) -> Transaction {
+pub fn create_update_tx(update: UpdateTx) -> Transaction {
     let channel_id: [u8; 32] = update.channel_id.into();
     let nonce: [u8; 32] = update.nonce.into();
     let balance_a: [u8; 32] = update.balance_a.into();
@@ -50,18 +50,18 @@ fn create_update_tx(update: UpdateTx) -> Transaction {
     }.sign(&CRYPTO.secret(), None)
 }
 
-pub fn create_new_channel_tx(
-    contract: Address,
-    network_id: Option<u64>,
-    update: NewChannelTx,
-) -> Transaction {
-    let challenge: [u8; 32] = update.challenge.into();
+/// Creates a payload for "openChannel" contract call.
+///
+/// * `to` - Who is expected to be join on the other side of the channel.
+/// * `challenge` - A channel challenge which should be unique.
+pub fn create_open_channel_payload(to: Address, challenge: BigEndianInt) -> Vec<u8> {
+    let challenge: [u8; 32] = challenge.into();
 
-    let data = encode_call(
+    encode_call(
         "openChannel(address,address,uint256,uint256)",
         &[
             // to
-            update.to.into(),
+            to.into(),
             // tokenContract (we use ETH)
             Address::default().into(),
             // tokenAmount
@@ -69,20 +69,7 @@ pub fn create_new_channel_tx(
             // SigA
             Token::Bytes(challenge.to_vec().into()),
         ],
-    );
-    Transaction {
-        to: contract,
-        // action: Action::Call(Address::default()),
-        // TODO: Get nonce from eth full node
-        nonce: 42u32.into(),
-        // TODO: set this semi automatically
-        gas_price: 1_000_000_000u64.into(),
-        // TODO: find out how much gas this contract acutally takes
-        gas_limit: 21_000u64.into(),
-        value: update.deposit.into(),
-        data,
-        signature: None,
-    }.sign(&CRYPTO.secret(), None)
+    )
 }
 
 #[test]
@@ -100,16 +87,6 @@ fn test_create_update_tx() {
 
 #[test]
 fn test_new_channel_tx() {
-    let tx = create_new_channel_tx(
-        Address::default(),
-        None,
-        NewChannelTx {
-            to: "0x000000000000000000000000000000000000007b"
-                .parse()
-                .expect("Unable to parse address"),
-            challenge: 23u32.into(),
-            deposit: 100u32.into(),
-        },
-    );
-    trace!("tx: {:?}", tx);
+    let data = create_open_channel_payload(Address::default(), "12345".parse().unwrap());
+    trace!("payload: {:?}", data);
 }
