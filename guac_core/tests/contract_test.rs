@@ -76,10 +76,10 @@ fn make_web3() -> Option<Web3Handle> {
 }
 
 lazy_static! {
-    static ref CONTRACT_ADDRESS: Address = env::var("CONTRACT_ADDRESS")
-        .expect("Unable to obtain contract address. Is $CONTRACT_ADDRESS set properly?")
+    static ref CHANNEL_ADDRESS: Address = env::var("CHANNEL_ADDRESS")
+        .expect("Unable to obtain channel manager contract address. Is $CHANNEL_ADDRESS set properly?")
         .parse()
-        .expect("Unable to parse address passed in $CONTRACT_ADDRESS");
+        .expect("Unable to parse address passed in $CHANNEL_ADDRESS");
     static ref WEB3: Web3Handle =
         make_web3().expect("Unable to create a valid transport for Web3 protocol");
 
@@ -143,7 +143,7 @@ fn make_seeded_key() -> PrivateKey {
 /// Waits for a single occurence of an event call and returns the log data
 fn poll_for_event(event: &str) -> web3::Result<Log> {
     let filter = FilterBuilder::default()
-        .address(vec![CONTRACT_ADDRESS.to_string().parse().unwrap()])
+        .address(vec![CHANNEL_ADDRESS.to_string().parse().unwrap()])
         .topics(Some(vec![derive_signature(event).into()]), None, None, None)
         .build();
 
@@ -168,7 +168,7 @@ fn poll_for_event(event: &str) -> web3::Result<Log> {
 #[test]
 #[ignore]
 fn contract() {
-    println!("Address {:?}", &*CONTRACT_ADDRESS);
+    println!("Address {:?}", &*CHANNEL_ADDRESS);
     println!("Network ID {:?}", &*NETWORK_ID);
     // Set up both parties (alice and bob)
     // they will be used to exchange ETH through channels contract.
@@ -205,7 +205,7 @@ fn contract() {
     println!("gas_price {:?}", gas_price);
 
     let tx = Transaction {
-        to: CONTRACT_ADDRESS.clone(),
+        to: CHANNEL_ADDRESS.clone(),
         // action: Action::Call(Address::default()),
         // TODO: Get nonce from eth full node
         nonce: 0u32.into(),
@@ -220,7 +220,7 @@ fn contract() {
 
     // Subscribe for ChannelOpen events
 
-    let address_h160: H160 = CONTRACT_ADDRESS.to_string().parse().unwrap();
+    let address_h160: H160 = CHANNEL_ADDRESS.to_string().parse().unwrap();
     let event_future =
         poll_for_event("ChannelOpen(bytes32,address,address,address,uint256,uint256)");
     let call_future = WEB3
@@ -258,7 +258,7 @@ fn contract() {
     // Call joinChannel(bytes32 id, uint tokenAmount)
     //
     let tx = Transaction {
-        to: CONTRACT_ADDRESS.clone(),
+        to: CHANNEL_ADDRESS.clone(),
         // action: Action::Call(Address::default()),
         // TODO: Get nonce from eth full node
         nonce: 0u32.into(),
@@ -345,7 +345,7 @@ fn contract() {
     // Call joinChannel(bytes32 id, uint tokenAmount)
     //
     let tx = Transaction {
-        to: CONTRACT_ADDRESS.clone(),
+        to: CHANNEL_ADDRESS.clone(),
         // action: Action::Call(Address::default()),
         // TODO: Get nonce from eth full node
         nonce: 1u32.into(),
@@ -390,7 +390,7 @@ fn contract() {
     // Call startChallenge(bytes32 channelId) public {
     //
     let tx = Transaction {
-        to: CONTRACT_ADDRESS.clone(),
+        to: CHANNEL_ADDRESS.clone(),
         // action: Action::Call(Address::default()),
         // TODO: Get nonce from eth full node
         nonce: 1u32.into(),
@@ -445,7 +445,7 @@ fn contract() {
         ],
     );
     let tx = Transaction {
-        to: CONTRACT_ADDRESS.clone(),
+        to: CHANNEL_ADDRESS.clone(),
         // action: Action::Call(Address::default()),
         // TODO: Get nonce from eth full node
         nonce: 2u32.into(),

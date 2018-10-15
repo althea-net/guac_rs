@@ -51,7 +51,7 @@ matrix:
       - nvm install v8.10.0
       - nvm use v8.10.0
       - npm install -g ganache-cli@latest truffle@latest
-      script:
+      before_script:
       - source scripts/chain-prep.sh
-      - env
+      script:
       - cargo test --verbose -- --nocapture --ignored contract
