@@ -1,5 +1,4 @@
 #!/bin/bash
-set -eux
 killall node 2>/dev/null || true
 ganache-cli -u 0 -u 1 -u 2 -m 'cook mango twist then skin sort option civil have still rather guilt' &
 git clone https://github.com/althea-mesh/simple-bidirectional-erc20-channel contract
