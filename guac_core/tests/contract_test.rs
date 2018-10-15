@@ -19,8 +19,8 @@ use std::env;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time;
 use std::thread;
+use std::time;
 use web3::futures::future::ok;
 use web3::futures::Async;
 use web3::futures::{Future, IntoFuture, Stream};
@@ -41,7 +41,6 @@ impl Deref for Web3Handle {
         &self.1
     }
 }
-
 
 /// This function verifies if a web3 transport can be safely created.
 fn make_web3() -> Option<Web3Handle> {
