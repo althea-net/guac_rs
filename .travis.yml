@@ -3,6 +3,7 @@ language:
   - node_js
 cache: cargo
 sudo: required
+services: docker
 
 node_js:
   - "node"
@@ -28,8 +29,6 @@ addons:
 
 before_install:
   - command -v cross 1>/dev/null || cargo install cross
-  - npm install -g npm@latest
-  - npm install -g ganache-cli@latest truffle@latest
 
 script:
   - cross build --target $TARGET --verbose --all
@@ -48,7 +47,9 @@ matrix:
         - cargo fmt --all -- --check
     - rust: stable
       ? env
-      ? before_install
+      before_install:
+      - npm install -g npm@latest
+      - npm install -g ganache-cli@latest truffle@latest
       before_script:
       - source scripts/chain-prep.sh
       script:
