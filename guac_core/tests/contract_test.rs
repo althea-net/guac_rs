@@ -20,6 +20,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time;
+use std::thread;
 use web3::futures::future::ok;
 use web3::futures::Async;
 use web3::futures::{Future, IntoFuture, Stream};
@@ -41,11 +42,38 @@ impl Deref for Web3Handle {
     }
 }
 
+
+/// This function verifies if a web3 transport can be safely created.
 fn make_web3() -> Option<Web3Handle> {
-    // TODO: Make it more robust
     let address = env::var("GANACHE_HOST").unwrap_or("http://localhost:8545".to_owned());
-    let (evloop, transport) = Http::new(&address).expect("Unable to create HTTP transport");
-    Some(Web3Handle(evloop, Web3::new(transport)))
+    eprintln!("Trying to create a Web3 connection to {:?}", address);
+    for counter in 0..30 {
+        match web3::transports::Http::new(&address) {
+            Ok((evloop, transport)) => {
+                // Creating a transport doesn't mean the connection is actually established.
+                // Request a list of accounts on the node to verify that connection to the
+                // specified network is stable.
+                let web3 = Web3::new(transport);
+                match web3.eth().accounts().wait() {
+                    Ok(accounts) => {
+                        println!("Got accounts {:?}", accounts);
+                        return Some(Web3Handle(evloop, web3));
+                    }
+                    Err(e) => {
+                        eprintln!("Unable to retrieve accounts ({}): {}", counter, e);
+                        thread::sleep(time::Duration::from_secs(1));
+                        continue;
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Unable to create transport ({}): {}", counter, e);
+                thread::sleep(time::Duration::from_secs(1));
+                continue;
+            }
+        }
+    }
+    None
 }
 
 lazy_static! {
@@ -139,6 +167,7 @@ fn poll_for_event(event: &str) -> web3::Result<Log> {
 }
 
 #[test]
+#[ignore]
 fn contract() {
     println!("Address {:?}", &*CONTRACT_ADDRESS);
     println!("Network ID {:?}", &*NETWORK_ID);

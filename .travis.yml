@@ -3,7 +3,6 @@ language:
   - node_js
 cache: cargo
 sudo: required
-services: docker
 
 node_js:
   - "node"
@@ -53,5 +52,4 @@ matrix:
       before_script:
       - source scripts/chain-prep.sh
       script:
-      - cargo test --verbose -- --ignored testnet
-
+      - cargo test --verbose -- --nocapture --ignored contract
