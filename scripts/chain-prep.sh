@@ -5,7 +5,7 @@ git clone https://github.com/althea-mesh/simple-bidirectional-erc20-channel cont
 pushd contract 
 npm install .
 truffle compile
-addresses="$(truffle migrate --verbose)"
-export CHANNEL_ADDRES=`jq -r '.networks| to_entries | sort_by(.key) | last.value.address' build/contracts/ChannelManager.json`
-export CHANNEL_ADDRES=`jq -r '.networks| to_entries | sort_by(.key) | last.value.address' build/contracts/SimpleToken.json`
+truffle migrate --verbose
+export CHANNEL_ADDRESS=`jq -r '.networks| to_entries | sort_by(.key) | last.value.address' build/contracts/ChannelManager.json`
+export TOKEN_ADDRESS=`jq -r '.networks| to_entries | sort_by(.key) | last.value.address' build/contracts/SimpleToken.json`
 popd
