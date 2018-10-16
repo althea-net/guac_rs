@@ -15,6 +15,7 @@ use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
 use guac_core::eth_client::create_join_channel_payload;
 use guac_core::eth_client::create_open_channel_payload;
+use guac_core::eth_client::create_start_challenge_payload;
 use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
 use rand::{OsRng, Rng};
 use std::env;
@@ -341,13 +342,7 @@ fn contract() {
     //
     // Bob starts a challenge
     //
-    let data = encode_call(
-        "startChallenge(bytes32)",
-        &[
-            // channel id
-            Token::Bytes(channel_id.to_vec().into()),
-        ],
-    );
+    let data = create_start_challenge_payload(channel_id);
 
     // Switch to bob
     *CRYPTO.secret_mut() = bob.clone();

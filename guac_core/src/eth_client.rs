@@ -135,6 +135,16 @@ pub fn create_update_channel_payload(
     )
 }
 
+pub fn create_start_challenge_payload(channel_id: ChannelId) -> Vec<u8> {
+    encode_call(
+        "startChallenge(bytes32)",
+        &[
+            // channel id
+            Token::Bytes(channel_id.to_vec().into()),
+        ],
+    )
+}
+
 #[test]
 fn test_create_update_tx() {
     let tx = create_update_tx(UpdateTx {
