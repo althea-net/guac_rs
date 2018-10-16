@@ -15,6 +15,7 @@ use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
 use guac_core::eth_client::create_join_channel_payload;
 use guac_core::eth_client::create_open_channel_payload;
+use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
 use rand::{OsRng, Rng};
 use std::env;
 use std::ops::Deref;
@@ -284,50 +285,23 @@ fn contract() {
     // Alice calls updateState
     //
     channel_nonce += 1;
-    let data = encode_call(
-        "updateState(bytes32,uint256,uint256,uint256,string,string)",
-        &[
-            // channelId
-            Token::Bytes(channel_id.to_vec()),
-            // nonce
-            channel_nonce.into(),
-            // balanceA
-            {
-                let bal: BigEndianInt = "500000000000000000".parse().unwrap(); // adds 99
-                bal.into()
-            },
-            // balanceB
-            {
-                let bal: BigEndianInt = "1500000000000000000".parse().unwrap(); // keeps same
-                bal.into()
-            },
-            // sigA
-            {
-                let payload = encode_tokens(&[
-                    Token::Bytes(channel_id.to_vec()),
-                    channel_nonce.into(),
-                    BigEndianInt::from_str("500000000000000000").unwrap().into(),
-                    BigEndianInt::from_str("1500000000000000000")
-                        .unwrap()
-                        .into(), // keeps same
-                ]);
-                let sig = alice.sign_msg(&payload);
-                sig.to_string().as_str().into()
-            },
-            // sigB
-            {
-                let payload = encode_tokens(&[
-                    Token::Bytes(channel_id.to_vec()),
-                    channel_nonce.into(),
-                    BigEndianInt::from_str("500000000000000000").unwrap().into(), // adds 99
-                    BigEndianInt::from_str("1500000000000000000")
-                        .unwrap()
-                        .into(), // keeps same
-                ]);
-                let sig = bob.sign_msg(&payload);
-                sig.to_string().as_str().into()
-            },
-        ],
+    let balance_a: BigEndianInt = "500000000000000000".parse().unwrap();
+    let balance_b: BigEndianInt = "1500000000000000000".parse().unwrap();
+
+    // Proof is the same for both parties
+    let proof = create_signature_data(
+        channel_id,
+        channel_nonce.into(),
+        balance_a.clone(),
+        balance_b.clone(),
+    );
+    let data = create_update_channel_payload(
+        channel_id,
+        channel_nonce.into(),
+        balance_a.clone(),
+        balance_b.clone(),
+        alice.sign_msg(&proof),
+        bob.sign_msg(&proof),
     );
 
     // Switch to alice

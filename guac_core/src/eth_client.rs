@@ -1,4 +1,5 @@
 use channel_client::types::UpdateTx;
+use clarity::abi::encode_tokens;
 use clarity::abi::{encode_call, Token};
 use clarity::Transaction;
 use clarity::{Address, BigEndianInt, Signature};
@@ -86,6 +87,50 @@ pub fn create_join_channel_payload(channel_id: ChannelId) -> Vec<u8> {
             Token::Bytes(channel_id.to_vec().into()),
             // tokenAmount
             0u32.into(), // should use `msg.value` ^
+        ],
+    )
+}
+
+/// Create a data that should be signed with a private key
+/// and the signed data should be passed as a Signature to
+/// create_update_channel_payload.
+pub fn create_signature_data(
+    channel_id: ChannelId,
+    nonce: BigEndianInt,
+    balance_a: BigEndianInt,
+    balance_b: BigEndianInt,
+) -> Vec<u8> {
+    encode_tokens(&[
+        Token::Bytes(channel_id.to_vec()),
+        nonce.into(),
+        balance_a.into(),
+        balance_b.into(),
+    ])
+}
+
+pub fn create_update_channel_payload(
+    channel_id: ChannelId,
+    nonce: BigEndianInt,
+    balance_a: BigEndianInt,
+    balance_b: BigEndianInt,
+    sig_a: Signature,
+    sig_b: Signature,
+) -> Vec<u8> {
+    encode_call(
+        "updateState(bytes32,uint256,uint256,uint256,string,string)",
+        &[
+            // channelId
+            Token::Bytes(channel_id.to_vec()),
+            // nonce
+            nonce.into(),
+            // balanceA
+            balance_a.into(),
+            // balanceB
+            balance_b.into(),
+            // sigA
+            sig_a.to_string().as_str().into(),
+            // sigB
+            sig_b.to_string().as_str().into(),
         ],
     )
 }
