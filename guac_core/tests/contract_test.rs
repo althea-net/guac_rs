@@ -13,6 +13,7 @@ use failure::Error;
 use guac_core::channel_client::channel_manager::ChannelManager;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
+use guac_core::eth_client::create_close_channel_payload;
 use guac_core::eth_client::create_join_channel_payload;
 use guac_core::eth_client::create_open_channel_payload;
 use guac_core::eth_client::create_start_challenge_payload;
@@ -398,14 +399,7 @@ fn contract() {
     *CRYPTO.secret_mut() = alice.clone();
     assert_eq!(CRYPTO.secret(), alice);
 
-    let data = encode_call(
-        // function closeChannel(bytes32 channelId) public {
-        "closeChannel(bytes32)",
-        &[
-            // channel id
-            Token::Bytes(channel_id.to_vec().into()),
-        ],
-    );
+    let data = create_close_channel_payload(channel_id);
     let tx = Transaction {
         to: CHANNEL_ADDRESS.clone(),
         // action: Action::Call(Address::default()),
