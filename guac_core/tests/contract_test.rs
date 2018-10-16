@@ -331,7 +331,7 @@ fn contract() {
                         .unwrap()
                         .into(), // keeps same
                 ]);
-                let sig = alice.sign_msg(&payload);
+                let sig = bob.sign_msg(&payload);
                 sig.to_string().as_str().into()
             },
         ],
