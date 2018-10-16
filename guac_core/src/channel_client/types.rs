@@ -187,13 +187,6 @@ impl Channel {
     }
 }
 
-#[derive(Serialize)]
-pub struct NewChannelTx {
-    pub to: Address,
-    pub challenge: BigEndianInt,
-    pub deposit: BigEndianInt,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct UpdateTx {
     pub channel_id: BigEndianInt,

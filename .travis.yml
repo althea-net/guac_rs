@@ -29,8 +29,6 @@ addons:
 
 before_install:
   - command -v cross 1>/dev/null || cargo install cross
-  - npm install -g npm@latest
-  - npm install -g ganache-cli@latest truffle@latest
 
 script:
   - cross build --target $TARGET --verbose --all
@@ -49,9 +47,11 @@ matrix:
         - cargo fmt --all -- --check
     - rust: stable
       ? env
-      ? before_install
+      before_install:
+      - nvm install v8.10.0
+      - nvm use v8.10.0
+      - npm install -g ganache-cli@latest truffle@latest
       before_script:
       - source scripts/chain-prep.sh
       script:
-      - cargo test --verbose -- --ignored testnet
-
+      - cargo test --verbose -- --nocapture --ignored contract
