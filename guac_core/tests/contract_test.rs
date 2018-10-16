@@ -13,6 +13,7 @@ use failure::Error;
 use guac_core::channel_client::channel_manager::ChannelManager;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
+use guac_core::eth_client::create_join_channel_payload;
 use guac_core::eth_client::create_open_channel_payload;
 use rand::{OsRng, Rng};
 use std::env;
@@ -240,15 +241,7 @@ fn contract() {
     assert_eq!(deposit_a, "1000000000000000000".parse().unwrap());
     assert_eq!(challenge, 42u32.into());
 
-    let data = encode_call(
-        "joinChannel(bytes32,uint256)",
-        &[
-            // id
-            Token::Bytes(channel_id.to_vec().into()),
-            // tokenAmount
-            0u32.into(), // should use `msg.value` ^
-        ],
-    );
+    let data = create_join_channel_payload(channel_id);
 
     // Switch to bob
     *CRYPTO.secret_mut() = bob.clone();

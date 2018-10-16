@@ -7,6 +7,9 @@ use std::io::Cursor;
 use crypto::CryptoService;
 use CRYPTO;
 
+/// An alias for a channel ID in a raw bytes form
+pub type ChannelId = [u8; 32];
+
 pub struct Fullnode {
     pub address: Address,
     pub url: String,
@@ -72,6 +75,21 @@ pub fn create_open_channel_payload(to: Address, challenge: BigEndianInt) -> Vec<
     )
 }
 
+/// Creates a payload for "joinChannel" contract call.
+///
+/// * `channel_id` - A valid channel ID
+pub fn create_join_channel_payload(channel_id: ChannelId) -> Vec<u8> {
+    encode_call(
+        "joinChannel(bytes32,uint256)",
+        &[
+            // id
+            Token::Bytes(channel_id.to_vec().into()),
+            // tokenAmount
+            0u32.into(), // should use `msg.value` ^
+        ],
+    )
+}
+
 #[test]
 fn test_create_update_tx() {
     let tx = create_update_tx(UpdateTx {
@@ -89,4 +107,10 @@ fn test_create_update_tx() {
 fn test_new_channel_tx() {
     let data = create_open_channel_payload(Address::default(), "12345".parse().unwrap());
     trace!("payload: {:?}", data);
+}
+
+#[test]
+fn test_join_channel_tx() {
+    let data = create_join_channel_payload([0u8; 32]);
+    assert!(data.len() > 0);
 }
