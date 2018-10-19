@@ -6,9 +6,10 @@ extern crate lazy_static;
 extern crate rand;
 #[macro_use]
 extern crate failure;
+extern crate num256;
 
 use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
-use clarity::{Address, BigEndianInt, PrivateKey, Transaction};
+use clarity::{Address, PrivateKey, Transaction};
 use failure::Error;
 use guac_core::channel_client::channel_manager::ChannelManager;
 use guac_core::crypto::CryptoService;
@@ -18,6 +19,7 @@ use guac_core::eth_client::create_join_channel_payload;
 use guac_core::eth_client::create_open_channel_payload;
 use guac_core::eth_client::create_start_challenge_payload;
 use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
+use num256::Uint256;
 use rand::{OsRng, Rng};
 use std::env;
 use std::ops::Deref;
@@ -197,7 +199,7 @@ fn contract() {
     println!("action {:?}", action);
     println!("cm {:?}", cm);
 
-    let challenge = BigEndianInt::from(42u32);
+    let challenge = Uint256::from(42u32);
 
     // Call openChannel
 
@@ -205,7 +207,7 @@ fn contract() {
 
     // Get gas price
     let gas_price = WEB3.eth().gas_price().wait().unwrap();
-    let gas_price: BigEndianInt = gas_price.to_string().parse().unwrap();
+    let gas_price: Uint256 = gas_price.to_string().parse().unwrap();
     println!("gas_price {:?}", gas_price);
 
     let tx = Transaction {
@@ -236,11 +238,11 @@ fn contract() {
 
     // Extract ChannelOpen event arguments
     let _token_contract = &log.data.0[0..32];
-    let deposit_a: BigEndianInt = log.data.0[32..64].into();
-    let challenge: BigEndianInt = log.data.0[64..96].into();
+    let deposit_a: Uint256 = log.data.0[32..64].into();
+    let challenge: Uint256 = log.data.0[64..96].into();
     // let channel_id = log.topics
     let channel_id: [u8; 32] = log.topics[1].into();
-    // let channel_id: BigEndianInt = format!("{:?}", log.topics[1]).parse().unwrap();
+    // let channel_id: Uint256 = format!("{:?}", log.topics[1]).parse().unwrap();
     assert_eq!(deposit_a, "1000000000000000000".parse().unwrap());
     assert_eq!(challenge, 42u32.into());
 
@@ -287,8 +289,8 @@ fn contract() {
     // Alice calls updateState
     //
     channel_nonce += 1;
-    let balance_a: BigEndianInt = "500000000000000000".parse().unwrap();
-    let balance_b: BigEndianInt = "1500000000000000000".parse().unwrap();
+    let balance_a: Uint256 = "500000000000000000".parse().unwrap();
+    let balance_b: Uint256 = "1500000000000000000".parse().unwrap();
 
     // Proof is the same for both parties
     let proof = create_signature_data(
@@ -428,27 +430,27 @@ fn contract() {
     println!("tx {:?}", tx);
     println!("ChannelClose {:?}", log);
 
-    let alice_balance: BigEndianInt = WEB3
+    let alice_balance: Uint256 = WEB3
         .eth()
         .balance(alice.to_public_key().unwrap().as_bytes().into(), None)
         .wait()
         .unwrap()
-        // Convert U256 to BigEndianInt
+        // Convert U256 to Uint256
         .to_string()
         .parse()
         .unwrap();
     println!("Alice {:?}", alice_balance);
-    let bob_balance: BigEndianInt = WEB3
+    let bob_balance: Uint256 = WEB3
         .eth()
         .balance(bob.to_public_key().unwrap().as_bytes().into(), None)
         .wait()
         .unwrap()
-        // Convert U256 to BigEndianInt
+        // Convert U256 to Uint256
         .to_string()
         .parse()
         .unwrap();
     println!("Bob {:?}", bob_balance);
 
-    assert!(alice_balance < BigEndianInt::from_str("9500000000000000000").unwrap());
-    assert!(bob_balance >= BigEndianInt::from_str("10490000000000000000").unwrap());
+    assert!(alice_balance < Uint256::from_str("9500000000000000000").unwrap());
+    assert!(bob_balance >= Uint256::from_str("10490000000000000000").unwrap());
 }

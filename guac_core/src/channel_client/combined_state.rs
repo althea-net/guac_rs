@@ -1,6 +1,6 @@
 use failure::Error;
 
-use clarity::BigEndianInt;
+use num256::Uint256;
 
 use channel_client::types::{Channel, UpdateTx};
 use std::ops::{Add, Sub};
@@ -22,7 +22,7 @@ pub struct CombinedState {
 
     /// This represents the amount of money we have confirmed we will recieve from them, but have
     /// not been `withdraw`n yet
-    pending_receive: BigEndianInt,
+    pending_receive: Uint256,
 }
 
 impl CombinedState {
@@ -54,7 +54,7 @@ impl CombinedState {
     /// updates, mearly ensures that the next state update we create will give the counterparty the
     /// amount sent. This function returns the "overflow" (amount - current balance in channel) if
     /// we don't have enough monty in the channel
-    pub fn pay_counterparty(&mut self, amount: BigEndianInt) -> Result<BigEndianInt, Error> {
+    pub fn pay_counterparty(&mut self, amount: Uint256) -> Result<Uint256, Error> {
         if amount > *self.my_state.my_balance_mut() {
             let remaining_amount = amount.clone() - self.my_state.my_balance().clone();
 
@@ -78,7 +78,7 @@ impl CombinedState {
         }
     }
 
-    pub fn withdraw(&mut self) -> Result<BigEndianInt, Error> {
+    pub fn withdraw(&mut self) -> Result<Uint256, Error> {
         let withdraw = self.pending_receive.clone();
         self.pending_receive = 0u32.into();
         Ok(withdraw)
@@ -90,7 +90,7 @@ impl CombinedState {
     pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
         let mut state = self.my_state.clone();
 
-        state.nonce = state.nonce.add(1u8.into());
+        state.nonce = state.nonce.add(1u8);
 
         Ok(state.create_update())
     }
@@ -187,10 +187,7 @@ impl CombinedState {
 mod tests {
     use super::*;
 
-    fn new_pair(
-        deposit_a: BigEndianInt,
-        deposit_b: BigEndianInt,
-    ) -> (CombinedState, CombinedState) {
+    fn new_pair(deposit_a: Uint256, deposit_b: Uint256) -> (CombinedState, CombinedState) {
         let (channel_a, channel_b) = Channel::new_pair(deposit_a, deposit_b);
         (
             CombinedState::new(&channel_a),

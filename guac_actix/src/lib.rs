@@ -11,6 +11,7 @@ extern crate guac_core;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
+extern crate num256;
 extern crate qutex;
 extern crate serde;
 extern crate serde_json;
@@ -34,8 +35,9 @@ mod network_requests;
 
 pub use network_endpoints::init_server;
 
-use clarity::{Address, BigEndianInt};
+use clarity::Address;
 use network_requests::tick;
+use num256::Uint256;
 use std::ops::{Add, Sub};
 
 /// A data type which wraps all network requests that guac makes, to check who the request is from
@@ -88,10 +90,10 @@ impl Handler<MakePayment> for PaymentController {
         *CRYPTO.get_balance_mut() = CRYPTO
             .get_balance_mut()
             .clone()
-            .sub(msg.0.amount.clone().into());
+            .sub(Uint256(msg.0.amount.clone()));
         Box::new(STORAGE.get_channel(msg.0.to.eth_address.clone()).and_then(
             move |mut channel_manager| {
-                channel_manager.pay_counterparty(msg.0.amount.clone().into())?;
+                channel_manager.pay_counterparty(Uint256(msg.0.amount.clone()))?;
                 Ok(())
             },
         ))
@@ -150,11 +152,11 @@ impl Handler<Register> for PaymentController {
 pub struct Withdraw(pub Address);
 
 impl Message for Withdraw {
-    type Result = Result<BigEndianInt, Error>;
+    type Result = Result<Uint256, Error>;
 }
 
 impl Handler<Withdraw> for PaymentController {
-    type Result = ResponseFuture<BigEndianInt, Error>;
+    type Result = ResponseFuture<Uint256, Error>;
     fn handle(&mut self, msg: Withdraw, _: &mut Context<Self>) -> Self::Result {
         Box::new(STORAGE.get_channel(msg.0.clone()).and_then(move |mut i| {
             let withdraw = i.withdraw()?;
@@ -169,11 +171,11 @@ impl Handler<Withdraw> for PaymentController {
 pub struct GetOwnBalance;
 
 impl Message for GetOwnBalance {
-    type Result = Result<BigEndianInt, Error>;
+    type Result = Result<Uint256, Error>;
 }
 
 impl Handler<GetOwnBalance> for PaymentController {
-    type Result = Result<BigEndianInt, Error>;
+    type Result = Result<Uint256, Error>;
     fn handle(&mut self, _msg: GetOwnBalance, _: &mut Context<Self>) -> Self::Result {
         Ok(CRYPTO.get_balance().clone())
     }

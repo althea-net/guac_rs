@@ -2,7 +2,8 @@ use channel_client::types::UpdateTx;
 use clarity::abi::encode_tokens;
 use clarity::abi::{encode_call, Token};
 use clarity::Transaction;
-use clarity::{Address, BigEndianInt, Signature};
+use clarity::{Address, Signature};
+use num256::Uint256;
 use std::io::Cursor;
 
 use crypto::CryptoService;
@@ -43,12 +44,12 @@ pub fn create_update_tx(update: UpdateTx) -> Transaction {
 
     Transaction {
         to: Address::default(),
-        nonce: BigEndianInt::from(42u32),
+        nonce: Uint256::from(42u32),
         // TODO: set this semi automatically
-        gas_price: BigEndianInt::from(3000u32),
+        gas_price: Uint256::from(3000u32),
         // TODO: find out how much gas this contract acutally takes
-        gas_limit: BigEndianInt::from(50_000u32),
-        value: BigEndianInt::from(0u32),
+        gas_limit: Uint256::from(50_000u32),
+        value: Uint256::from(0u32),
         data,
         signature: None,
     }.sign(&CRYPTO.secret(), None)
@@ -58,7 +59,7 @@ pub fn create_update_tx(update: UpdateTx) -> Transaction {
 ///
 /// * `to` - Who is expected to be join on the other side of the channel.
 /// * `challenge` - A channel challenge which should be unique.
-pub fn create_open_channel_payload(to: Address, challenge: BigEndianInt) -> Vec<u8> {
+pub fn create_open_channel_payload(to: Address, challenge: Uint256) -> Vec<u8> {
     let challenge: [u8; 32] = challenge.into();
 
     encode_call(
@@ -96,9 +97,9 @@ pub fn create_join_channel_payload(channel_id: ChannelId) -> Vec<u8> {
 /// create_update_channel_payload.
 pub fn create_signature_data(
     channel_id: ChannelId,
-    nonce: BigEndianInt,
-    balance_a: BigEndianInt,
-    balance_b: BigEndianInt,
+    nonce: Uint256,
+    balance_a: Uint256,
+    balance_b: Uint256,
 ) -> Vec<u8> {
     encode_tokens(&[
         Token::Bytes(channel_id.to_vec()),
@@ -110,9 +111,9 @@ pub fn create_signature_data(
 
 pub fn create_update_channel_payload(
     channel_id: ChannelId,
-    nonce: BigEndianInt,
-    balance_a: BigEndianInt,
-    balance_b: BigEndianInt,
+    nonce: Uint256,
+    balance_a: Uint256,
+    balance_b: Uint256,
     sig_a: Signature,
     sig_b: Signature,
 ) -> Vec<u8> {
