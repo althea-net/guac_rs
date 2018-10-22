@@ -1,8 +1,8 @@
-use error::Error;
+use error::GuacError;
+use failure::Error;
 use std::ops::Deref;
 use web3::transports::{EventLoopHandle, Http};
 use web3::Web3;
-
 /// A handle that contains event loop instance and a web3 instance
 ///
 /// EventLoop has to live at least as long as the "Web3" object, or
@@ -19,8 +19,7 @@ impl Deref for Web3Handle {
 
 impl Web3Handle {
     pub fn new(address: &str) -> Result<Web3Handle, Error> {
-        let (evloop, transport) =
-            Http::new(&address).map_err(|e| Error::Web3Error(format!("{}", e)))?;
+        let (evloop, transport) = Http::new(&address).map_err(GuacError::from)?;
         Ok(Web3Handle(evloop, Web3::new(transport)))
     }
 }
