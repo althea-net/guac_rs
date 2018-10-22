@@ -1,7 +1,8 @@
 use clarity::{Address, PrivateKey, Signature};
 use multihash::{encode, Hash};
+use network::Web3Handle;
 
-use owning_ref::RwLockWriteGuardRefMut;
+use owning_ref::{RwLockReadGuardRef, RwLockWriteGuardRefMut};
 use sha3::{Digest, Keccak256};
 use std::sync::{Arc, RwLock};
 
@@ -17,6 +18,9 @@ pub struct Crypto {
 
     /// This is a local balance which is just a hack for testing things
     pub balance: Uint256,
+
+    // Handle to a Web3 instance
+    pub web3: Web3Handle,
 }
 
 pub trait CryptoService {
@@ -29,6 +33,7 @@ pub trait CryptoService {
     fn eth_sign(&self, data: &[u8]) -> Signature;
     fn hash_bytes(&self, x: &[&[u8]]) -> Uint256;
     fn verify(_fingerprint: &Uint256, _signature: &Signature, _address: Address) -> bool;
+    fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Handle>;
 }
 
 impl Crypto {
@@ -38,6 +43,8 @@ impl Crypto {
                 .parse()
                 .unwrap(),
             balance: 1_000_000_000_000u64.into(),
+            // TODO: Proper connecting
+            web3: Web3Handle::new("http://localhost:8545").unwrap(),
         }
     }
 }
@@ -77,5 +84,8 @@ impl CryptoService for Arc<RwLock<Crypto>> {
     }
     fn verify(_fingerprint: &Uint256, _signature: &Signature, _address: Address) -> bool {
         unimplemented!("verify")
+    }
+    fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Handle> {
+        RwLockReadGuardRef::new(self.read().unwrap()).map(|c| &c.web3)
     }
 }
