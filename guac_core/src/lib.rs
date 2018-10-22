@@ -20,6 +20,7 @@ extern crate owning_ref;
 extern crate qutex;
 #[macro_use]
 extern crate log;
+extern crate num256;
 extern crate sha3;
 
 pub mod channel_client;

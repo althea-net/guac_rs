@@ -1,8 +1,7 @@
 use failure::Error;
 
 use clarity::Address;
-use clarity::BigEndianInt;
-// use ethereum_types::{Address, BigEndianInt};
+use num256::Uint256;
 
 use channel_client::combined_state::CombinedState;
 use channel_client::types::{ChannelStatus, UpdateTx};
@@ -19,17 +18,17 @@ pub enum ChannelManager {
     /// After counterparty accepts proposal, while blockchain tx to create channel is pending
     PendingCreation {
         state: Channel,
-        pending_send: BigEndianInt,
+        pending_send: Uint256,
     },
     /// After we accepts proposal, while counterparty's blockchain tx to create channel is pending
     PendingOtherCreation {
         state: Channel,
-        pending_send: BigEndianInt,
+        pending_send: Uint256,
     },
     /// After counterparty opened channel, we ran out of credit in channel, while our blockchain tx to join is pending
     PendingJoin {
         state: CombinedState,
-        pending_send: BigEndianInt,
+        pending_send: Uint256,
     },
     /// For party(s) who is already in channel
     Joined {
@@ -141,14 +140,14 @@ impl ChannelManager {
                     .my_state_mut()
                     .my_balance_mut()
                     .clone()
-                    .add(100_000_000_000_000u64.into());
+                    .add(Uint256::from(100_000_000_000_000u64));
 
                 *state.their_state_mut().my_deposit_mut() = 100_000_000_000_000u64.into();
                 *state.their_state_mut().my_balance_mut() = state
                     .their_state_mut()
                     .my_balance_mut()
                     .clone()
-                    .add(100_000_000_000_000u64.into());
+                    .add(Uint256::from(100_000_000_000_000u64));
 
                 // now we have balance in our channel, we can pay what we owe them
                 state.pay_counterparty(pending_send)?;
@@ -170,7 +169,7 @@ impl ChannelManager {
         &mut self,
         from: Address,
         to: Address,
-        deposit: BigEndianInt,
+        deposit: Uint256,
     ) -> Result<ChannelManagerAction, Error> {
         ensure!(from != to, "cannot pay to self");
         let ret;
@@ -371,7 +370,7 @@ impl ChannelManager {
         Ok(())
     }
 
-    pub fn pay_counterparty(&mut self, amount: BigEndianInt) -> Result<(), Error> {
+    pub fn pay_counterparty(&mut self, amount: Uint256) -> Result<(), Error> {
         *self = match self {
             ChannelManager::Open { ref mut state } => {
                 assert_eq!(state.my_state().is_a, false);
@@ -425,7 +424,7 @@ impl ChannelManager {
         Ok(())
     }
 
-    pub fn withdraw(&mut self) -> Result<BigEndianInt, Error> {
+    pub fn withdraw(&mut self) -> Result<Uint256, Error> {
         match self {
             ChannelManager::Open { ref mut state } | ChannelManager::Joined { ref mut state } => {
                 Ok(state.withdraw()?)
