@@ -12,6 +12,7 @@ use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
 use clarity::{Address, PrivateKey, Transaction};
 use failure::Error;
 use guac_core::channel_client::channel_manager::ChannelManager;
+use guac_core::crypto::Config;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
 use guac_core::eth_client::create_close_channel_payload;
@@ -437,4 +438,14 @@ fn contract() {
 
     assert!(alice_balance < Uint256::from_str("9500000000000000000").unwrap());
     assert!(bob_balance >= Uint256::from_str("10490000000000000000").unwrap());
+}
+
+#[test]
+#[ignore]
+fn init_and_query() {
+    let cfg = Config {
+        address: "http://127.0.0.1:8545".to_string(),
+    };
+    CRYPTO.init(&cfg).unwrap();
+    assert_ne!(CRYPTO.web3().eth().accounts().wait().unwrap().len(), 0);
 }
