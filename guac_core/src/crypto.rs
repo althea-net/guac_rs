@@ -7,6 +7,10 @@ use owning_ref::{RwLockReadGuardRef, RwLockWriteGuardRefMut};
 use sha3::{Digest, Keccak256};
 use std::sync::{Arc, RwLock};
 
+use error::GuacError;
+use futures::future::ok;
+use futures::Future;
+use futures::IntoFuture;
 use num256::Uint256;
 
 /// A global object which stores per node crypto state
@@ -46,6 +50,9 @@ pub trait CryptoService {
     fn hash_bytes(&self, x: &[&[u8]]) -> Uint256;
     fn verify(_fingerprint: &Uint256, _signature: &Signature, _address: Address) -> bool;
     fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Handle>;
+
+    // Async stuff
+    fn get_network_id(&self) -> Box<Future<Item = u64, Error = Error>>;
 }
 
 impl Crypto {
@@ -110,6 +117,23 @@ impl CryptoService for Arc<RwLock<Crypto>> {
             assert!(c.web3.is_some(), "Web3 connection is not initialized.");
             c.web3.as_ref().unwrap()
         })
+    }
+    fn get_network_id(&self) -> Box<Future<Item = u64, Error = Error>> {
+        Box::new(
+            self.web3()
+                .net()
+                .version()
+                .into_future()
+                .map_err(GuacError::from)
+                .from_err()
+                .map(|value| {
+                    // According to https://github.com/ethereum/wiki/wiki/JSON-RPC#net_version
+                    // server sends network id as a string.
+                    value
+                        .parse()
+                        .expect("Network was expected to return a valid network ID")
+                }),
+        )
     }
 }
 

@@ -449,4 +449,6 @@ fn init_and_query() {
     };
     CRYPTO.init(&cfg).unwrap();
     assert_ne!(CRYPTO.web3().eth().accounts().wait().unwrap().len(), 0);
+
+    assert_eq!(CRYPTO.get_network_id().wait().unwrap(), *NETWORK_ID);
 }
