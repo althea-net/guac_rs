@@ -17,6 +17,8 @@ lazy_static! {
 pub struct Config {
     /// Network address
     pub address: String,
+    /// Address for the contract
+    pub contract: Address,
 }
 
 pub struct Crypto {
@@ -27,6 +29,9 @@ pub struct Crypto {
 
     // Handle to a Web3 instance
     pub web3: Option<Web3Handle>,
+
+    /// Contract address
+    pub contract: Address,
 }
 
 pub trait CryptoService {
@@ -52,6 +57,7 @@ impl Crypto {
             balance: 1_000_000_000_000u64.into(),
             // TODO: Proper connecting
             web3: None,
+            contract: Address::default(),
         }
     }
 }
@@ -60,6 +66,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
     fn init(&self, config: &Config) -> Result<(), Error> {
         let mut service = self.write().unwrap();
         service.web3 = Some(Web3Handle::new(&config.address)?);
+        service.contract = config.contract.clone();
         Ok(())
     }
     fn own_eth_addr(&self) -> Address {
