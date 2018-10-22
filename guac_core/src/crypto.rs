@@ -1,4 +1,5 @@
 use clarity::{Address, PrivateKey, Signature};
+use failure::Error;
 use multihash::{encode, Hash};
 use network::Web3Handle;
 
@@ -13,6 +14,11 @@ lazy_static! {
     pub static ref CRYPTO: Arc<RwLock<Crypto>> = Arc::new(RwLock::new(Crypto::new()));
 }
 
+pub struct Config {
+    /// Network address
+    pub address: String,
+}
+
 pub struct Crypto {
     pub secret: PrivateKey,
 
@@ -20,10 +26,11 @@ pub struct Crypto {
     pub balance: Uint256,
 
     // Handle to a Web3 instance
-    pub web3: Web3Handle,
+    pub web3: Option<Web3Handle>,
 }
 
 pub trait CryptoService {
+    fn init(&self, config: &Config) -> Result<(), Error>;
     fn own_eth_addr(&self) -> Address;
     fn secret(&self) -> PrivateKey;
     fn secret_mut<'ret, 'me: 'ret>(&'me self) -> RwLockWriteGuardRefMut<'ret, Crypto, PrivateKey>;
@@ -44,12 +51,17 @@ impl Crypto {
                 .unwrap(),
             balance: 1_000_000_000_000u64.into(),
             // TODO: Proper connecting
-            web3: Web3Handle::new("http://localhost:8545").unwrap(),
+            web3: None,
         }
     }
 }
 
 impl CryptoService for Arc<RwLock<Crypto>> {
+    fn init(&self, config: &Config) -> Result<(), Error> {
+        let mut service = self.write().unwrap();
+        service.web3 = Some(Web3Handle::new(&config.address)?);
+        Ok(())
+    }
     fn own_eth_addr(&self) -> Address {
         self.read()
             .unwrap()
@@ -86,6 +98,15 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         unimplemented!("verify")
     }
     fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Handle> {
-        RwLockReadGuardRef::new(self.read().unwrap()).map(|c| &c.web3)
+        RwLockReadGuardRef::new(self.read().unwrap()).map(|c| {
+            // To use web3 you need to call CRYPTO.init first.
+            assert!(c.web3.is_some(), "Web3 connection is not initialized.");
+            c.web3.as_ref().unwrap()
+        })
     }
+}
+
+#[test]
+fn create() {
+    &*CRYPTO;
 }
