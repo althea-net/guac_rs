@@ -22,11 +22,14 @@ extern crate qutex;
 extern crate log;
 extern crate num256;
 extern crate sha3;
+extern crate web3;
 
 pub mod channel_client;
 pub mod counterparty;
 pub mod crypto;
+pub mod error;
 pub mod eth_client;
+pub mod network;
 pub mod storage;
 
 pub use crypto::CRYPTO;
