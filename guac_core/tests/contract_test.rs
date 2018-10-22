@@ -19,6 +19,7 @@ use guac_core::eth_client::create_join_channel_payload;
 use guac_core::eth_client::create_open_channel_payload;
 use guac_core::eth_client::create_start_challenge_payload;
 use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
+use guac_core::network::Web3Handle;
 use num256::Uint256;
 use rand::{OsRng, Rng};
 use std::env;
@@ -34,35 +35,18 @@ use web3::transports::{EventLoopHandle, Http};
 use web3::types::{Bytes, FilterBuilder, Log, TransactionRequest, H160, U256};
 use web3::Web3;
 
-/// A handle that contains event loop instance and a web3 instance
-///
-/// EventLoop has to live at least as long as the "Web3" object, or
-/// otherwise calls will fail. We achieve this by implementing a Deref
-/// trait that would return a borrowed Web3 object.
-struct Web3Handle(EventLoopHandle, Web3<Http>);
-
-impl Deref for Web3Handle {
-    type Target = Web3<Http>;
-    fn deref(&self) -> &Web3<Http> {
-        &self.1
-    }
-}
-
-/// This function verifies if a web3 transport can be safely created.
 fn make_web3() -> Option<Web3Handle> {
     let address = env::var("GANACHE_HOST").unwrap_or("http://localhost:8545".to_owned());
     eprintln!("Trying to create a Web3 connection to {:?}", address);
     for counter in 0..30 {
-        match web3::transports::Http::new(&address) {
-            Ok((evloop, transport)) => {
-                // Creating a transport doesn't mean the connection is actually established.
+        match Web3Handle::new(&address) {
+            Ok(web3) => {
                 // Request a list of accounts on the node to verify that connection to the
                 // specified network is stable.
-                let web3 = Web3::new(transport);
                 match web3.eth().accounts().wait() {
                     Ok(accounts) => {
                         println!("Got accounts {:?}", accounts);
-                        return Some(Web3Handle(evloop, web3));
+                        return Some(web3);
                     }
                     Err(e) => {
                         eprintln!("Unable to retrieve accounts ({}): {}", counter, e);
