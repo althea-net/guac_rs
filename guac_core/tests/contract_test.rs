@@ -446,6 +446,9 @@ fn init_and_query() {
     let cfg = Config {
         address: "http://127.0.0.1:8545".to_string(),
         contract: CHANNEL_ADDRESS.clone(),
+        secret: "fafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafa"
+            .parse()
+            .unwrap(),
     };
     CRYPTO.init(&cfg).unwrap();
     assert_ne!(CRYPTO.web3().eth().accounts().wait().unwrap().len(), 0);
