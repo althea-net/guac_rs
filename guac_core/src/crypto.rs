@@ -45,6 +45,11 @@ pub trait CryptoService {
     fn secret_mut<'ret, 'me: 'ret>(&'me self) -> RwLockWriteGuardRefMut<'ret, Crypto, PrivateKey>;
     fn get_balance_mut<'ret, 'me: 'ret>(&'me self)
         -> RwLockWriteGuardRefMut<'ret, Crypto, Uint256>;
+    /// Access local balance without querying network.
+    ///
+    /// This is different from get_network_balance, where an actual
+    /// network call is made to retrieve up to date balance. This method
+    /// should be preferred over querying the network.
     fn get_balance(&self) -> Uint256;
     fn eth_sign(&self, data: &[u8]) -> Signature;
     fn hash_bytes(&self, x: &[&[u8]]) -> Uint256;
@@ -55,6 +60,14 @@ pub trait CryptoService {
     fn get_network_id(&self) -> Box<Future<Item = u64, Error = Error>>;
     fn get_nonce(&self) -> Box<Future<Item = Uint256, Error = Error>>;
     fn get_gas_price(&self) -> Box<Future<Item = Uint256, Error = Error>>;
+    /// Queries the network for current balance. This is different
+    /// from get_balance which keeps track of local balance to save
+    /// up on network calls.
+    ///
+    /// This function shouldn't be called every time. Ideally it should be
+    /// called once when initializing private key, or periodically to synchronise
+    /// local and network balance.
+    fn get_network_balance(&self) -> Box<Future<Item = Uint256, Error = Error>>;
 }
 
 impl Crypto {
@@ -154,6 +167,18 @@ impl CryptoService for Arc<RwLock<Crypto>> {
             self.web3()
                 .eth()
                 .gas_price()
+                .into_future()
+                .map_err(GuacError::from)
+                .from_err()
+                // Ugly conversion routine from ethereum-types -> clarity
+                .map(|value| value.to_string().parse().unwrap()),
+        )
+    }
+    fn get_network_balance(&self) -> Box<Future<Item = Uint256, Error = Error>> {
+        Box::new(
+            self.web3()
+                .eth()
+                .balance(self.own_eth_addr().to_string().parse().unwrap(), None)
                 .into_future()
                 .map_err(GuacError::from)
                 .from_err()
