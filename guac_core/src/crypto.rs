@@ -1,4 +1,5 @@
 use clarity::abi::derive_signature;
+use clarity::Transaction;
 use clarity::{Address, PrivateKey, Signature};
 use failure::Error;
 use multihash::{encode, Hash};
@@ -15,7 +16,7 @@ use futures::IntoFuture;
 use futures::Stream;
 use num256::Uint256;
 use std::time;
-use web3::types::{FilterBuilder, Log};
+use web3::types::{Bytes, FilterBuilder, Log};
 
 /// A global object which stores per node crypto state
 lazy_static! {
@@ -42,6 +43,13 @@ pub struct Crypto {
 
     /// Contract address
     pub contract: Address,
+}
+
+pub enum Action {
+    /// Sends a "traditional" ETH transfer
+    To(Address),
+    /// Does a contract call with provided ddata
+    Call(Vec<u8>),
 }
 
 pub trait CryptoService {
@@ -78,6 +86,15 @@ pub trait CryptoService {
     ///
     /// * `event` - Event signature
     fn wait_for_event(&self, event: &str) -> Box<Future<Item = Log, Error = Error>>;
+    /// Broadcast a transaction on the network.
+    ///
+    /// * `action` - Defines a type of transaction
+    /// * `value` - How much wei to send
+    fn broadcast_transaction(
+        &self,
+        action: Action,
+        value: Uint256,
+    ) -> Box<Future<Item = Uint256, Error = Error>>;
 }
 
 impl Crypto {
@@ -225,6 +242,70 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                 .from_err()
                 .map(|maybe_log| maybe_log.expect("Expected log data but None found"))
                 .into_future(),
+        )
+    }
+
+    fn broadcast_transaction(
+        &self,
+        action: Action,
+        value: Uint256,
+    ) -> Box<Future<Item = Uint256, Error = Error>> {
+        // We're not relying on web3 signing functionality. Here we're do the signing ourselves.
+        let props = self
+            .get_network_id()
+            .join3(self.get_network_id(), self.get_nonce());
+        // let instance = self.read().unwrap();
+        let contract = self.read().unwrap().contract.clone();
+        let secret = self.read().unwrap().secret.clone();
+        let web3 = self.web3().clone();
+
+        Box::new(
+            props
+                .and_then(move |(network_id, gas_price, nonce)| {
+                    // ok(Uint256::from(0u64))
+                    let transaction = match action {
+                        Action::To(address) => {
+                            Transaction {
+                                to: address.clone(),
+                                // action: Action::Call(Address::default()),
+                                // TODO: Get nonce from eth full node
+                                nonce: nonce,
+                                // TODO: set this semi automatically
+                                gas_price: gas_price.into(),
+                                // TODO: find out how much gas this contract acutally takes
+                                gas_limit: 6721975u32.into(),
+                                value: value,
+                                data: Vec::new(),
+                                signature: None,
+                            }
+                            //.sign(&self.secret(), )
+                        }
+                        Action::Call(data) => {
+                            Transaction {
+                                to: contract.clone(),
+                                // action: Action::Call(Address::default()),
+                                // TODO: Get nonce from eth full node
+                                nonce: nonce,
+                                // TODO: set this semi automatically
+                                gas_price: gas_price.into(),
+                                // TODO: find out how much gas this contract acutally takes
+                                gas_limit: 6721975u32.into(),
+                                value: value,
+                                data: data,
+                                signature: None,
+                            }
+                        }
+                    };
+
+                    let transaction = transaction.sign(&secret, Some(network_id));
+
+                    web3.eth()
+                        .send_raw_transaction(Bytes::from(transaction.to_bytes().unwrap()))
+                        .into_future()
+                        .map_err(GuacError::from)
+                        .and_then(|tx| ok(tx.to_string().parse().unwrap()))
+                        .from_err()
+                }).into_future(),
         )
     }
 }
