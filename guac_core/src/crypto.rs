@@ -27,6 +27,8 @@ pub struct Config {
     pub address: String,
     /// Address for the contract
     pub contract: Address,
+    /// Private key
+    pub secret: PrivateKey,
 }
 
 pub struct Crypto {
@@ -97,6 +99,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         let mut service = self.write().unwrap();
         service.web3 = Some(Web3Handle::new(&config.address)?);
         service.contract = config.contract.clone();
+        service.secret = config.secret.clone();
         Ok(())
     }
     fn own_eth_addr(&self) -> Address {
