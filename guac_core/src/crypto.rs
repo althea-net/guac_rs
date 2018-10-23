@@ -53,6 +53,7 @@ pub trait CryptoService {
 
     // Async stuff
     fn get_network_id(&self) -> Box<Future<Item = u64, Error = Error>>;
+    fn get_nonce(&self) -> Box<Future<Item = Uint256, Error = Error>>;
 }
 
 impl Crypto {
@@ -133,6 +134,18 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                         .parse()
                         .expect("Network was expected to return a valid network ID")
                 }),
+        )
+    }
+    fn get_nonce(&self) -> Box<Future<Item = Uint256, Error = Error>> {
+        Box::new(
+            self.web3()
+                .eth()
+                .transaction_count(self.own_eth_addr().to_string().parse().unwrap(), None)
+                .into_future()
+                .map_err(GuacError::from)
+                .from_err()
+                // Ugly conversion routine from ethereum-types -> clarity
+                .map(|value| value.to_string().parse().unwrap()),
         )
     }
 }
