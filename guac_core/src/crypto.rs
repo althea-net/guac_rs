@@ -1,3 +1,4 @@
+use clarity::abi::derive_signature;
 use clarity::{Address, PrivateKey, Signature};
 use failure::Error;
 use multihash::{encode, Hash};
@@ -11,7 +12,10 @@ use error::GuacError;
 use futures::future::ok;
 use futures::Future;
 use futures::IntoFuture;
+use futures::Stream;
 use num256::Uint256;
+use std::time;
+use web3::types::{FilterBuilder, Log};
 
 /// A global object which stores per node crypto state
 lazy_static! {
@@ -68,6 +72,10 @@ pub trait CryptoService {
     /// called once when initializing private key, or periodically to synchronise
     /// local and network balance.
     fn get_network_balance(&self) -> Box<Future<Item = Uint256, Error = Error>>;
+    /// Waits for an event on the network using the event name.
+    ///
+    /// * `event` - Event signature
+    fn wait_for_event(&self, event: &str) -> Box<Future<Item = Log, Error = Error>>;
 }
 
 impl Crypto {
@@ -184,6 +192,36 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                 .from_err()
                 // Ugly conversion routine from ethereum-types -> clarity
                 .map(|value| value.to_string().parse().unwrap()),
+        )
+    }
+
+    fn wait_for_event(&self, event: &str) -> Box<Future<Item = Log, Error = Error>> {
+        // Build a filter
+        let filter = FilterBuilder::default()
+            .address(vec![
+                // Convert contract address into eth-types
+                self.read().unwrap().contract.to_string().parse().unwrap(),
+            ]).topics(Some(vec![derive_signature(event).into()]), None, None, None)
+            .build();
+
+        Box::new(
+            self.web3()
+                .eth_filter()
+                .create_logs_filter(filter)
+                .then(|filter| {
+                    filter
+                        .unwrap()
+                        .stream(time::Duration::from_secs(0))
+                        .into_future()
+                        .map(|(head, _tail)| {
+                            // Throw away rest of the stream
+                            head
+                        })
+                }).map_err(|(e, _)| e)
+                .map_err(GuacError::from)
+                .from_err()
+                .map(|maybe_log| maybe_log.expect("Expected log data but None found"))
+                .into_future(),
         )
     }
 }
