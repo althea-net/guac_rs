@@ -3,10 +3,15 @@ use clarity::abi::encode_tokens;
 use clarity::abi::{encode_call, Token};
 use clarity::Transaction;
 use clarity::{Address, Signature};
+use error::GuacError;
+use failure::Error;
+use futures::future::ok;
+use futures::Future;
+use futures::IntoFuture;
 use num256::Uint256;
 use std::io::Cursor;
 
-use crypto::CryptoService;
+use crypto::{Action, CryptoService};
 use CRYPTO;
 
 /// An alias for a channel ID in a raw bytes form
@@ -154,6 +159,35 @@ pub fn create_close_channel_payload(channel_id: ChannelId) -> Vec<u8> {
             // channel id
             Token::Bytes(channel_id.to_vec().into()),
         ],
+    )
+}
+
+/// Calls ChannelOpen on the contract and waits for event.
+///
+/// * `to` - Other party
+/// * `challenge` - Challenge
+/// * `value` - Initial deposit
+pub fn open_channel(
+    to: Address,
+    challenge: Uint256,
+    value: Uint256,
+) -> Box<Future<Item = ChannelId, Error = Error>> {
+    // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
+    let event =
+        CRYPTO.wait_for_event("ChannelOpen(bytes32,address,address,address,uint256,uint256)");
+
+    // Broadcast a transaction on the network with data
+    let call = CRYPTO.broadcast_transaction(
+        Action::Call(create_open_channel_payload(to, challenge)),
+        value,
+    );
+
+    Box::new(
+        call.join(event)
+            .and_then(|(_tx, response)| {
+                let channel_id: ChannelId = response.topics[1].into();
+                ok(channel_id)
+            }).into_future(),
     )
 }
 
