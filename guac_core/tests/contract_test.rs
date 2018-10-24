@@ -197,50 +197,16 @@ fn contract() {
 
     // Call openChannel
 
-    let data = create_open_channel_payload(bob.to_public_key().unwrap(), challenge.clone());
-
     // Get gas price
     let gas_price = WEB3.eth().gas_price().wait().unwrap();
     let gas_price: Uint256 = gas_price.to_string().parse().unwrap();
-    println!("gas_price {}", gas_price);
 
-    let tx = Transaction {
-        to: CHANNEL_ADDRESS.clone(),
-        // action: Action::Call(Address::default()),
-        // TODO: Get nonce from eth full node
-        nonce: 0u32.into(),
-        // TODO: set this semi automatically
-        gas_price: gas_price.clone(),
-        // TODO: find out how much gas this contract acutally takes
-        gas_limit: 6721975u32.into(), //gas_price.clone() * 2u32.into(),
-        value: "1000000000000000000".parse().unwrap(),
-        data,
-        signature: None,
-    }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
-
-    // Subscribe for ChannelOpen events
-
-    let address_h160: H160 = CHANNEL_ADDRESS.to_string().parse().unwrap();
-    let event_future =
-        poll_for_event("ChannelOpen(bytes32,address,address,address,uint256,uint256)");
-    let call_future = WEB3
-        .eth()
-        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
-
-    // Wait for both TX and ChannelOpen event
-    let (_tx, log) = call_future.join(event_future).wait().unwrap();
-
-    // Extract ChannelOpen event arguments
-    let _token_contract = &log.data.0[0..32];
-    let deposit_a: Uint256 = log.data.0[32..64].into();
-    let challenge: Uint256 = log.data.0[64..96].into();
-    // let channel_id = log.topics
-    let channel_id: [u8; 32] = log.topics[1].into();
-    // let channel_id: Uint256 = format!("{:?}", log.topics[1]).parse().unwrap();
-    assert_eq!(deposit_a, "1000000000000000000".parse().unwrap());
-    assert_eq!(challenge, 42u32.into());
-
-    // let data = create_join_channel_payload(channel_id);
+    let channel_id = open_channel(
+        bob.to_public_key().unwrap(),
+        challenge,
+        "1000000000000000000".parse().unwrap(),
+    ).wait()
+    .unwrap();
 
     // Switch to bob
     *CRYPTO.secret_mut() = bob.clone();
