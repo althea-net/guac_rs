@@ -20,6 +20,7 @@ use guac_core::eth_client::create_join_channel_payload;
 use guac_core::eth_client::create_open_channel_payload;
 use guac_core::eth_client::create_start_challenge_payload;
 use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
+use guac_core::eth_client::{join_channel, open_channel};
 use guac_core::network::Web3Handle;
 use num256::Uint256;
 use rand::{OsRng, Rng};
@@ -159,6 +160,14 @@ fn poll_for_event(event: &str) -> web3::Result<Log> {
 #[test]
 #[ignore]
 fn contract() {
+    let cfg = Config {
+        address: env::var("GANACHE_HOST").unwrap_or("http://localhost:8545".to_owned()),
+        contract: CHANNEL_ADDRESS.clone(),
+        secret: "fafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafa"
+            .parse()
+            .unwrap(),
+    };
+    CRYPTO.init(&cfg).unwrap();
     println!("Address {:?}", &*CHANNEL_ADDRESS);
     println!("Network ID {:?}", &*NETWORK_ID);
     // Set up both parties (alice and bob)
@@ -193,7 +202,7 @@ fn contract() {
     // Get gas price
     let gas_price = WEB3.eth().gas_price().wait().unwrap();
     let gas_price: Uint256 = gas_price.to_string().parse().unwrap();
-    println!("gas_price {:?}", gas_price);
+    println!("gas_price {}", gas_price);
 
     let tx = Transaction {
         to: CHANNEL_ADDRESS.clone(),
@@ -231,41 +240,17 @@ fn contract() {
     assert_eq!(deposit_a, "1000000000000000000".parse().unwrap());
     assert_eq!(challenge, 42u32.into());
 
-    let data = create_join_channel_payload(channel_id);
+    // let data = create_join_channel_payload(channel_id);
 
     // Switch to bob
     *CRYPTO.secret_mut() = bob.clone();
     assert_eq!(CRYPTO.secret(), bob);
+    println!("bob {:?}", CRYPTO.secret());
 
-    //
-    // Call joinChannel(bytes32 id, uint tokenAmount)
-    //
-    let tx = Transaction {
-        to: CHANNEL_ADDRESS.clone(),
-        // action: Action::Call(Address::default()),
-        // TODO: Get nonce from eth full node
-        nonce: 0u32.into(),
-        // TODO: set this semi automatically
-        gas_price: gas_price.clone(),
-        // TODO: find out how much gas this contract acutally takes
-        gas_limit: 6721975u32.into(),
-        value: "1000000000000000000".parse().unwrap(),
-        data,
-        signature: None,
-    }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
-
-    let event_future = poll_for_event("ChannelJoin(bytes32,address,address,uint256,uint256)");
-
-    let call_future = WEB3
-        .eth()
-        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
-
-    let (tx, _log) = event_future
-        .join(call_future)
+    // Bob joins Alice's channel
+    join_channel(channel_id, "1000000000000000000".parse().unwrap())
         .wait()
-        .expect("Unable to wait for call future");
-    println!("tx {:?}", tx);
-    println!("ChannelJoin {:?}", log);
+        .unwrap();
 
     // This has to be updated on every state update
     let mut channel_nonce = 0u32;

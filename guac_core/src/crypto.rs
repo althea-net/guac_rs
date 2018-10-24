@@ -16,7 +16,7 @@ use futures::IntoFuture;
 use futures::Stream;
 use num256::Uint256;
 use std::time;
-use web3::types::{Bytes, FilterBuilder, Log};
+use web3::types::{Bytes, FilterBuilder, Log, H256};
 
 /// A global object which is responsible for managing all crypo related things.
 lazy_static! {
@@ -85,7 +85,12 @@ pub trait CryptoService {
     /// Waits for an event on the network using the event name.
     ///
     /// * `event` - Event signature
-    fn wait_for_event(&self, event: &str) -> Box<Future<Item = Log, Error = Error>>;
+    /// * `topic` - First topic to filter out
+    fn wait_for_event(
+        &self,
+        event: &str,
+        topic: Option<[u8; 32]>,
+    ) -> Box<Future<Item = Log, Error = Error>>;
     /// Broadcast a transaction on the network.
     ///
     /// * `action` - Defines a type of transaction
@@ -215,13 +220,24 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         )
     }
 
-    fn wait_for_event(&self, event: &str) -> Box<Future<Item = Log, Error = Error>> {
+    fn wait_for_event(
+        &self,
+        event: &str,
+        topic: Option<[u8; 32]>,
+    ) -> Box<Future<Item = Log, Error = Error>> {
         // Build a filter
+        let mut topics = vec![];
+        // Append a first topic
+        if let Some(topic) = topic {
+            topics.push(topic.into());
+        }
+
+        // Build a filter with specified topics
         let filter = FilterBuilder::default()
-            .address(vec![
+            .address(
                 // Convert contract address into eth-types
-                self.read().unwrap().contract.to_string().parse().unwrap(),
-            ]).topics(Some(vec![derive_signature(event).into()]), None, None, None)
+                vec![self.read().unwrap().contract.to_string().parse().unwrap()],
+            ).topics(Some(topics), None, None, None)
             .build();
 
         Box::new(
@@ -253,7 +269,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         // We're not relying on web3 signing functionality. Here we're do the signing ourselves.
         let props = self
             .get_network_id()
-            .join3(self.get_network_id(), self.get_nonce());
+            .join3(self.get_gas_price(), self.get_nonce());
         // let instance = self.read().unwrap();
         let contract = self.read().unwrap().contract.clone();
         let secret = self.read().unwrap().secret.clone();
@@ -262,39 +278,25 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         Box::new(
             props
                 .and_then(move |(network_id, gas_price, nonce)| {
-                    // ok(Uint256::from(0u64))
                     let transaction = match action {
-                        Action::To(address) => {
-                            Transaction {
-                                to: address.clone(),
-                                // action: Action::Call(Address::default()),
-                                // TODO: Get nonce from eth full node
-                                nonce: nonce,
-                                // TODO: set this semi automatically
-                                gas_price: gas_price.into(),
-                                // TODO: find out how much gas this contract acutally takes
-                                gas_limit: 6721975u32.into(),
-                                value: value,
-                                data: Vec::new(),
-                                signature: None,
-                            }
-                            //.sign(&self.secret(), )
-                        }
-                        Action::Call(data) => {
-                            Transaction {
-                                to: contract.clone(),
-                                // action: Action::Call(Address::default()),
-                                // TODO: Get nonce from eth full node
-                                nonce: nonce,
-                                // TODO: set this semi automatically
-                                gas_price: gas_price.into(),
-                                // TODO: find out how much gas this contract acutally takes
-                                gas_limit: 6721975u32.into(),
-                                value: value,
-                                data: data,
-                                signature: None,
-                            }
-                        }
+                        Action::To(address) => Transaction {
+                            to: address.clone(),
+                            nonce: nonce,
+                            gas_price: gas_price.into(),
+                            gas_limit: 6721975u32.into(),
+                            value: value,
+                            data: Vec::new(),
+                            signature: None,
+                        },
+                        Action::Call(data) => Transaction {
+                            to: contract.clone(),
+                            nonce: nonce,
+                            gas_price: gas_price.into(),
+                            gas_limit: 6721975u32.into(),
+                            value: value,
+                            data: data,
+                            signature: None,
+                        },
                     };
 
                     let transaction = transaction.sign(&secret, Some(network_id));
@@ -303,7 +305,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                         .send_raw_transaction(Bytes::from(transaction.to_bytes().unwrap()))
                         .into_future()
                         .map_err(GuacError::from)
-                        .and_then(|tx| ok(tx.to_string().parse().unwrap()))
+                        .and_then(|tx| ok(format!("0x{:x}", tx).parse().unwrap()))
                         .from_err()
                 }).into_future(),
         )
