@@ -173,8 +173,10 @@ pub fn open_channel(
     value: Uint256,
 ) -> Box<Future<Item = ChannelId, Error = Error>> {
     // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
-    let event =
-        CRYPTO.wait_for_event("ChannelOpen(bytes32,address,address,address,uint256,uint256)");
+    let event = CRYPTO.wait_for_event(
+        "ChannelOpen(bytes32,address,address,address,uint256,uint256)",
+        None,
+    );
 
     // Broadcast a transaction on the network with data
     let call = CRYPTO.broadcast_transaction(
@@ -188,6 +190,32 @@ pub fn open_channel(
                 let channel_id: ChannelId = response.topics[1].into();
                 ok(channel_id)
             }).into_future(),
+    )
+}
+
+/// Calls JoinChannel on the contract and waits for event.
+///
+/// * `to` - Other party
+/// * `challenge` - Challenge
+/// * `value` - Initial deposit
+pub fn join_channel(
+    channel_id: ChannelId,
+    value: Uint256,
+) -> Box<Future<Item = (), Error = Error>> {
+    // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
+    let event = CRYPTO.wait_for_event(
+        "ChannelOpen(bytes32,address,address,address,uint256,uint256)",
+        None,
+    );
+
+    // Broadcast a transaction on the network with data
+    let call =
+        CRYPTO.broadcast_transaction(Action::Call(create_join_channel_payload(channel_id)), value);
+
+    Box::new(
+        call.join(event)
+            .and_then(|(_tx, _response)| ok(()))
+            .into_future(),
     )
 }
 
