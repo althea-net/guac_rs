@@ -18,7 +18,7 @@ use num256::Uint256;
 use std::time;
 use web3::types::{Bytes, FilterBuilder, Log};
 
-/// A global object which stores per node crypto state
+/// A global object which is responsible for managing all crypo related things.
 lazy_static! {
     pub static ref CRYPTO: Arc<RwLock<Crypto>> = Arc::new(RwLock::new(Crypto::new()));
 }
@@ -35,7 +35,7 @@ pub struct Config {
 pub struct Crypto {
     pub secret: PrivateKey,
 
-    /// This is a local balance which is just a hack for testing things
+    /// This is a cached local balance
     pub balance: Uint256,
 
     // Handle to a Web3 instance
