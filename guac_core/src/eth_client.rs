@@ -203,9 +203,10 @@ pub fn join_channel(
     value: Uint256,
 ) -> Box<Future<Item = (), Error = Error>> {
     // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
+
     let event = CRYPTO.wait_for_event(
-        "ChannelOpen(bytes32,address,address,address,uint256,uint256)",
-        None,
+        "ChannelJoin(bytes32,address,address,uint256,uint256)",
+        Some(channel_id.into()),
     );
 
     // Broadcast a transaction on the network with data
@@ -214,7 +215,7 @@ pub fn join_channel(
 
     Box::new(
         call.join(event)
-            .and_then(|(_tx, _response)| ok(()))
+            .and_then(|(_tx, response)| ok(()))
             .into_future(),
     )
 }
