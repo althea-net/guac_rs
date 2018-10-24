@@ -225,20 +225,19 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         event: &str,
         topic: Option<[u8; 32]>,
     ) -> Box<Future<Item = Log, Error = Error>> {
-        // Build a filter
-        let mut topics = vec![];
-        // Append a first topic
-        if let Some(topic) = topic {
-            topics.push(topic.into());
-        }
-
         // Build a filter with specified topics
         let filter = FilterBuilder::default()
             .address(
                 // Convert contract address into eth-types
                 vec![self.read().unwrap().contract.to_string().parse().unwrap()],
-            ).topics(Some(topics), None, None, None)
-            .build();
+            ).topics(
+                Some(vec![derive_signature(event).into()]),
+                // This is a first, optional topic to filter. If specified it will be converted
+                // into a vector of values, otherwise a None.
+                topic.map(|v| vec![v.into()]),
+                None,
+                None,
+            ).build();
 
         Box::new(
             self.web3()
