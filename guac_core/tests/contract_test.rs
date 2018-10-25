@@ -20,7 +20,7 @@ use guac_core::eth_client::create_join_channel_payload;
 use guac_core::eth_client::create_open_channel_payload;
 use guac_core::eth_client::create_start_challenge_payload;
 use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
-use guac_core::eth_client::{join_channel, open_channel};
+use guac_core::eth_client::{join_channel, open_channel, update_channel};
 use guac_core::network::Web3Handle;
 use num256::Uint256;
 use rand::{OsRng, Rng};
@@ -235,48 +235,18 @@ fn contract() {
         balance_a.clone(),
         balance_b.clone(),
     );
-    let data = create_update_channel_payload(
+
+    *CRYPTO.secret_mut() = alice.clone();
+    assert_eq!(CRYPTO.secret(), alice);
+    update_channel(
         channel_id,
-        channel_nonce.into(),
+        Uint256::from(channel_nonce),
         balance_a.clone(),
         balance_b.clone(),
         alice.sign_msg(&proof),
         bob.sign_msg(&proof),
-    );
-
-    // Switch to alice
-    *CRYPTO.secret_mut() = alice.clone();
-    assert_eq!(CRYPTO.secret(), alice);
-
-    //
-    // Call joinChannel(bytes32 id, uint tokenAmount)
-    //
-    let tx = Transaction {
-        to: CHANNEL_ADDRESS.clone(),
-        // action: Action::Call(Address::default()),
-        // TODO: Get nonce from eth full node
-        nonce: 1u32.into(),
-        // TODO: set this semi automatically
-        gas_price: gas_price.clone(),
-        // TODO: find out how much gas this contract acutally takes
-        gas_limit: 6721975u32.into(),
-        value: "0".parse().unwrap(),
-        data,
-        signature: None,
-    }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
-
-    let event_future = poll_for_event("ChannelUpdateState(bytes32,uint256,uint256,uint256)");
-
-    let call_future = WEB3
-        .eth()
-        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
-
-    let (tx, log) = call_future
-        .join(event_future)
-        .wait()
-        .expect("Unable to wait for call future");
-    println!("tx {:?}", tx);
-    println!("ChannelUpdateState {:?}", log);
+    ).wait()
+    .unwrap();
 
     //
     // Bob starts a challenge
