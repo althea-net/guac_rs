@@ -249,6 +249,45 @@ pub fn update_channel(
     )
 }
 
+pub fn start_challenge(channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>> {
+    // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
+
+    let event = CRYPTO.wait_for_event(
+        "ChannelChallenge(bytes32,uint256,address)",
+        Some(channel_id.into()),
+    );
+
+    // Broadcast a transaction on the network with data
+    let call = CRYPTO.broadcast_transaction(
+        Action::Call(create_start_challenge_payload(channel_id)),
+        Uint256::from(0),
+    );
+
+    Box::new(
+        call.join(event)
+            .and_then(|(_tx, response)| ok(()))
+            .into_future(),
+    )
+}
+
+pub fn close_channel(channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>> {
+    // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
+
+    let event = CRYPTO.wait_for_event("ChannelClose(bytes32)", Some(channel_id.into()));
+
+    // Broadcast a transaction on the network with data
+    let call = CRYPTO.broadcast_transaction(
+        Action::Call(create_close_channel_payload(channel_id)),
+        Uint256::from(0),
+    );
+
+    Box::new(
+        call.join(event)
+            .and_then(|(_tx, _response)| ok(()))
+            .into_future(),
+    )
+}
+
 #[test]
 fn test_create_update_tx() {
     let tx = create_update_tx(UpdateTx {
