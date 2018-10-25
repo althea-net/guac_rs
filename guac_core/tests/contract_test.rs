@@ -19,8 +19,10 @@ use guac_core::eth_client::create_close_channel_payload;
 use guac_core::eth_client::create_join_channel_payload;
 use guac_core::eth_client::create_open_channel_payload;
 use guac_core::eth_client::create_start_challenge_payload;
+use guac_core::eth_client::{
+    close_channel, join_channel, open_channel, start_challenge, update_channel,
+};
 use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
-use guac_core::eth_client::{join_channel, open_channel, update_channel};
 use guac_core::network::Web3Handle;
 use num256::Uint256;
 use rand::{OsRng, Rng};
@@ -248,93 +250,49 @@ fn contract() {
     ).wait()
     .unwrap();
 
-    //
-    // Bob starts a challenge
-    //
-    let data = create_start_challenge_payload(channel_id);
-
     // Switch to bob
     *CRYPTO.secret_mut() = bob.clone();
     assert_eq!(CRYPTO.secret(), bob);
 
-    //
-    // Call startChallenge(bytes32 channelId) public {
-    //
-    let tx = Transaction {
-        to: CHANNEL_ADDRESS.clone(),
-        // action: Action::Call(Address::default()),
-        // TODO: Get nonce from eth full node
-        nonce: 1u32.into(),
-        // TODO: set this semi automatically
-        gas_price: gas_price.clone(),
-        // TODO: find out how much gas this contract acutally takes
-        gas_limit: 6721975u32.into(),
-        value: "0".parse().unwrap(),
-        data,
-        signature: None,
-    }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
-
-    let event_future = poll_for_event("ChannelChallenge(bytes32,uint256,address)");
-
-    let call_future = WEB3
-        .eth()
-        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
-
-    let (tx, log) = call_future
-        .join(event_future)
-        .wait()
-        .expect("Unable to wait for call future");
-    println!("tx {:?}", tx);
-    println!("ChannelChallenge {:?}", log);
+    // Bob starts challenge on channel
+    start_challenge(channel_id).wait().unwrap();
 
     //
     // Switch to alice (keep in mind that Bob started the closing challenge)
     //
-
-    let res = WEB3
-        .eth()
-        .balance(alice.to_public_key().unwrap().as_bytes().into(), None)
-        .wait()
-        .unwrap();
-    println!("Alice {:?}", res);
-    let res = WEB3
-        .eth()
-        .balance(bob.to_public_key().unwrap().as_bytes().into(), None)
-        .wait()
-        .unwrap();
-    println!("Bob {:?}", res);
-
     *CRYPTO.secret_mut() = alice.clone();
     assert_eq!(CRYPTO.secret(), alice);
 
-    let data = create_close_channel_payload(channel_id);
-    let tx = Transaction {
-        to: CHANNEL_ADDRESS.clone(),
-        // action: Action::Call(Address::default()),
-        // TODO: Get nonce from eth full node
-        nonce: 2u32.into(),
-        // TODO: set this semi automatically
-        gas_price: gas_price.clone(),
-        // TODO: find out how much gas this contract acutally takes
-        gas_limit: 6721975u32.into(),
-        value: "0".parse().unwrap(),
-        data,
-        signature: None,
-    }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
+    close_channel(channel_id).wait().unwrap();
 
-    let event_future = poll_for_event("ChannelClose(bytes32)");
+    // let data = create_close_channel_payload(channel_id);
+    // let tx = Transaction {
+    //     to: CHANNEL_ADDRESS.clone(),
+    //     // action: Action::Call(Address::default()),
+    //     // TODO: Get nonce from eth full node
+    //     nonce: 2u32.into(),
+    //     // TODO: set this semi automatically
+    //     gas_price: gas_price.clone(),
+    //     // TODO: find out how much gas this contract acutally takes
+    //     gas_limit: 6721975u32.into(),
+    //     value: "0".parse().unwrap(),
+    //     data,
+    //     signature: None,
+    // }.sign(&CRYPTO.secret(), Some(*NETWORK_ID));
 
-    let call_future = WEB3
-        .eth()
-        .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
+    // let event_future = poll_for_event("ChannelClose(bytes32)");
 
-    let (tx, log) = call_future
-        .join(event_future)
-        .wait()
-        .expect("Unable to wait for call future");
+    // let call_future = WEB3
+    //     .eth()
+    //     .send_raw_transaction(Bytes::from(tx.to_bytes().unwrap()));
 
-    println!("tx {:?}", tx);
-    println!("ChannelClose {:?}", log);
+    // let (tx, log) = call_future
+    //     .join(event_future)
+    //     .wait()
+    //     .expect("Unable to wait for call future");
+
+    // println!("tx {:?}", tx);
+    // println!("ChannelClose {:?}", log);
 
     let alice_balance: Uint256 = WEB3
         .eth()
