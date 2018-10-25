@@ -220,6 +220,35 @@ pub fn join_channel(
     )
 }
 
+pub fn update_channel(
+    channel_id: ChannelId,
+    channel_nonce: Uint256,
+    balance_a: Uint256,
+    balance_b: Uint256,
+    sig_a: Signature,
+    sig_b: Signature,
+) -> Box<Future<Item = (), Error = Error>> {
+    let event = CRYPTO.wait_for_event(
+        "ChannelUpdateState(bytes32,uint256,uint256,uint256)",
+        Some(channel_id.into()),
+    );
+
+    let data = create_update_channel_payload(
+        channel_id,
+        channel_nonce.into(),
+        balance_a.clone(),
+        balance_b.clone(),
+        sig_a,
+        sig_b,
+    );
+    let call = CRYPTO.broadcast_transaction(Action::Call(data), Uint256::from(0u64));
+    Box::new(
+        call.join(event)
+            .and_then(|(_tx, _response)| ok(()))
+            .into_future(),
+    )
+}
+
 #[test]
 fn test_create_update_tx() {
     let tx = create_update_tx(UpdateTx {
