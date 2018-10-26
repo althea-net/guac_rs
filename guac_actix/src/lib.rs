@@ -87,10 +87,7 @@ impl Handler<MakePayment> for PaymentController {
 
     fn handle(&mut self, msg: MakePayment, _ctx: &mut Context<Self>) -> Self::Result {
         trace!("sending payment {:?}", msg);
-        *CRYPTO.get_balance_mut() = CRYPTO
-            .get_balance_mut()
-            .clone()
-            .sub(Uint256(msg.0.amount.clone()));
+        *CRYPTO.get_balance_mut() -= Uint256(msg.0.amount.clone());
         Box::new(STORAGE.get_channel(msg.0.to.eth_address.clone()).and_then(
             move |mut channel_manager| {
                 channel_manager.pay_counterparty(Uint256(msg.0.amount.clone()))?;
