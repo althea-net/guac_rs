@@ -24,7 +24,7 @@ use failure::Error;
 use futures::Future;
 
 use guac_core::channel_client::ChannelManager;
-pub use guac_core::counterparty::Counterparty;
+use guac_core::counterparty::Counterparty;
 use guac_core::STORAGE;
 
 pub use guac_core::crypto::CryptoService;
