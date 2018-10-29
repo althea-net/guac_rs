@@ -2,8 +2,9 @@
 use actix::actors::mocker::Mocker;
 use actix::prelude::*;
 use clarity::Address;
+use clarity::Signature;
 use failure::Error;
-use guac_core::eth_client::{join_channel, open_channel, ChannelId};
+use guac_core::eth_client::{join_channel, open_channel, update_channel, ChannelId};
 use num256::Uint256;
 
 struct ChannelActorImpl;
@@ -53,6 +54,21 @@ impl Handler<JoinChannel> for ChannelActorImpl {
 
     fn handle(&mut self, msg: JoinChannel, _ctx: &mut Context<Self>) -> Self::Result {
         join_channel(msg.0, msg.1)
+    }
+}
+
+#[derive(Debug)]
+struct UpdateChannel(ChannelId, Uint256, Uint256, Uint256, Signature, Signature);
+
+impl Message for UpdateChannel {
+    type Result = Result<(), Error>;
+}
+
+impl Handler<UpdateChannel> for ChannelActorImpl {
+    type Result = ResponseFuture<(), Error>;
+
+    fn handle(&mut self, msg: UpdateChannel, _ctx: &mut Context<Self>) -> Self::Result {
+        update_channel(msg.0, msg.1, msg.2, msg.3, msg.4, msg.5)
     }
 }
 
