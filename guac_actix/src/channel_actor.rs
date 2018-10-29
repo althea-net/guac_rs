@@ -5,7 +5,7 @@ use clarity::Address;
 use clarity::Signature;
 use failure::Error;
 use guac_core::eth_client::{
-    join_channel, open_channel, start_challenge, update_channel, ChannelId,
+    close_channel, join_channel, open_channel, start_challenge, update_channel, ChannelId,
 };
 use num256::Uint256;
 
@@ -86,6 +86,21 @@ impl Handler<StartChallenge> for ChannelActorImpl {
 
     fn handle(&mut self, msg: StartChallenge, _ctx: &mut Context<Self>) -> Self::Result {
         start_challenge(msg.0)
+    }
+}
+
+#[derive(Debug)]
+struct CloseChannel(ChannelId);
+
+impl Message for CloseChannel {
+    type Result = Result<(), Error>;
+}
+
+impl Handler<CloseChannel> for ChannelActorImpl {
+    type Result = ResponseFuture<(), Error>;
+
+    fn handle(&mut self, msg: CloseChannel, _ctx: &mut Context<Self>) -> Self::Result {
+        close_channel(msg.0)
     }
 }
 
