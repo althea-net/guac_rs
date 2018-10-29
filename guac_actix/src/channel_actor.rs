@@ -21,11 +21,11 @@ impl Actor for ChannelActorImpl {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Context<Self>) {
-        println!("Actor is alive");
+        trace!("ChannelActor is alive");
     }
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
-        println!("Actor is stopped");
+        trace!("ChannelActor is stopped");
     }
 }
 
