@@ -30,6 +30,7 @@ use guac_core::STORAGE;
 pub use guac_core::crypto::CryptoService;
 pub use guac_core::CRYPTO;
 
+mod channel_actor;
 mod network_endpoints;
 mod network_requests;
 
