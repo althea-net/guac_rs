@@ -4,7 +4,9 @@ use actix::prelude::*;
 use clarity::Address;
 use clarity::Signature;
 use failure::Error;
-use guac_core::eth_client::{join_channel, open_channel, update_channel, ChannelId};
+use guac_core::eth_client::{
+    join_channel, open_channel, start_challenge, update_channel, ChannelId,
+};
 use num256::Uint256;
 
 struct ChannelActorImpl;
@@ -69,6 +71,21 @@ impl Handler<UpdateChannel> for ChannelActorImpl {
 
     fn handle(&mut self, msg: UpdateChannel, _ctx: &mut Context<Self>) -> Self::Result {
         update_channel(msg.0, msg.1, msg.2, msg.3, msg.4, msg.5)
+    }
+}
+
+#[derive(Debug)]
+struct StartChallenge(ChannelId);
+
+impl Message for StartChallenge {
+    type Result = Result<(), Error>;
+}
+
+impl Handler<StartChallenge> for ChannelActorImpl {
+    type Result = ResponseFuture<(), Error>;
+
+    fn handle(&mut self, msg: StartChallenge, _ctx: &mut Context<Self>) -> Self::Result {
+        start_challenge(msg.0)
     }
 }
 
