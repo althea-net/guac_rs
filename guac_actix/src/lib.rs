@@ -36,9 +36,18 @@ mod network_requests;
 
 pub use network_endpoints::init_server;
 
+use actix::dev::{ContextParts, Mailbox};
+use actix::prelude::*;
+use althea_types::Identity;
+use channel_actor::{ChannelActor, OpenChannel};
 use clarity::Address;
+use futures::future::ok;
+use guac_core::eth_client::ChannelId;
 use network_requests::tick;
+use network_requests::{NetworkRequestActor, SendProposalRequest};
 use num256::Uint256;
+use std::any::Any;
+use std::net::{IpAddr, Ipv6Addr};
 use std::ops::{Add, Sub};
 
 /// A data type which wraps all network requests that guac makes, to check who the request is from
@@ -110,9 +119,13 @@ impl Handler<Tick> for PaymentController {
 
     fn handle(&mut self, _msg: Tick, _ctx: &mut Context<Self>) -> Self::Result {
         // TODO: Send to bounty hunter
+        trace!("Received a tick message");
         Box::new(STORAGE.get_all_counterparties().and_then(|keys| {
+            trace!("Counterparties: {:?}", keys);
             for i in keys {
+                trace!("Spawn tick for {:?}", i);
                 Arbiter::spawn(tick(i.clone()).then(move |res| {
+                    trace!("Tick result {:?}", res);
                     match res {
                         Ok(_) => {
                             info!("tick to {:?} was successful", i);
@@ -129,7 +142,7 @@ impl Handler<Tick> for PaymentController {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Register(pub Counterparty);
 
 impl Message for Register {
@@ -140,6 +153,7 @@ impl Handler<Register> for PaymentController {
     type Result = ResponseFuture<(), Error>;
 
     fn handle(&mut self, msg: Register, _ctx: &mut Context<Self>) -> Self::Result {
+        trace!("Register new counterparty {:?}", msg);
         Box::new(STORAGE.init_data(msg.0, ChannelManager::New))
     }
 }
@@ -177,4 +191,136 @@ impl Handler<GetOwnBalance> for PaymentController {
     fn handle(&mut self, _msg: GetOwnBalance, _: &mut Context<Self>) -> Self::Result {
         Ok(CRYPTO.get_balance().clone())
     }
+}
+
+#[test]
+fn get_own_balance() {
+    let system = System::new("test");
+    let addr = PaymentController::default().start();
+    let res = addr.send(GetOwnBalance);
+    Arbiter::spawn(res.then(|res| {
+        System::current().stop();
+        ok(())
+    }));
+    system.run();
+}
+
+#[test]
+fn register() {
+    let system = System::new("test");
+    let addr = PaymentController::default().start();
+    let res = addr.send(Register(Counterparty {
+        address: "0x0101010101010101010101010101010101010101"
+            .parse()
+            .unwrap(),
+        url: "http://127.0.0.1:1234/".to_string(),
+    }));
+    Arbiter::spawn(res.then(|res| {
+        println!("res {:?}", res);
+        System::current().stop();
+        ok(())
+    }));
+    system.run();
+}
+
+fn new_addr(x: u64) -> Address {
+    format!("0x{}", format!("{:02}", x).repeat(20))
+        .parse()
+        .unwrap()
+}
+
+fn new_identity(x: u64) -> Identity {
+    let y = x as u16;
+    Identity {
+        mesh_ip: IpAddr::V6(Ipv6Addr::new(y, y, y, y, y, y, y, y)),
+        wg_public_key: String::from("AAAAAAAAAAAAAAAAAAAA"),
+        eth_address: new_addr(x),
+    }
+}
+
+// extern crate log;
+
+use log::{Level, LevelFilter, Metadata, Record};
+
+struct ConsoleLogger;
+
+impl log::Log for ConsoleLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= Level::Trace
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            println!("{} - {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+#[test]
+fn make_payment() {
+    // TODO: There must be a better way to do this
+    log::set_logger(&ConsoleLogger).unwrap();
+    log::set_max_level(LevelFilter::Trace);
+
+    let system = System::new("test");
+    let addr = PaymentController::default().start();
+
+    let channel_addr = ChannelActor::mock(Box::new(|v, _ctx| -> Box<Any> {
+        if let Some(msg) = v.downcast_ref::<OpenChannel>() {
+            println!("intercepted msg {:?}", msg);
+            let mut channel_id: ChannelId = [42u8; 32];
+            Box::new(Some(Ok(channel_id) as Result<ChannelId, Error>))
+        } else {
+            println!("I dont know that message");
+            Box::new(None as Option<Result<ChannelId, Error>>)
+        }
+    })).start();
+    System::current().registry().set(channel_addr);
+
+    let network_request_addr = NetworkRequestActor::mock(Box::new(|v, _ctx| -> Box<Any> {
+        if let Some(msg) = v.downcast_ref::<SendProposalRequest>() {
+            println!("intercepted network request msg {:?}", msg);
+            let mut cm = msg.2.clone();
+            cm.proposal_result(true)
+                .expect("Proposal result was expected to succeed");
+            Box::new(Some(Ok(cm) as Result<ChannelManager, Error>))
+        } else {
+            println!("intercepted unknown network manager msg");
+            Box::new(None as Option<Result<ChannelManager, Error>>)
+        }
+    })).start();
+    System::current().registry().set(network_request_addr);
+
+    // let res = addr.send(MakePayment(PaymentTx {
+    //     amount: 123u64.into(),
+    //     from: new_identity(1),
+    //     to: new_identity(2),
+    // }));
+    let res = addr.send(Register(Counterparty {
+        address: "0x4242424242424242424242424242424242424242"
+            .parse()
+            .unwrap(),
+        url: "127.0.0.1:12345".to_string(),
+    }));
+    Arbiter::spawn(res.then(|res| {
+        println!("res {:?}", res);
+        PaymentController::from_registry().send(Tick).then(|res| {
+            println!("tick1 result {:?}", res);
+            println!("------------------------------------- tick 2");
+            PaymentController::from_registry().send(Tick).then(|res| {
+                println!("tick2 result {:?}", res);
+                System::current().stop();
+                ok(())
+            })
+        })
+    }));
+    system.run();
+
+    assert_eq!(STORAGE.get_all_counterparties().wait().unwrap().len(), 1);
+    println!(
+        "All counterparties {:?}",
+        STORAGE.get_all_counterparties().wait().unwrap()
+    );
 }

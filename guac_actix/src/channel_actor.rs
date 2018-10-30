@@ -9,11 +9,18 @@ use guac_core::eth_client::{
 };
 use num256::Uint256;
 
-struct ChannelActorImpl;
+pub struct ChannelActorImpl;
 
 impl Default for ChannelActorImpl {
     fn default() -> Self {
         Self {}
+    }
+}
+
+impl Supervised for ChannelActorImpl {}
+impl SystemService for ChannelActorImpl {
+    fn service_started(&mut self, _ctx: &mut Context<Self>) {
+        info!("Channel system service started");
     }
 }
 
@@ -30,7 +37,7 @@ impl Actor for ChannelActorImpl {
 }
 
 #[derive(Debug)]
-struct OpenChannel(Address, Uint256, Uint256);
+pub struct OpenChannel(pub Address, pub Uint256, pub Uint256);
 
 impl Message for OpenChannel {
     type Result = Result<ChannelId, Error>;
@@ -45,7 +52,7 @@ impl Handler<OpenChannel> for ChannelActorImpl {
 }
 
 #[derive(Debug)]
-struct JoinChannel(ChannelId, Uint256);
+pub struct JoinChannel(ChannelId, Uint256);
 
 impl Message for JoinChannel {
     type Result = Result<(), Error>;
@@ -60,7 +67,7 @@ impl Handler<JoinChannel> for ChannelActorImpl {
 }
 
 #[derive(Debug)]
-struct UpdateChannel(ChannelId, Uint256, Uint256, Uint256, Signature, Signature);
+pub struct UpdateChannel(ChannelId, Uint256, Uint256, Uint256, Signature, Signature);
 
 impl Message for UpdateChannel {
     type Result = Result<(), Error>;
@@ -75,7 +82,7 @@ impl Handler<UpdateChannel> for ChannelActorImpl {
 }
 
 #[derive(Debug)]
-struct StartChallenge(ChannelId);
+pub struct StartChallenge(ChannelId);
 
 impl Message for StartChallenge {
     type Result = Result<(), Error>;
@@ -90,7 +97,7 @@ impl Handler<StartChallenge> for ChannelActorImpl {
 }
 
 #[derive(Debug)]
-struct CloseChannel(ChannelId);
+pub struct CloseChannel(ChannelId);
 
 impl Message for CloseChannel {
     type Result = Result<(), Error>;
@@ -105,9 +112,9 @@ impl Handler<CloseChannel> for ChannelActorImpl {
 }
 
 #[cfg(not(test))]
-type ChannelActor = ChannelActorImpl;
+pub type ChannelActor = ChannelActorImpl;
 #[cfg(test)]
-type ChannelActor = Mocker<ChannelActorImpl>;
+pub type ChannelActor = Mocker<ChannelActorImpl>;
 
 #[test]
 fn does_it_work() {

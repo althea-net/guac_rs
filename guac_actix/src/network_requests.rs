@@ -1,3 +1,6 @@
+#[cfg(test)]
+use actix::actors::mocker::Mocker;
+use actix::prelude::*;
 use actix_web::client;
 use actix_web::client::Connection;
 use actix_web::HttpMessage;
@@ -17,8 +20,11 @@ use std::net::SocketAddr;
 
 use tokio::net::TcpStream as TokioTcpStream;
 
+use channel_actor::{ChannelActor, OpenChannel};
+use futures::future::ok;
 use guac_core::channel_client::{ChannelManager, ChannelManagerAction};
 use guac_core::counterparty::Counterparty;
+use num256::Uint256;
 
 /// This function needs to be called periodically for every counterparty to to do things which
 /// happen on a cycle.
@@ -34,6 +40,12 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
             // "commit" the changes when the tick is successful (could include network requests,
             // etc.)
             let mut temp_channel_manager = channel_manager.clone();
+            trace!(
+                "Tick: got channel for counterparty {:?} = {:?}",
+                counterparty,
+                temp_channel_manager
+            );
+
             trace!(
                 "counterparty {:?} is in state {:?}",
                 counterparty.clone(),
@@ -53,14 +65,37 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
             // not be mutated during the lifecycle of the request
             match action {
                 ChannelManagerAction::SendChannelProposal(channel) => Box::new(
-                    send_proposal_request(channel, counterparty.url, temp_channel_manager)
+                    // This will do an HTTP request on other party HTTP server
+                    // i.e. POST http://bob:1234/propose
+                    NetworkRequestActor::from_registry()
+                        .send(SendProposalRequest(
+                            channel.clone(),
+                            counterparty.url,
+                            temp_channel_manager,
+                        ))
                         // we move the mutex guarded channel manager through to the closure, which
                         // ensures nothing else tampers with it
-                        .and_then(move |cm| {
-                            // only when the request is successful, we `commit` it to `channel_manager`
-                            // (which makes the state change permanent)
-                            *channel_manager = cm;
-                            Ok(())
+                        .then(move |cm| {
+                            trace!(
+                                "After send proposal request channel={:?} cm={:?}",
+                                channel.clone(),
+                                cm
+                            );
+                            // Create a channel by contacting a channel actor after this request
+                            // was successful
+                            ChannelActor::from_registry()
+                                .send(OpenChannel(
+                                    channel.address_b.clone(),
+                                    Uint256::from(42u64),
+                                    Uint256::from(100_000_000_000_000u64),
+                                ))
+                                .then(move |channel_id| {
+                                    trace!("After open channel was sent {:?}", channel_id);
+                                    // only when all the requests were successful, we commit it to `channel_manager`
+                                    // (which makes the state change permanent)
+                                    *channel_manager = cm.unwrap().unwrap();
+                                    ok(())
+                                })
                         }),
                 )
                     as Box<Future<Item = (), Error = Error>>,
@@ -103,6 +138,39 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
         })
 }
 
+#[cfg(not(test))]
+pub type NetworkRequestActor = NetworkRequestActorImpl;
+#[cfg(test)]
+pub type NetworkRequestActor = Mocker<NetworkRequestActorImpl>;
+
+/// An actor that is responsible for communication with other parties through HTTP.
+pub struct NetworkRequestActorImpl;
+
+impl Default for NetworkRequestActorImpl {
+    fn default() -> Self {
+        Self {}
+    }
+}
+
+impl Supervised for NetworkRequestActorImpl {}
+
+impl SystemService for NetworkRequestActorImpl {
+    fn service_started(&mut self, _ctx: &mut Context<Self>) {
+        info!("Network request actor system service started");
+    }
+}
+impl Actor for NetworkRequestActorImpl {
+    type Context = Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Context<Self>) {
+        trace!("Network request actor is alive");
+    }
+
+    fn stopped(&mut self, _ctx: &mut Context<Self>) {
+        trace!("Network request actor is stopped");
+    }
+}
+
 pub fn send_channel_created_request(
     channel: Channel,
     url: String,
@@ -129,12 +197,33 @@ pub fn send_channel_created_request(
     })
 }
 
+#[derive(Debug)]
+pub struct SendProposalRequest(pub Channel, pub String, pub ChannelManager);
+
+impl Message for SendProposalRequest {
+    type Result = Result<ChannelManager, Error>;
+}
+
+impl Handler<SendProposalRequest> for NetworkRequestActorImpl {
+    type Result = ResponseFuture<ChannelManager, Error>;
+
+    fn handle(&mut self, msg: SendProposalRequest, _ctx: &mut Context<Self>) -> Self::Result {
+        Box::new(send_proposal_request(msg.0, msg.1, msg.2))
+    }
+}
+
 pub fn send_proposal_request(
     channel: Channel,
     url: String,
     mut manager: ChannelManager,
 ) -> impl Future<Item = ChannelManager, Error = Error> {
-    let socket: SocketAddr = url.parse().unwrap();
+    trace!(
+        "Send channel proposal request channel={:?} url={} manager={:?}",
+        channel,
+        url,
+        manager
+    );
+    let socket: SocketAddr = url.parse().expect("Unable to parse URL");
     let endpoint = format!("http://[{}]:{}/propose", socket.ip(), socket.port());
 
     let stream = TokioTcpStream::connect(&socket);
