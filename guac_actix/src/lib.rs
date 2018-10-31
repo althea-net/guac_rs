@@ -205,24 +205,6 @@ fn get_own_balance() {
     system.run();
 }
 
-#[test]
-fn register() {
-    let system = System::new("test");
-    let addr = PaymentController::default().start();
-    let res = addr.send(Register(Counterparty {
-        address: "0x0101010101010101010101010101010101010101"
-            .parse()
-            .unwrap(),
-        url: "http://127.0.0.1:1234/".to_string(),
-    }));
-    Arbiter::spawn(res.then(|res| {
-        println!("res {:?}", res);
-        System::current().stop();
-        ok(())
-    }));
-    system.run();
-}
-
 fn new_addr(x: u64) -> Address {
     format!("0x{}", format!("{:02}", x).repeat(20))
         .parse()
