@@ -114,9 +114,11 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                 }
 
                 ChannelManagerAction::SendChannelCreatedUpdate(channel) => Box::new(
-                    send_channel_created_request(channel, counterparty.url, temp_channel_manager)
-                        .and_then(move |cm| {
-                            *channel_manager = cm;
+                     NetworkRequestActor::from_registry()
+                        .send(SendChannelCreatedRequest(channel, counterparty.url, temp_channel_manager))
+                        .then(move |cm| {
+                            trace!("Send channel created requested returned old_cm={:?} new={:?}", channel_manager, cm);
+                            *channel_manager = cm.unwrap().unwrap();
                             Ok(())
                         }),
                 )
@@ -171,11 +173,32 @@ impl Actor for NetworkRequestActorImpl {
     }
 }
 
-pub fn send_channel_created_request(
+#[derive(Debug)]
+pub struct SendChannelCreatedRequest(pub Channel, pub String, pub ChannelManager);
+
+impl Message for SendChannelCreatedRequest {
+    type Result = Result<ChannelManager, Error>;
+}
+
+impl Handler<SendChannelCreatedRequest> for NetworkRequestActorImpl {
+    type Result = ResponseFuture<ChannelManager, Error>;
+
+    fn handle(&mut self, msg: SendChannelCreatedRequest, _ctx: &mut Context<Self>) -> Self::Result {
+        Box::new(send_channel_created_request(msg.0, msg.1, msg.2))
+    }
+}
+
+fn send_channel_created_request(
     channel: Channel,
     url: String,
     manager: ChannelManager,
 ) -> impl Future<Item = ChannelManager, Error = Error> {
+    trace!(
+        "network_requests.rs - Send created request channel={:?} url={} manager={:?}",
+        channel,
+        url,
+        manager
+    );
     let socket: SocketAddr = url.parse().unwrap();
     let endpoint = format!("http://[{}]:{}/channel_created", socket.ip(), socket.port());
 
@@ -218,7 +241,7 @@ pub fn send_proposal_request(
     mut manager: ChannelManager,
 ) -> impl Future<Item = ChannelManager, Error = Error> {
     trace!(
-        "Send channel proposal request channel={:?} url={} manager={:?}",
+        "network_requests.rs - Send channel proposal request channel={:?} url={} manager={:?}",
         channel,
         url,
         manager
@@ -249,6 +272,12 @@ pub fn send_channel_update(
     url: String,
     mut manager: ChannelManager,
 ) -> impl Future<Item = ChannelManager, Error = Error> {
+    trace!(
+        "network_requests.rs - Send channel update request update={:?} url={} manager={:?}",
+        update,
+        url,
+        manager
+    );
     let socket: SocketAddr = url.parse().unwrap();
     let endpoint = format!("http://[{}]:{}/update", socket.ip(), socket.port());
 
@@ -278,6 +307,12 @@ pub fn send_channel_joined(
     url: String,
     manager: ChannelManager,
 ) -> impl Future<Item = ChannelManager, Error = Error> {
+    trace!(
+        "network_requests.rs - Send channel joined request channel={:?} url={} manager={:?}",
+        new_channel,
+        url,
+        manager
+    );
     let socket: SocketAddr = url.parse().unwrap();
     let endpoint = format!("http://[{}]:{}/channel_joined", socket.ip(), socket.port());
 
