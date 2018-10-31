@@ -176,6 +176,12 @@ pub fn send_channel_created_request(
     url: String,
     manager: ChannelManager,
 ) -> impl Future<Item = ChannelManager, Error = Error> {
+    trace!(
+        "Send created request channel={:?} url={} manager={:?}",
+        channel,
+        url,
+        manager
+    );
     let socket: SocketAddr = url.parse().unwrap();
     let endpoint = format!("http://[{}]:{}/channel_created", socket.ip(), socket.port());
 
@@ -249,6 +255,12 @@ pub fn send_channel_update(
     url: String,
     mut manager: ChannelManager,
 ) -> impl Future<Item = ChannelManager, Error = Error> {
+    trace!(
+        "Send channel update request update={:?} url={} manager={:?}",
+        update,
+        url,
+        manager
+    );
     let socket: SocketAddr = url.parse().unwrap();
     let endpoint = format!("http://[{}]:{}/update", socket.ip(), socket.port());
 

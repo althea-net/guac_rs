@@ -292,30 +292,31 @@ fn make_payment() {
         }
     })).start();
     System::current().registry().set(network_request_addr);
-
-    // let res = addr.send(MakePayment(PaymentTx {
-    //     amount: 123u64.into(),
-    //     from: new_identity(1),
-    //     to: new_identity(2),
-    // }));
     let res = addr.send(Register(Counterparty {
         address: "0x4242424242424242424242424242424242424242"
             .parse()
             .unwrap(),
         url: "127.0.0.1:12345".to_string(),
     }));
-    Arbiter::spawn(res.then(|res| {
-        println!("res {:?}", res);
-        PaymentController::from_registry().send(Tick).then(|res| {
+    Arbiter::spawn(
+        res.then(|res| {
+            println!("res {:?}", res);
+            PaymentController::from_registry().send(Tick)
+        }).then(|res| {
             println!("tick1 result {:?}", res);
             println!("------------------------------------- tick 2");
-            PaymentController::from_registry().send(Tick).then(|res| {
-                println!("tick2 result {:?}", res);
-                System::current().stop();
-                ok(())
-            })
-        })
-    }));
+            PaymentController::from_registry().send(Tick)
+        }).then(|res| {
+            println!("tick2 result {:?}", res);
+            println!("------------------------------------- tick 3");
+            PaymentController::from_registry().send(Tick)
+        }).then(|res| {
+            println!("tick3 result {:?}", res);
+            System::current().stop();
+            ok(())
+        }),
+    );
+
     system.run();
 
     assert_eq!(STORAGE.get_all_counterparties().wait().unwrap().len(), 1);
