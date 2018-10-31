@@ -1,0 +1,107 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'guac_core'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=guac_core"],
+        "filter": {
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug test 'contract_test'",
+      "cargo": {
+        "args": ["build", "--test=contract_test", "--package=guac_core"],
+        "filter": {
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in test 'contract_test'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=contract_test",
+          "--package=guac_core"
+        ],
+        "filter": {
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'guac_actix'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=guac_actix"],
+        "filter": {
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUST_TEST_THREADS": 1
+      }
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug individual unit tests in library 'guac_actix'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=guac_actix"],
+        "filter": {
+          "kind": "lib"
+        }
+      },
+      "args": ["make_payment"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'guac_http'",
+      "cargo": {
+        "args": ["build", "--bin=guac_http", "--package=guac_http"],
+        "filter": {
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'guac_http'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bin=guac_http", "--package=guac_http"],
+        "filter": {
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
