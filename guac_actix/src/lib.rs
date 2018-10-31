@@ -44,7 +44,7 @@ use clarity::Address;
 use futures::future::ok;
 use guac_core::eth_client::ChannelId;
 use network_requests::tick;
-use network_requests::{NetworkRequestActor, SendProposalRequest};
+use network_requests::{NetworkRequestActor, SendChannelCreatedRequest, SendProposalRequest};
 use num256::Uint256;
 use std::any::Any;
 use std::net::{IpAddr, Ipv6Addr};
@@ -242,6 +242,8 @@ impl log::Log for ConsoleLogger {
 
 #[test]
 fn make_payment() {
+    use std::sync::{Arc, Mutex};
+
     // TODO: There must be a better way to do this
     log::set_logger(&ConsoleLogger).unwrap();
     log::set_max_level(LevelFilter::Trace);
@@ -249,11 +251,36 @@ fn make_payment() {
     let system = System::new("test");
     let addr = PaymentController::default().start();
 
-    let channel_addr = ChannelActor::mock(Box::new(|v, _ctx| -> Box<Any> {
+    // Keeps track and order of ChannelActor messages
+    let mut channel_call_counter = Arc::new(Mutex::new(0));
+    // Keeps track and order of NetworkRequestActor messages
+    let mut network_requests_counter = Arc::new(Mutex::new(0));
+
+    let channel_counter = channel_call_counter.clone();
+    let network_counter = network_requests_counter.clone();
+
+    let channel_addr = ChannelActor::mock(Box::new(move |v, _ctx| -> Box<Any> {
+        let mut channel_counter = channel_counter.lock().unwrap();
+        let mut network_counter = network_counter.lock().unwrap();
+
+        *channel_counter += 1;
+        println!("Channel actor received {} msg", *channel_counter);
         if let Some(msg) = v.downcast_ref::<OpenChannel>() {
-            println!("intercepted msg {:?}", msg);
+            // Verify that this happens *before* network request.
+            // This is first call...
+            assert_eq!(*channel_counter, 1);
+            // and no network requests are received yet
+            assert_eq!(*network_counter, 1);
+
+            println!("intercepted {:?}", msg);
             let mut channel_id: ChannelId = [42u8; 32];
             Box::new(Some(Ok(channel_id) as Result<ChannelId, Error>))
+        } else if let Some(msg) = v.downcast_ref::<SendChannelCreatedRequest>() {
+            // This is the 2nd call
+            assert_eq!(*channel_counter, 2);
+            println!("intercepted {:?}", msg);
+            let cm = msg.2.clone();
+            Box::new(Some(Ok(cm) as Result<ChannelManager, Error>))
         } else {
             println!("I dont know that message");
             Box::new(None as Option<Result<ChannelId, Error>>)
@@ -261,9 +288,22 @@ fn make_payment() {
     })).start();
     System::current().registry().set(channel_addr);
 
-    let network_request_addr = NetworkRequestActor::mock(Box::new(|v, _ctx| -> Box<Any> {
+    let channel_counter = channel_call_counter.clone();
+    let network_counter = network_requests_counter.clone();
+    let network_request_addr = NetworkRequestActor::mock(Box::new(move |v, _ctx| -> Box<Any> {
+        let mut channel_counter = channel_counter.lock().unwrap();
+        let mut network_counter = network_counter.lock().unwrap();
+
+        println!("Network requests received {} msg", *network_counter);
+        *network_counter += 1;
+
         if let Some(msg) = v.downcast_ref::<SendProposalRequest>() {
             println!("intercepted network request msg {:?}", msg);
+            // Channel call didn't happen yet as we're proposing now
+            assert_eq!(*channel_counter, 0);
+            // This is the first network request
+            assert_eq!(*network_counter, 1);
+
             let mut cm = msg.2.clone();
             cm.proposal_result(true)
                 .expect("Proposal result was expected to succeed");
@@ -278,7 +318,7 @@ fn make_payment() {
         address: "0x4242424242424242424242424242424242424242"
             .parse()
             .unwrap(),
-        url: "127.0.0.1:12345".to_string(),
+        url: "http://127.0.0.1:12345".to_string(),
     }));
     Arbiter::spawn(
         res.then(|res| {
@@ -294,6 +334,10 @@ fn make_payment() {
             PaymentController::from_registry().send(Tick)
         }).then(|res| {
             println!("tick3 result {:?}", res);
+            println!("------------------------------------- tick 4");
+            PaymentController::from_registry().send(Tick)
+        }).then(|res| {
+            println!("tick4 result {:?}", res);
             System::current().stop();
             ok(())
         }),
