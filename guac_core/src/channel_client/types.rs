@@ -171,23 +171,17 @@ impl Channel {
             bail!("sig is bad")
         }
 
-        if update
-            .their_balance(self.is_a)
-            .clone()
-            .add(update.my_balance(self.is_a).clone())
-            != self.my_balance().clone().add(self.their_balance().clone())
-        {
-            bail!("balance does not add up")
-        }
+        ensure!(
+            update.their_balance(self.is_a).clone() + update.my_balance(self.is_a).clone()
+                == self.my_balance().clone() + self.their_balance().clone(),
+            "balance does not add up"
+        );
 
-        if update
-            .their_balance(self.is_a)
-            .clone()
-            .add(update.my_balance(self.is_a).clone())
-            != self.deposit_a.clone().add(self.deposit_b.clone())
-        {
-            bail!("balance does not add up")
-        }
+        ensure!(
+            update.their_balance(self.is_a).clone() + update.my_balance(self.is_a).clone()
+                == self.deposit_a.clone() + self.deposit_b.clone(),
+            "balance does not add up to deposit values"
+        );
 
         if self.nonce > update.nonce {
             bail!("Update too old");
