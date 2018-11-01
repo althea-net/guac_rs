@@ -23,6 +23,7 @@ use althea_types::PaymentTx;
 use failure::Error;
 use futures::Future;
 
+use guac_core::channel_client::types::UpdateTx;
 use guac_core::channel_client::ChannelManager;
 use guac_core::counterparty::Counterparty;
 use guac_core::STORAGE;
@@ -41,10 +42,13 @@ use actix::prelude::*;
 use althea_types::Identity;
 use channel_actor::{ChannelActor, OpenChannel};
 use clarity::Address;
+use clarity::Signature;
 use futures::future::ok;
 use guac_core::eth_client::ChannelId;
 use network_requests::tick;
-use network_requests::{NetworkRequestActor, SendChannelCreatedRequest, SendProposalRequest};
+use network_requests::{
+    NetworkRequestActor, SendChannelCreatedRequest, SendChannelUpdate, SendProposalRequest,
+};
 use num256::Uint256;
 use std::any::Any;
 use std::net::{IpAddr, Ipv6Addr};
@@ -307,6 +311,33 @@ fn make_payment() {
             let mut cm = msg.2.clone();
             cm.proposal_result(true)
                 .expect("Proposal result was expected to succeed");
+            Box::new(Some(Ok(cm) as Result<ChannelManager, Error>))
+        } else if let Some(msg) = v.downcast_ref::<SendChannelCreatedRequest>() {
+            println!("intercepted send channel created request msg {:?}", msg);
+            assert_eq!(*channel_counter, 1);
+            assert_eq!(*network_counter, 2);
+
+            let mut cm = msg.2.clone();
+            Box::new(Some(Ok(cm) as Result<ChannelManager, Error>))
+        } else if let Some(msg) = v.downcast_ref::<SendChannelUpdate>() {
+            println!("intercept send updated state request msg {:?}", msg);
+            assert_eq!(*channel_counter, 1);
+            assert_eq!(*network_counter, 3);
+            let mut cm = msg.2.clone();
+
+            cm.received_updated_state(&UpdateTx {
+                channel_id: "0x4242424242424242424242424242424242424242"
+                    .parse()
+                    .unwrap(),
+                nonce: Uint256::from(123u64),
+
+                balance_a: Uint256::from(1u64),
+                balance_b: Uint256::from(2u64),
+
+                signature_a: Some(Signature::new(1u64.into(), 2u64.into(), 3u64.into())),
+                signature_b: Some(Signature::new(4u64.into(), 5u64.into(), 6u64.into())),
+            }).expect("Recevied update state");
+
             Box::new(Some(Ok(cm) as Result<ChannelManager, Error>))
         } else {
             println!("intercepted unknown network manager msg");

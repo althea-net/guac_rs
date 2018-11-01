@@ -90,7 +90,7 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                                     Uint256::from(100_000_000_000_000u64),
                                 ))
                                 .then(move |channel_id| {
-                                    trace!("After open channel was sent {:?}", channel_id);
+                                    trace!("After open channel was sent {:?} ({:?})", channel_id, cm);
                                     // only when all the requests were successful, we commit it to `channel_manager`
                                     // (which makes the state change permanent)
                                     *channel_manager = cm.unwrap().unwrap();
@@ -125,9 +125,10 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                     as Box<Future<Item = (), Error = Error>>,
                 ChannelManagerAction::SendUpdatedState(update) => {
                     Box::new(
-                        send_channel_update(update, counterparty.url, temp_channel_manager)
-                            .and_then(move |cm| {
-                                *channel_manager = cm;
+                        NetworkRequestActor::from_registry()
+                        .send(SendChannelUpdate(update, counterparty.url, temp_channel_manager))
+                            .then(move |cm| {
+                                *channel_manager = cm.unwrap().unwrap();
                                 Ok(())
                             }),
                     ) as Box<Future<Item = (), Error = Error>>
@@ -267,7 +268,22 @@ pub fn send_proposal_request(
     })
 }
 
-pub fn send_channel_update(
+#[derive(Debug)]
+pub struct SendChannelUpdate(pub UpdateTx, pub String, pub ChannelManager);
+
+impl Message for SendChannelUpdate {
+    type Result = Result<ChannelManager, Error>;
+}
+
+impl Handler<SendChannelUpdate> for NetworkRequestActorImpl {
+    type Result = ResponseFuture<ChannelManager, Error>;
+
+    fn handle(&mut self, msg: SendChannelUpdate, _ctx: &mut Context<Self>) -> Self::Result {
+        Box::new(send_channel_update(msg.0, msg.1, msg.2))
+    }
+}
+
+fn send_channel_update(
     update: UpdateTx,
     url: String,
     mut manager: ChannelManager,
