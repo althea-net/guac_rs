@@ -89,12 +89,17 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                                     Uint256::from(42u64),
                                     Uint256::from(100_000_000_000_000u64),
                                 ))
-                                .then(move |channel_id| {
+                                .from_err()
+                                .and_then(move |channel_id| {
                                     trace!("After open channel was sent {:?} ({:?})", channel_id, cm);
                                     // only when all the requests were successful, we commit it to `channel_manager`
                                     // (which makes the state change permanent)
-                                    *channel_manager = cm.unwrap().unwrap();
-                                    ok(())
+                                    // channel_manager.received_channel_id();
+                                    // CM should be in PendingCreation state
+                                    let mut cm = cm.unwrap().unwrap();
+                                    cm.channel_open_event(&Uint256::from(channel_id.unwrap()))?;
+                                    *channel_manager = cm;
+                                    Ok(())
                                 })
                         }),
                 )

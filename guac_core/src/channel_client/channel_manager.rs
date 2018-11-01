@@ -177,7 +177,7 @@ impl ChannelManager {
             ChannelManager::New => {
                 // TODO make the defaults configurable
                 let proposal = Channel {
-                    channel_id: 0u32.into(),
+                    channel_id: None,
                     address_a: from,
                     address_b: to,
                     channel_status: ChannelStatus::Joined,
@@ -466,6 +466,23 @@ impl ChannelManager {
             _ => bail!("we can only receive updated state in open or joined"),
         }
     }
+
+    pub fn channel_open_event(&mut self, channel_id: &Uint256) -> Result<(), Error> {
+        trace!("Channel open event {:?} {:?}", *self, channel_id);
+        match *self {
+            ChannelManager::Proposed { ref mut state, .. }
+            | ChannelManager::PendingCreation { ref mut state, .. }
+            | ChannelManager::PendingOtherCreation { ref mut state, .. } => {
+                ensure!(
+                    state.channel_id.is_none(),
+                    "Unable to handle channel open event twice"
+                );
+                state.channel_id = Some(channel_id.clone());
+                Ok(())
+            }
+            ref cm => bail!("Unable to set channel id with a state of {:?}", cm),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -511,15 +528,18 @@ mod tests {
                     .unwrap(),
             ).unwrap();
 
-        let channel_prop = match proposal {
+        let mut channel_prop = match proposal {
             ChannelManagerAction::SendChannelProposal(channel) => channel,
             _ => panic!("Wrong action returned"),
         };
 
+        channel_prop.channel_id = Some(42u64.into());
+
         assert!(manager_b.check_proposal(&channel_prop).unwrap());
         manager_a.proposal_result(true).unwrap();
+        manager_a.channel_open_event(&Uint256::from(42u64)).unwrap();
 
-        let (channel_a, channel_b) = Channel::new_pair(100u32.into(), 0u32.into());
+        let (channel_a, channel_b) = Channel::new_pair(42u64.into(), 100u32.into(), 0u32.into());
 
         assert_eq!(
             manager_a,

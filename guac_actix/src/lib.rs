@@ -277,7 +277,7 @@ fn make_payment() {
             assert_eq!(*network_counter, 1);
 
             println!("intercepted {:?}", msg);
-            let mut channel_id: ChannelId = [42u8; 32];
+            let mut channel_id: ChannelId = [0x42u8; 32];
             Box::new(Some(Ok(channel_id) as Result<ChannelId, Error>))
         } else if let Some(msg) = v.downcast_ref::<SendChannelCreatedRequest>() {
             // This is the 2nd call
@@ -326,7 +326,7 @@ fn make_payment() {
             let mut cm = msg.2.clone();
 
             cm.received_updated_state(&UpdateTx {
-                channel_id: "0x4242424242424242424242424242424242424242"
+                channel_id: "0x4242424242424242424242424242424242424242424242424242424242424242"
                     .parse()
                     .unwrap(),
                 nonce: Uint256::from(123u64),
