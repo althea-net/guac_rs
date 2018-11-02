@@ -24,6 +24,7 @@ extern crate num256;
 extern crate sha3;
 extern crate web3;
 
+pub mod api;
 pub mod channel_client;
 pub mod counterparty;
 pub mod crypto;
