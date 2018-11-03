@@ -153,6 +153,7 @@ impl Message for Register {
     type Result = Result<(), Error>;
 }
 
+// Tell guac how to contact counterparty and initialize channel manager for them
 impl Handler<Register> for PaymentController {
     type Result = ResponseFuture<(), Error>;
 
