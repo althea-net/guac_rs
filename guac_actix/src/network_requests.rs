@@ -88,10 +88,13 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                                     channel.address_b.clone(),
                                     Uint256::from(42u64),
                                     Uint256::from(100_000_000_000_000u64),
-                                ))
-                                .from_err()
+                                )).from_err()
                                 .and_then(move |channel_id| {
-                                    trace!("After open channel was sent {:?} ({:?})", channel_id, cm);
+                                    trace!(
+                                        "After open channel was sent {:?} ({:?})",
+                                        channel_id,
+                                        cm
+                                    );
                                     // only when all the requests were successful, we commit it to `channel_manager`
                                     // (which makes the state change permanent)
                                     // channel_manager.received_channel_id();
@@ -119,25 +122,34 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                 }
 
                 ChannelManagerAction::SendChannelCreatedUpdate(channel) => Box::new(
-                     NetworkRequestActor::from_registry()
-                        .send(SendChannelCreatedRequest(channel, counterparty.url, temp_channel_manager))
-                        .then(move |cm| {
-                            trace!("Send channel created requested returned old_cm={:?} new={:?}", channel_manager, cm);
+                    NetworkRequestActor::from_registry()
+                        .send(SendChannelCreatedRequest(
+                            channel,
+                            counterparty.url,
+                            temp_channel_manager,
+                        )).then(move |cm| {
+                            trace!(
+                                "Send channel created requested returned old_cm={:?} new={:?}",
+                                channel_manager,
+                                cm
+                            );
                             *channel_manager = cm.unwrap().unwrap();
                             Ok(())
                         }),
                 )
                     as Box<Future<Item = (), Error = Error>>,
-                ChannelManagerAction::SendUpdatedState(update) => {
-                    Box::new(
-                        NetworkRequestActor::from_registry()
-                        .send(SendChannelUpdate(update, counterparty.url, temp_channel_manager))
-                            .then(move |cm| {
-                                *channel_manager = cm.unwrap().unwrap();
-                                Ok(())
-                            }),
-                    ) as Box<Future<Item = (), Error = Error>>
-                }
+                ChannelManagerAction::SendUpdatedState(update) => Box::new(
+                    NetworkRequestActor::from_registry()
+                        .send(SendChannelUpdate(
+                            update,
+                            counterparty.url,
+                            temp_channel_manager,
+                        )).then(move |cm| {
+                            *channel_manager = cm.unwrap().unwrap();
+                            Ok(())
+                        }),
+                )
+                    as Box<Future<Item = (), Error = Error>>,
                 ChannelManagerAction::None => {
                     *channel_manager = temp_channel_manager;
                     Box::new(futures::future::ok(())) as Box<Future<Item = (), Error = Error>>
