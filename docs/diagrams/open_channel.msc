@@ -1,0 +1,33 @@
+// command to render: mscgen -Tsvg -o happy_path_flow.svg happy_path_flow.msc
+msc {
+  user,
+  guac_a,
+  guac_b,
+  "contract";
+  
+//  u [label="User"];
+
+  --- [label="Opening channel"];
+  user => guac_a [label="fillChannel\nB, 10"];
+  guac_a box guac_a [label="state=New"];
+  
+  guac_a => guac_b [label="POST /proposeChannel\nA: 10, B:0"];
+  guac_b box guac_b [label="state=Proposed"];
+  
+  guac_a << guac_b [label="signature"];
+  guac_a => contract [label="newChannel\nA: 10, B:0"];
+  
+  
+  guac_a << contract [label="confirmation"];
+  guac_a box guac_a [label="state=Created"];
+
+  guac_a => guac_b [label="POST /channel_created"];
+  guac_b => contract [label="verify channel"];
+    
+  guac_a << contract [label="ok"];
+  guac_b box guac_b [label="state=Created"];
+
+  ...;
+
+  --- [label="Channel is open"];
+}
