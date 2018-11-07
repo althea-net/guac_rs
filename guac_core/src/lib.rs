@@ -24,6 +24,10 @@ extern crate num256;
 extern crate sha3;
 extern crate web3;
 
+// Traits
+pub mod payment_contract;
+
+// Code
 pub mod api;
 pub mod channel_client;
 pub mod counterparty;

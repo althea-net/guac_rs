@@ -44,7 +44,6 @@ use channel_actor::{ChannelActor, OpenChannel};
 use clarity::Address;
 use clarity::Signature;
 use futures::future::ok;
-use guac_core::eth_client::ChannelId;
 use network_requests::tick;
 use network_requests::{
     NetworkRequestActor, SendChannelCreatedRequest, SendChannelUpdate, SendProposalRequest,
@@ -248,6 +247,7 @@ impl log::Log for ConsoleLogger {
 
 #[test]
 fn make_payment() {
+    use guac_core::payment_contract::ChannelId;
     *CRYPTO.get_balance_mut() = Uint256::from(100_000_000_000_000u64);
 
     use std::sync::{Arc, Mutex};
