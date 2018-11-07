@@ -1,3 +1,4 @@
+
 # Introduction
 
 Guac is an Ethereum single hop payment channel client for guac Bi-Directional Payment
@@ -46,7 +47,7 @@ Parameters:
 
 - `HTTP 400 BAD REQUEST`
 
-Party B considers the request invalid (i.e. malicious balances, address0 is on blacklist, address1 is not owned by party B, etc.). Although possible response, this request is meant to succeed with `HTTP 201 CRAETED` response in most of the cases.
+Party B considers the request invalid (i.e. malicious balances, address0 is on blacklist, address1 is not owned by party B, etc.). Although possible response, this request is meant to succeed with `HTTP 201 CREATED` response in most of the cases.
 
 ### Confirming a channel
 
@@ -62,7 +63,7 @@ Possible responses:
 
 - `HTTP 201 NO CONTENT`
 
-Notification succeed. Changed the state properly.
+Notification succeed. B knows that the channel is opened already, and the state will be updated after that to `Created`.
 
 ## Contract layer
 
@@ -70,11 +71,79 @@ This component should reflect the functionality of the guac payment channel cont
 
 # Implementation
 
-_Open question: Do we want to keep tick functionality since the state machine with guac contract is simplified?_
+## CryptoService
 
 ```rust
-trait Tick {
-    fn tick(&self);
+trait CryptoService {
+    fn init(&self, config: &Config) -> Result<(), Error>;
+    fn own_eth_addr(&self) -> Address;
+    fn secret(&self) -> PrivateKey;
+    fn secret_mut<'ret, 'me: 'ret>(&'me self) -> RwLockWriteGuardRefMut<'ret, Crypto, PrivateKey>;
+    fn get_balance_mut<'ret, 'me: 'ret>(&'me self)
+        -> RwLockWriteGuardRefMut<'ret, Crypto, Uint256>;
+    /// Access local balance without querying network.
+    ///
+    /// This is different from get_network_balance, where an actual
+    /// network call is made to retrieve up to date balance. This method
+    /// should be preferred over querying the network.
+    fn get_balance(&self) -> Uint256;
+    fn eth_sign(&self, data: &[u8]) -> Signature;
+    fn hash_bytes(&self, x: &[&[u8]]) -> Uint256;
+    fn verify(_fingerprint: &Uint256, _signature: &Signature, _address: Address) -> bool;
+    fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Handle>;
+
+    // Async stuff
+    fn get_network_id(&self) -> impl Future<Item = u64, Error = Error>;
+    fn get_nonce(&self) -> impl Future<Item = Uint256, Error = Error>;
+    fn get_gas_price(&self) -> impl Future<Item = Uint256, Error = Error>;
+    /// Queries the network for current balance. This is different
+    /// from get_balance which keeps track of local balance to save
+    /// up on network calls.
+    ///
+    /// This function shouldn't be called every time. Ideally it should be
+    /// called once when initializing private key, or periodically to synchronise
+    /// local and network balance.
+    fn get_network_balance(&self) -> impl Future<Item = Uint256, Error = Error>;
+    /// Waits for an event on the network using the event name.
+    ///
+    /// * `event` - Event signature
+    /// * `topic` - First topic to filter out
+    fn wait_for_event(
+        &self,
+        event: &str,
+        topic: Option<[u8; 32]>,
+    ) -> impl Future<Item = Log, Error = Error>;
+    /// Broadcast a transaction on the network.
+    ///
+    /// * `action` - Defines a type of transaction
+    /// * `value` - How much wei to send
+    fn broadcast_transaction(
+        &self,
+        action: Action,
+        value: Uint256,
+    ) -> impl Future<Item = Uint256, Error = Error>;
+}
+
+## Storage
+
+This is a trait that implements a storage of Counterparties. It is left in tact for most of the part, only the interface is extracted as a trait.
+
+```rust
+// Open question: Naming of this trait?
+trait Storage {
+    pub fn get_all_counterparties(&self) -> impl Future<Item = Vec<Counterparty>, Error = Error>;
+    pub fn get_all_channel_managers_mut(
+        &self,
+    ) -> impl Future<Item = Vec<Guard<ChannelManager>>, Error = Error>;
+    pub fn get_channel(
+        &self,
+        k: Address,
+    ) -> impl Future<Item = Guard<ChannelManager>, Error = Error>;
+    fn init_data(
+        &self,
+        k: Counterparty,
+        v: ChannelManager,
+    ) -> impl Future<Item = (), Error = Error>;
 }
 ```
 
@@ -84,11 +153,21 @@ A trait that describes the node to node protocol described above in section [Tra
 
 _Open question: How do we name those traits and implementations? For now its example to illustrate the idea_
 
-
 ```rust
+type ChannelId = [u8; 32];
+
+struct Channel {
+    channel_id: ChannelId,
+    address0: Address,
+    address1: Address,
+    balance0: Uint256,
+    balance1: Uint256,
+    // Rest of implementation details about the channel
+}
+
 trait TransportProtocol {
-    /// Proposes a channel
-    fn propose(&mut self, channel_id: &ChannelId, address0: &Address, address1: &Address, balance0: &Uint256, balance1: &Uint256) -> impl Future<Item = Signature, Error = Error>;
+    /// Proposes a channel and returns Signature after signing a fingerprint
+    fn propose(&mut self, channel: &Channel) -> impl Future<Item = Signature, Error = Error>;
     /// Notifies about channel created
     fn channel_created(&mut self, channel_id: &ChannelId) -> impl Future<Item = (), Error = Error>;
     /// Update state
@@ -101,11 +180,11 @@ struct HTTPTransportClient {
 
 impl TransportProtocol for HTTPTransportClient {
     /// Send `POST http://url/propose` request to other party
-    fn propose(&mut self, channel_id: &ChannelId, address0: &Address, address1: &Address, balance0: &Uint256, balance1: &Uint256) -> impl Future<Item = Signature, Error = Error>;
-    /// Notifies about channel created with `POST http://url/channel_joined`
-    fn channel_created(&mut self, channel_id: &ChannelId) -> impl Future<Item = (), Error = Error>;
+    fn propose(&mut self, channel: &Channel) -> impl Future<Item = Signature, Error = Error>;
+    /// Notifies about channel created with `POST http://url/channel_created`
+    fn channel_created(&mut self, channel: &Channel) -> impl Future<Item = (), Error = Error>;
     /// TODO: Update state with `POST http://url/update`
-    fn update(&mut self, channel_id: &ChannelId, ...) -> impl Future<Item = (), Error = Error>;
+    fn update(&mut self, channel: &Channel) -> impl Future<Item = (), Error = Error>;
 }
 
 struct HTTPTransportServer {
@@ -115,16 +194,154 @@ struct HTTPTransportServer {
 
 impl TransportProtocol for HTTPTransportServer {
     /// When receiving `POST http://url/propose` request from other party
-    fn propose(&mut self, channel_id: &ChannelId, address0: &Address, address1: &Address, balance0: &Uint256, balance1: &Uint256) -> impl Future<Item = Signature, Error = Error>;
-    /// When received `POST http://url/channel_joined` about channel is created
-    fn channel_created(&mut self, channel_id: &ChannelId) -> impl Future<Item = (), Error = Error>;
+    fn propose(&mut self, channel: &Channel) -> impl Future<Item = Signature, Error = Error>;
+    /// When received `POST http://url/channel_created` about channel is created
+    fn channel_created(&mut self, channel: &Channel) -> impl Future<Item = (), Error = Error>;
     /// TODO: Update state with `POST http://url/update`
-    fn update(&mut self, channel_id: &ChannelId, ...) -> impl Future<Item = (), Error = Error>;
+    fn update(&mut self, channel: &Channel) -> impl Future<Item = (), Error = Error>;
 }
 ```
+
+### PaymentContract
+
+This is the implementation of payment channel trait.
+
+In contrast to PaymentProtocol parameters of methods in this trait resembles the arguments of the contract itself as closely as possible.
+
+```rust
+trait PaymentContract {
+    /// Creates new channel with given parameters
+    fn new_channel(&self, 
+        channel_id: &ChannelId,
+        address0: &Address,
+        address1: &Address,
+        balance0: &Uint256,
+        balance1: &Uint256,
+        signature0: &Signature,
+        signature1: &Signature) -> impl Future<Item = (), Error = Error>;
+    /// Updates the state of the contract with given parameters.
+    /// 
+    /// Precondition: Channel identified by channel_id has to be created with new_channel before
+    /// Postcondition: Channel parameters will be updated with new parameters
+    fn update_state(&self,
+        channel_id: &ChannelId,
+        sequence_number: &Uint256,
+        balance0: &Uint256,
+        balance1: &Uint256,
+        signature0: &Signature,
+        signature1: &Signature) -> impl Future<Item = (), Error = Error>;
+    /// Closes channel fast
+    fn close_channel_fast(&self,
+        channel_id: &ChannelId,
+        sequence_number: &Uint256,
+        balance0: &Uint256,
+        balance1: &Uint256,
+        signature0: &Signature,
+        signature1: &Signature) -> impl Future<Item = (), Error = Error>;
+}
+```
+
+### PaymentManager
+
+This is what `guac_actix`'s `PaymentController` used to be, but is not tied to actix now. This more likely extracts its functionality in a generic layer. Exposing it through Actix actor will be trivial though, as explained later in [Actix adapter](#actix-adapter) section.
+
+```rust
+
+/// Tries to resemble most of the guac_actix's PaymentController stuff
+trait PaymentManager {
+    fn withdraw(&self, ...) -> impl Future<Item = (), Error = Error>;
+    fn make_payment(&self, counterparty: &Counterparty) -> impl Future<Item = (), Error = Error>;
+}
+
+struct GuacPaymentManager<T, C, S>
+where T: TransportProtocol, C: PaymentContract, S: Storage {
+    transport: TransportProtocol,
+    contract: PaymentContract,
+    storage: Storage,
+}
+
+struct GuacPaymentManager<T, C, S>
+    where T: TransportProtocol,
+          C: PaymentContract,
+          S: Storage {
+    fn new(t: T, c: C, s: S) -> Self {
+        Self {
+            transport: t,
+            contract: c,
+            storage: s,
+        }
+    }
+}
+
+impl<T, C, S> PaymentManager for GuacPaymentManager<T, C, S> {
+    fn withdraw(&self, ...) -> impl Future<Item = (), Error = Error> {
+        /// TODO
+    }
+    fn make_payment(&self, counterparty: &Counterparty, amount: Uint256) -> impl Future<Item = (), Error = Error> {
+        Box::new(self.storage.get_channel(counterparty.eth_address).and_then(
+            move |mut channel_manager| {
+                channel_manager.pay_counterparty(Uint256(amount));
+            }
+        ));
+    }
+
+    fn tick(&self) -> impl Future<Item = (), Error = Error> {
+        Box::new(self.storage.get_all_counterparties().and_then(|keys| {
+            for i in keys {
+                self.storage
+                    .get_channel(counterparty.address.clone())
+                    .and_then(move |mut channel_manager| {
+
+                        let action = channel_manager.tick();
+
+                        match action {
+                            // Use self.transport for HTTP requests between parties
+                            // Use self.contract for Contract requests
+                            // Use self.storage for accessing counterparties
+                        }
+                    });
+            }
+        });
+    }
+}
+
+```
+
+### Channel manager
+
+Channel manager is code is mostly left in place, just removed parts of code where it does not match the functionality in Guac contract.
+
+```rust
+enum ChannelManager {
+    // This code is mostly left intact
+    New,
+    Proposed {
+        state: Channel,
+        accepted: bool,
+    },
+    Open {
+        state: CombinedState,
+    },
+    Closed {
+        state: CombinedState,
+    }
+    // ...
+}
+
+impl ChannelManager {
+    // Code left intact
+    fn tick(&self) -> Result<ChannelManagerAction, Error>;
+}
+```
+
+## Actix adapter
+
+_Open question: Combining PaymentManager, CryptoService and exposing their functionality through messages like MakePayment (compatibliity), GetOwnBalance (compat) etc?_
+
+TBD
 
 # Appendix
 
 ## Channel IDs
 
-Generating Channel IDs should be done in a securely manner using a random device (think of `/dev/urandom`) and the channel ID has to be exacly 32 bytes in length.
+Generating Channel IDs should be done in a securely manner using a random device (think of `/dev/urandom`). Channel ID has to be exacly 32 bytes in length and that exactly matches `bytes32` type in Solidity.
