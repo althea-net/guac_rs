@@ -247,6 +247,8 @@ impl log::Log for ConsoleLogger {
 
 #[test]
 fn make_payment() {
+    *CRYPTO.get_balance_mut() = Uint256::from(100_000_000_000_000u64);
+
     use std::sync::{Arc, Mutex};
 
     // TODO: There must be a better way to do this
@@ -310,7 +312,7 @@ fn make_payment() {
             assert_eq!(*network_counter, 1);
 
             let mut cm = msg.2.clone();
-            cm.proposal_result(true)
+            cm.proposal_result(true, 100_000_000_000_000u64.into())
                 .expect("Proposal result was expected to succeed");
             Box::new(Some(Ok(cm) as Result<ChannelManager, Error>))
         } else if let Some(msg) = v.downcast_ref::<SendChannelCreatedRequest>() {
@@ -332,8 +334,8 @@ fn make_payment() {
                     .unwrap(),
                 nonce: Uint256::from(123u64),
 
-                balance_a: Uint256::from(1u64),
-                balance_b: Uint256::from(2u64),
+                balance_a: Uint256::from(99_999_999_999_999u64),
+                balance_b: Uint256::from(1u64),
 
                 signature_a: Some(Signature::new(1u64.into(), 2u64.into(), 3u64.into())),
                 signature_b: Some(Signature::new(4u64.into(), 5u64.into(), 6u64.into())),

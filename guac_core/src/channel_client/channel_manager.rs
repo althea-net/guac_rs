@@ -259,13 +259,13 @@ impl ChannelManager {
         Ok(())
     }
 
-    pub fn proposal_result(&mut self, decision: bool) -> Result<(), Error> {
+    pub fn proposal_result(&mut self, decision: bool, pending_send: Uint256) -> Result<(), Error> {
         *self = match self {
             ChannelManager::Proposed { accepted, state } => {
                 if decision {
                     ChannelManager::PendingCreation {
                         state: state.clone(),
-                        pending_send: 0u32.into(),
+                        pending_send,
                     }
                 } else {
                     ChannelManager::Proposed {
@@ -537,7 +537,7 @@ mod tests {
         channel_prop.channel_id = Some(42u64.into());
 
         assert!(manager_b.check_proposal(&channel_prop).unwrap());
-        manager_a.proposal_result(true).unwrap();
+        manager_a.proposal_result(true, 0u64.into()).unwrap();
         manager_a.channel_open_event(&Uint256::from(42u64)).unwrap();
 
         let (channel_a, channel_b) = Channel::new_pair(42u64.into(), 100u32.into(), 0u32.into());
@@ -602,8 +602,8 @@ mod tests {
 
         assert!(manager_b.check_proposal(&channel_prop_a).unwrap());
         assert!(!manager_a.check_proposal(&channel_prop_b).unwrap());
-        manager_a.proposal_result(true).unwrap();
-        manager_b.proposal_result(false).unwrap();
+        manager_a.proposal_result(true, 0u64.into()).unwrap();
+        manager_b.proposal_result(false, 0u64.into()).unwrap();
 
         assert_eq!(
             manager_a,

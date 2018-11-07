@@ -278,7 +278,7 @@ pub fn send_proposal_request(
             .from_err()
             .and_then(move |response| {
                 response.json().from_err().and_then(move |res: bool| {
-                    manager.proposal_result(res)?;
+                    manager.proposal_result(res, 0u64.into())?;
                     Ok(manager)
                 })
             })
