@@ -1,4 +1,4 @@
-use failure::Error;
+use failure::{err_msg, Error};
 
 use num256::Uint256;
 
@@ -92,7 +92,7 @@ impl CombinedState {
 
         state.nonce = state.nonce.add(1u8);
 
-        Ok(state.create_update())
+        Ok(state.create_update()?)
     }
 
     /// This is what processes the `UpdateTx` created by the `create_payment` on the counterparty.
@@ -188,7 +188,7 @@ mod tests {
     use super::*;
 
     fn new_pair(deposit_a: Uint256, deposit_b: Uint256) -> (CombinedState, CombinedState) {
-        let (channel_a, channel_b) = Channel::new_pair(deposit_a, deposit_b);
+        let (channel_a, channel_b) = Channel::new_pair(42u64.into(), deposit_a, deposit_b);
         (
             CombinedState::new(&channel_a),
             CombinedState::new(&channel_b),

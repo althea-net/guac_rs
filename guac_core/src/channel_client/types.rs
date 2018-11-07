@@ -1,5 +1,5 @@
 use clarity::{Address, Signature};
-use failure::Error;
+use failure::{err_msg, Error};
 use num256::Uint256;
 
 use crypto::CryptoService;
@@ -16,7 +16,7 @@ pub enum ChannelStatus {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Channel {
-    pub channel_id: Uint256,
+    pub channel_id: Option<Uint256>,
     pub address_a: Address,
     pub address_b: Address,
     pub channel_status: ChannelStatus,
@@ -31,9 +31,13 @@ pub struct Channel {
 }
 
 impl Channel {
-    pub fn new_pair(deposit_a: Uint256, deposit_b: Uint256) -> (Channel, Channel) {
+    pub fn new_pair(
+        channel_id: Uint256,
+        deposit_a: Uint256,
+        deposit_b: Uint256,
+    ) -> (Channel, Channel) {
         let channel_a = Channel {
-            channel_id: 0u64.into(),
+            channel_id: Some(channel_id.clone()),
             address_a: "0x0000000000000000000000000000000000000001"
                 .parse()
                 .unwrap(),
@@ -132,9 +136,13 @@ impl Channel {
             false => &mut self.deposit_a,
         }
     }
-    pub fn create_update(&self) -> UpdateTx {
+    pub fn create_update(&self) -> Result<UpdateTx, Error> {
+        let channel_id = self.channel_id.as_ref().ok_or(err_msg(
+            "Unable to create update before channel is open on the network",
+        ))?;
+
         let mut update_tx = UpdateTx {
-            channel_id: self.channel_id.clone(),
+            channel_id: channel_id.clone(),
             nonce: self.nonce.clone(),
             balance_a: self.balance_a.clone(),
             balance_b: self.balance_b.clone(),
@@ -142,11 +150,20 @@ impl Channel {
             signature_b: None,
         };
 
-        update_tx.sign(self.is_a, self.channel_id.clone());
-        update_tx
+        update_tx.sign(self.is_a, channel_id.clone());
+        Ok(update_tx)
     }
     pub fn apply_update(&mut self, update: &UpdateTx, validate_balance: bool) -> Result<(), Error> {
-        if update.channel_id != self.channel_id {
+        trace!(
+            "Apply update for channel {:?} with {:?}",
+            self.channel_id,
+            update.channel_id
+        );
+        ensure!(
+            self.channel_id.is_some(),
+            "Unable to apply update before opening a channel on the network"
+        );
+        if update.channel_id != *self.channel_id.as_ref().unwrap() {
             bail!("update not for the right channel")
         }
 
@@ -154,23 +171,17 @@ impl Channel {
             bail!("sig is bad")
         }
 
-        if update
-            .their_balance(self.is_a)
-            .clone()
-            .add(update.my_balance(self.is_a).clone())
-            != self.my_balance().clone().add(self.their_balance().clone())
-        {
-            bail!("balance does not add up")
-        }
+        ensure!(
+            update.their_balance(self.is_a).clone() + update.my_balance(self.is_a).clone()
+                == self.my_balance().clone() + self.their_balance().clone(),
+            "balance does not add up"
+        );
 
-        if update
-            .their_balance(self.is_a)
-            .clone()
-            .add(update.my_balance(self.is_a).clone())
-            != self.deposit_a.clone().add(self.deposit_b.clone())
-        {
-            bail!("balance does not add up")
-        }
+        ensure!(
+            update.their_balance(self.is_a).clone() + update.my_balance(self.is_a).clone()
+                == self.deposit_a.clone() + self.deposit_b.clone(),
+            "balance does not add up to deposit values"
+        );
 
         if self.nonce > update.nonce {
             bail!("Update too old");
