@@ -313,33 +313,6 @@ impl<T, C, S> PaymentManager for GuacPaymentManager<T, C, S> {
 
 ```
 
-### Channel manager
-
-Channel manager is code is mostly left in place, just removed parts of code where it does not match the functionality in Guac contract.
-
-```rust
-enum ChannelManager {
-    // This code is mostly left intact
-    New,
-    Proposed {
-        state: Channel,
-        accepted: bool,
-    },
-    Open {
-        state: CombinedState,
-    },
-    Closed {
-        state: CombinedState,
-    }
-    // ...
-}
-
-impl ChannelManager {
-    // Code left intact
-    fn tick(&self) -> Result<ChannelManagerAction, Error>;
-}
-```
-
 ## Actix adapter
 
 _Open question: Combining PaymentManager, CryptoService and exposing their functionality through messages like MakePayment (compatibliity), GetOwnBalance (compat) etc?_
