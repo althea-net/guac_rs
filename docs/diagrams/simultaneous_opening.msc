@@ -1,4 +1,4 @@
-// command to render: mscgen -Tsvg -o happy_path_flow.svg happy_path_flow.msc
+// command to render: mscgen -Tsvg -o simultaneous_opening.svg simultaneous_opening.msc
 msc {
   hscale = "2";
   u,a,b,c;
@@ -8,21 +8,25 @@ msc {
   a box a [label="state New"],
   b box b [label="state New"];
   |||;
-  u=>a [label="fillChannel B, 10"];
-  a box a [label="state Proposed A: 10, B: 0"];
-  a-xb [label="proposeChannel A: 10, B:0"];
+  u=>a [label="fillChannel B, 10"],
   b=>b [label="fillChannel A, 10"];
-  b box b [label="state Proposed A: 0, B: 10"];
-  a<=b [label="proposeChannel A: 0, B:10"];
-  a box a [label="state Proposed A: 10, B: 10"];
-  a=>b [label="proposeChannel A: 10, B: 10"];
-  b box b [label="state Creating A: 10, B: 10"];
-  a<<b [label="sig A: 10, B: 10"];
+  a box a [label="state Proposing A: 10, B: 0"],
+  b box b [label="state Proposing A: 0, B: 10"];
+  a=>b [label="proposeChannel A: 10, B: 0", arcskip="2"];
+  a<=b [label="proposeChannel A: 0, B: 10", arcskip="2"],
+  c note c [label="<- Simulataneous proposals"];
+  |||;
+  b box b [label="state OtherCreating A: 10, B: 10"];
+  a<<b [label="newChannel A: 10, B: 10"];
   a box a [label="state Creating A: 10, B: 10"];
   a=>c [label="newChannel A: 10, B: 10"];
   ...  [ label = "After some polling..." ];
-  a<<c [label="channelOpen event A: 11, B: 9"];
-  a box a [label="state Open"];
-  b<<c [label="channelOpen event A: 11, B: 9"];
+  a<<c [label="channelOpened event A: 11, B: 9"];
+  a=>b [label="channelOpened notification"],
+  b=>c [label="verify channelOpened"];
+  b<<c [label="channelOpened success"];
   b box b [label="state Open"];
+  a<<b [label="channelOpened success"];
+  a box a [label="state Open"];
+  ---  [ label = "Channel is ready to use" ];
 }
