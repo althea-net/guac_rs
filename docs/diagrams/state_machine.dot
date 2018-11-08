@@ -18,13 +18,10 @@ digraph G {
 
     
         New -> Proposing [ label="fillChannel", fontcolor="blue"];
-        New -> OtherProposing [ label="unacceptable\nproposeChannel", fontcolor="red" ];
         New -> OtherCreating [ label="acceptable\nproposeChannel", fontcolor="red" ];
-        OtherProposing -> OtherCreating [ label="acceptable\nnewChannel", fontcolor="red" ];
         Proposing -> Creating [ label="acceptable\nnewChannel", fontcolor="red" ];
         OtherCreating -> Open [ label="channelOpened\nnotification", fontcolor="red" ];
         Creating -> Open [ label="channelOpened\nconfirmation", fontcolor="red" ];
-        Open -> OtherProposing [ label="unacceptable\nproposeChannel", fontcolor="red" ];
         Open -> OtherCreating [ label="acceptable\nproposeChannel", fontcolor="red" ];
         Open -> Proposing [ label="fillChannel", fontcolor="blue" ];
 }
