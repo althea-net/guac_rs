@@ -7,7 +7,6 @@ msc {
   a box a [label="state Open"],
   b box b [label="state Open"];
   u=>a [label="fillChannel B, 10"];
-  a box a [label="state Proposing"];
   a=>b [label="propose closeChannelFast"];
   a=>b [label="propose newChannel A: 11, B: 9"];
   b box b [label="state OtherCreating"];

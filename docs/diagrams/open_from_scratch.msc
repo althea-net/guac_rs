@@ -14,6 +14,7 @@ msc {
   b box b [label="state OtherProposing A: 10, B: 0"];
   |||;
   ...  [ label = "Propose timer..." ];
+  b box b [label="state OtherCreating"];
   a<<b [label="signed newChannel A: 10, B:0"];
   a box a [label="state Creating"];
   a=>c [label="submit newChannel A: 10, B:0"];
