@@ -2,26 +2,38 @@
 digraph G {
     pad=0.2
     
-    Legend [ label=<
-        <table border="0" cellpadding="2" cellspacing="0" cellborder="0">
-        <tr>
-        <td colspan="4"><b>Color Legend</b></td>
-        </tr>
-        <tr>
-        <td><font color="blue">From user</font></td>
-        </tr>
-        <tr>
-        <td><font color="red">From counterparty</font></td>
-        </tr>
-        </table>
-    >];
+    // Legend [ label=<
+    //     <table border="0" cellpadding="2" cellspacing="0" cellborder="0">
+    //     <tr>
+    //     <td colspan="4"><b>Color Legend</b></td>
+    //     </tr>
+    //     <tr>
+    //     <td><font color="blue">From user</font></td>
+    //     </tr>
+    //     <tr>
+    //     <td><font color="red">From counterparty</font></td>
+    //     </tr>
+    //     </table>
+    // >];
 
     
-        New -> Proposing [ label="fillChannel", fontcolor="blue"];
-        New -> OtherCreating [ label="acceptable\nproposeChannel", fontcolor="red" ];
-        Proposing -> Creating [ label="acceptable\nnewChannel", fontcolor="red" ];
-        OtherCreating -> Open [ label="channelOpened\nnotification", fontcolor="red" ];
-        Creating -> Open [ label="channelOpened\nconfirmation", fontcolor="red" ];
-        Open -> OtherCreating [ label="acceptable\nproposeChannel", fontcolor="red" ];
-        Open -> Proposing [ label="fillChannel", fontcolor="blue" ];
+        // New -> Proposing; //[ label="fillChannel", fontcolor="blue"];
+        // New -> OtherProposing; //[ label="proposeChannel", fontcolor="red" ];
+        // Proposing -> Creating; //[ label="newChannel", fontcolor="red" ];
+        // Proposing -> OtherCreating; //
+        // OtherProposing -> OtherCreating; //[ label="proposeTimerEnd\n" ]
+        // OtherCreating -> Open; // [ label="channelOpened\nnotification", fontcolor="red" ];
+        // Creating -> Open; // [ label="channelOpened\nconfirmation", fontcolor="red" ];
+        // Open -> OtherCreating; // [ label="proposeChannel", fontcolor="red" ];
+        // Open -> Proposing; // [ label="fillChannel", fontcolor="blue" ];
+    
+    New -> Proposing [ label="from user:\nfillChannel\nout: proposeChannel" ];
+    New -> OtherProposing [ label="from counterparty:\nproposeChannel" ];
+    Proposing -> OtherCreating [ label="from user:\nfillChannel" ];
+    OtherProposing -> OtherCreating [ label="internal:\nproposeTimer" ];
+    OtherProposing -> Creating [ label="from user:\nfillChannel\nout: " ];
+    Creating -> Open [ label="from counterparty:\nok response to\nchannelOpened notification" ];
+    OtherCreating -> Open [ label="from chain:\nchannelOpened" ];
+    Open -> OtherCreating [ label="from counterparty:\nproposeChannel" ];
+    Open -> Creating [ label="from counterparty:\nnewChannel\n(as response to proposal)" ];
 }

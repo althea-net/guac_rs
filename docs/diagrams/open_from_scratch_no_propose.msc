@@ -9,11 +9,8 @@ msc {
   b box b [label="state New"];
   |||;
   u=>a [label="fillChannel B, 10"];
-  a box a [label="state Proposing A: 10, B: 0"];
-  a=>b [label="propose newChannel A: 10, B:0"];
-  b box b [label="state OtherProposing A: 10, B: 0"];
-  |||;
-  ...  [ label = "Propose timer..." ];
+  a=>b [label="proposed newChannel A: 10, B:0"];
+  b box b [label="state OtherCreating"];
   a<<b [label="signed newChannel A: 10, B:0"];
   a box a [label="state Creating"];
   a=>c [label="submit newChannel A: 10, B:0"];
