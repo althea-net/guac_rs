@@ -93,7 +93,34 @@ impl TransportProtocol for HTTPTransportClient {
         }))
     }
     /// Send channel update
-    fn send_channel_update(&self, _update_tx: &UpdateTx) -> Box<Future<Item = (), Error = Error>> {
-        unimplemented!();
+    fn send_channel_update(
+        &self,
+        update_tx: &UpdateTx,
+    ) -> Box<Future<Item = UpdateTx, Error = Error>> {
+        trace!(
+            "Send channel update request update={:?} url={}",
+            update_tx,
+            self.addr,
+        );
+        let endpoint = format!("http://[{}]:{}/update", self.addr.ip(), self.addr.port());
+
+        let stream = TcpStream::connect(&self.addr);
+
+        let payload = NetworkRequest::from_data(update_tx.clone());
+
+        Box::new(stream.from_err().and_then(move |stream| {
+            client::post(&endpoint)
+                .with_connection(Connection::from_stream(stream))
+                .json(payload)
+                .unwrap()
+                .send()
+                .from_err()
+                .and_then(move |response| {
+                    response
+                        .json()
+                        .from_err()
+                        .and_then(move |res_update: UpdateTx| Ok(res_update))
+                })
+        }))
     }
 }

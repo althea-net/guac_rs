@@ -15,5 +15,8 @@ pub trait TransportProtocol {
         channel: &Channel,
     ) -> Box<Future<Item = (), Error = Error>>;
     /// Send channel update
-    fn send_channel_update(&self, update_tx: &UpdateTx) -> Box<Future<Item = (), Error = Error>>;
+    fn send_channel_update(
+        &self,
+        update_tx: &UpdateTx,
+    ) -> Box<Future<Item = UpdateTx, Error = Error>>;
 }
