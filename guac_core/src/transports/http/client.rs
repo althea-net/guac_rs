@@ -59,9 +59,38 @@ impl TransportProtocol for HTTPTransportClient {
     /// Sends a channel created request
     fn send_channel_created_request(
         &self,
-        _channel: &Channel,
+        channel: &Channel,
     ) -> Box<Future<Item = (), Error = Error>> {
-        unimplemented!();
+        trace!(
+            "Send created request channel={:?} addr={}",
+            channel,
+            self.addr
+        );
+        // Prepare URL for sending channel created notification
+        let endpoint = format!(
+            "http://[{}]:{}/channel_created",
+            self.addr.ip(),
+            self.addr.port()
+        );
+        // Create a connection to remote server
+        let stream = TcpStream::connect(&self.addr);
+        // Prepare a payload for sending
+        let payload = NetworkRequest::from_data(channel.clone());
+        // Process request
+        Box::new(stream.from_err().and_then(move |stream| {
+            client::post(&endpoint)
+                .with_connection(Connection::from_stream(stream))
+                .json(payload)
+                .unwrap()
+                .send()
+                .from_err()
+                .and_then(move |response| {
+                    response.body().from_err().and_then(move |res| {
+                        trace!("Channel created request returned {:?}", res);
+                        Ok(())
+                    })
+                })
+        }))
     }
     /// Send channel update
     fn send_channel_update(&self, _update_tx: &UpdateTx) -> Box<Future<Item = (), Error = Error>> {
