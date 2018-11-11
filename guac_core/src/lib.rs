@@ -20,7 +20,11 @@ extern crate owning_ref;
 extern crate qutex;
 #[macro_use]
 extern crate log;
+#[cfg(test)]
+extern crate actix;
 extern crate actix_web;
+#[cfg(test)]
+extern crate mockito;
 extern crate num256;
 extern crate sha3;
 extern crate tokio;
