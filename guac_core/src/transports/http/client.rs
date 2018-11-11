@@ -92,6 +92,7 @@ impl TransportProtocol for HTTPTransportClient {
                 })
         }))
     }
+
     /// Send channel update
     fn send_channel_update(
         &self,
@@ -122,5 +123,36 @@ impl TransportProtocol for HTTPTransportClient {
                         .and_then(move |res_update: UpdateTx| Ok(res_update))
                 })
         }))
+    }
+
+    // Send a channel joined to other party
+    fn send_channel_joined(&self, channel: &Channel) -> Box<Future<Item = (), Error = Error>> {
+        trace!(
+            "Send channel joined request channel={:?} url={}",
+            channel,
+            self.addr,
+        );
+        // Prepare URL
+        let endpoint = format!(
+            "http://[{}]:{}/channel_joined",
+            self.addr.ip(),
+            self.addr.port()
+        );
+        // Make a payload
+        let payload = NetworkRequest::from_data(channel.clone());
+        // Connect to server
+        Box::new(
+            TcpStream::connect(&self.addr)
+                .from_err()
+                .and_then(move |stream| {
+                    client::post(&endpoint)
+                        .with_connection(Connection::from_stream(stream))
+                        .json(payload)
+                        .unwrap()
+                        .send()
+                        .from_err()
+                        .and_then(move |response| response.body().from_err().and_then(|_| Ok(())))
+                }),
+        )
     }
 }
