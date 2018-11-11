@@ -30,6 +30,8 @@ owning_ref = "0.4"
 clarity = "0.1"
 sha3 = "0.8"
 num256 = "0.1"
+actix-web = "0.7"
+tokio = "0.1"
 
 [dev-dependencies]
 lazy_static = "1.0"

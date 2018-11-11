@@ -20,8 +20,10 @@ extern crate owning_ref;
 extern crate qutex;
 #[macro_use]
 extern crate log;
+extern crate actix_web;
 extern crate num256;
 extern crate sha3;
+extern crate tokio;
 extern crate web3;
 
 // Traits
@@ -36,6 +38,8 @@ pub mod error;
 pub mod eth_client;
 pub mod network;
 pub mod storage;
+pub mod transport_protocol;
+pub mod transports;
 
 pub use crypto::CRYPTO;
 pub use storage::STORAGE;
