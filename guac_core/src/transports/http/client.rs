@@ -369,3 +369,93 @@ fn invalid_channel_joined() {
     });
     sys.run();
 }
+
+#[test]
+fn update() {
+    use actix::{Arbiter, Handler, System};
+    use mockito::mock;
+    use serde_json;
+
+    let update_request = UpdateTx {
+        channel_id: 1234u64.into(),
+        nonce: 0u64.into(),
+        balance_a: 100u64.into(),
+        balance_b: 200u64.into(),
+        signature_a: None,
+        signature_b: None,
+    };
+
+    let _m = mock("POST", "/update")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(serde_json::to_string(&update_request).unwrap())
+        .create();
+    let client = HTTPTransportClient {
+        addr: mockito::SERVER_ADDRESS
+            .parse()
+            .expect("Invalid mockito address"),
+    };
+    let channel = make_channel();
+    let sys = System::new("test");
+    Arbiter::spawn({
+        client
+            .send_channel_update(&update_request.clone())
+            .then(|res| {
+                let update = res.expect("Expected a valid response but got error instead");
+                assert_eq!(
+                    update,
+                    UpdateTx {
+                        channel_id: 1234u64.into(),
+                        nonce: 0u64.into(),
+                        balance_a: 100u64.into(),
+                        balance_b: 200u64.into(),
+                        signature_a: None,
+                        signature_b: None,
+                    }
+                );
+                System::current().stop();
+                Ok(())
+            })
+    });
+    sys.run();
+}
+
+#[test]
+fn invalid_update() {
+    use actix::{Arbiter, Handler, System};
+    use mockito::mock;
+    use serde_json;
+
+    let update_request = UpdateTx {
+        channel_id: 1234u64.into(),
+        nonce: 0u64.into(),
+        balance_a: 100u64.into(),
+        balance_b: 200u64.into(),
+        signature_a: None,
+        signature_b: None,
+    };
+
+    let _m = mock("POST", "/update")
+        .with_status(404)
+        .with_header("content-type", "application/json")
+        .with_body(serde_json::to_string(&update_request).unwrap())
+        .create();
+    let client = HTTPTransportClient {
+        addr: mockito::SERVER_ADDRESS
+            .parse()
+            .expect("Invalid mockito address"),
+    };
+    let channel = make_channel();
+    let sys = System::new("test");
+    Arbiter::spawn({
+        client
+            .send_channel_update(&update_request.clone())
+            .then(|res| {
+                let err = res.expect_err("Expected an error but got a valid response instead");
+                assert!(format!("{}", err).starts_with("Received client error from server: 404"));
+                System::current().stop();
+                Ok(())
+            })
+    });
+    sys.run();
+}
