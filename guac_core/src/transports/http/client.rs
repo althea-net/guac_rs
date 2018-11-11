@@ -1,4 +1,5 @@
 use actix_web::client;
+use actix_web::client::ClientResponse;
 use actix_web::client::Connection;
 use actix_web::http::StatusCode;
 use actix_web::HttpMessage;
@@ -10,7 +11,6 @@ use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use transport_protocol::TransportProtocol;
 use transports::http::network_request::NetworkRequest;
-
 /// Represnetation of an transport client that works over HTTP.
 ///
 /// Contains useful properties to make an HTTP request. One instance
@@ -28,6 +28,20 @@ impl HTTPTransportClient {
     pub fn new(url: String) -> Result<HTTPTransportClient, Error> {
         Ok(HTTPTransportClient { addr: url.parse()? })
     }
+}
+
+/// Verifies if the response from server is correct by checking status code.HTTPTransportClient
+///
+/// Implementation of this is very simplified and all responses are expected to have HTTP 200 OK
+/// response.
+fn verify_client_error(response: ClientResponse) -> Result<ClientResponse, Error> {
+    if response.status() != 200 {
+        return Err(format_err!(
+            "Received client error from server: {}",
+            response.status()
+        ));
+    }
+    Ok(response)
 }
 
 impl TransportProtocol for HTTPTransportClient {
@@ -50,15 +64,8 @@ impl TransportProtocol for HTTPTransportClient {
                 .unwrap()
                 .send()
                 .from_err()
+                .and_then(verify_client_error)
                 .and_then(move |response| {
-                    if response.status() != 200 {
-                        return Err(format_err!(
-                            "Received client error from server: {}",
-                            response.status()
-                        ));
-                    }
-                    Ok(response)
-                }).and_then(move |response| {
                     response
                         .json()
                         .from_err()
@@ -94,15 +101,8 @@ impl TransportProtocol for HTTPTransportClient {
                 .unwrap()
                 .send()
                 .from_err()
+                .and_then(verify_client_error)
                 .and_then(move |response| {
-                    if response.status() != 200 {
-                        return Err(format_err!(
-                            "Received client error from server: {}",
-                            response.status()
-                        ));
-                    }
-                    Ok(response)
-                }).and_then(move |response| {
                     response.body().from_err().and_then(move |res| {
                         trace!("Channel created request returned {:?}", res);
                         Ok(())
@@ -135,6 +135,14 @@ impl TransportProtocol for HTTPTransportClient {
                 .send()
                 .from_err()
                 .and_then(move |response| {
+                    if response.status() != 200 {
+                        return Err(format_err!(
+                            "Received client error from server: {}",
+                            response.status()
+                        ));
+                    }
+                    Ok(response)
+                }).and_then(move |response| {
                     response
                         .json()
                         .from_err()
@@ -169,7 +177,15 @@ impl TransportProtocol for HTTPTransportClient {
                         .unwrap()
                         .send()
                         .from_err()
-                        .and_then(move |response| response.body().from_err().and_then(|_| Ok(())))
+                        .and_then(move |response| {
+                            if response.status() != 200 {
+                                return Err(format_err!(
+                                    "Received client error from server: {}",
+                                    response.status()
+                                ));
+                            }
+                            Ok(response)
+                        }).and_then(move |response| response.body().from_err().and_then(|_| Ok(())))
                 }),
         )
     }
@@ -273,6 +289,80 @@ fn channel_created() {
     Arbiter::spawn({
         client.send_channel_created_request(&channel).then(|res| {
             res.expect("Expected a valid response but got error instead");
+            System::current().stop();
+            Ok(())
+        })
+    });
+    sys.run();
+}
+
+#[test]
+fn invalid_channel_created() {
+    use actix::{Arbiter, Handler, System};
+    use mockito::mock;
+
+    let _m = mock("POST", "/channel_created").with_status(404).create();
+
+    let client = HTTPTransportClient {
+        addr: mockito::SERVER_ADDRESS
+            .parse()
+            .expect("Invalid mockito address"),
+    };
+    let channel = make_channel();
+    let sys = System::new("test");
+    Arbiter::spawn({
+        client.send_channel_created_request(&channel).then(|res| {
+            let err = res.expect_err("Expected an erro but got valid error instead");
+            assert!(format!("{}", err).starts_with("Received client error from server: 404"));
+            System::current().stop();
+            Ok(())
+        })
+    });
+    sys.run();
+}
+
+#[test]
+fn channel_joined() {
+    use actix::{Arbiter, Handler, System};
+    use mockito::mock;
+
+    let _m = mock("POST", "/channel_joined").with_status(200).create();
+
+    let client = HTTPTransportClient {
+        addr: mockito::SERVER_ADDRESS
+            .parse()
+            .expect("Invalid mockito address"),
+    };
+    let channel = make_channel();
+    let sys = System::new("test");
+    Arbiter::spawn({
+        client.send_channel_joined(&channel).then(|res| {
+            res.expect("Expected a valid response but got error instead");
+            System::current().stop();
+            Ok(())
+        })
+    });
+    sys.run();
+}
+
+#[test]
+fn invalid_channel_joined() {
+    use actix::{Arbiter, Handler, System};
+    use mockito::mock;
+
+    let _m = mock("POST", "/channel_joined").with_status(404).create();
+
+    let client = HTTPTransportClient {
+        addr: mockito::SERVER_ADDRESS
+            .parse()
+            .expect("Invalid mockito address"),
+    };
+    let channel = make_channel();
+    let sys = System::new("test");
+    Arbiter::spawn({
+        client.send_channel_joined(&channel).then(|res| {
+            let err = res.expect_err("Expected a valid response but got error instead");
+            assert!(format!("{}", err).starts_with("Received client error from server: 404"));
             System::current().stop();
             Ok(())
         })
