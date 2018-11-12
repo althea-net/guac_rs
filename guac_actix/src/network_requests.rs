@@ -1,9 +1,6 @@
 #[cfg(test)]
 use actix::actors::mocker::Mocker;
 use actix::prelude::*;
-use actix_web::client;
-use actix_web::client::Connection;
-use actix_web::HttpMessage;
 
 use guac_core::channel_client::types::{Channel, UpdateTx};
 use guac_core::crypto::CryptoService;
@@ -12,18 +9,15 @@ use guac_core::STORAGE;
 
 use failure::Error;
 use futures;
+use futures::future::result;
 use futures::Future;
-
-use NetworkRequest;
-
-use std::net::SocketAddr;
-
-use tokio::net::TcpStream as TokioTcpStream;
+use futures::IntoFuture;
 
 use channel_actor::{ChannelActor, OpenChannel};
-use futures::future::ok;
 use guac_core::channel_client::{ChannelManager, ChannelManagerAction};
 use guac_core::counterparty::Counterparty;
+use guac_core::transport_protocol::TransportProtocol;
+use guac_core::transports::http::client::HTTPTransportClient;
 use num256::Uint256;
 
 /// This function needs to be called periodically for every counterparty to to do things which
@@ -111,16 +105,17 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                     *channel_manager = temp_channel_manager;
                     Box::new(futures::future::ok(())) as Box<Future<Item = (), Error = Error>>
                 }
-                ChannelManagerAction::SendChannelJoinTransaction(channel) => {
-                    Box::new(
-                        send_channel_joined(channel, counterparty.url, temp_channel_manager)
-                            .and_then(move |cm| {
-                                *channel_manager = cm;
-                                Ok(())
-                            }),
-                    ) as Box<Future<Item = (), Error = Error>>
-                }
-
+                ChannelManagerAction::SendChannelJoinTransaction(channel) => Box::new(
+                    NetworkRequestActor::from_registry()
+                        .send(SendChannelJoined(
+                            channel,
+                            counterparty.url,
+                            temp_channel_manager,
+                        )).then(move |cm| {
+                            *channel_manager = cm.unwrap().unwrap();
+                            Ok(())
+                        }),
+                ),
                 ChannelManagerAction::SendChannelCreatedUpdate(channel) => Box::new(
                     NetworkRequestActor::from_registry()
                         .send(SendChannelCreatedRequest(
@@ -202,40 +197,18 @@ impl Handler<SendChannelCreatedRequest> for NetworkRequestActorImpl {
     type Result = ResponseFuture<ChannelManager, Error>;
 
     fn handle(&mut self, msg: SendChannelCreatedRequest, _ctx: &mut Context<Self>) -> Self::Result {
-        Box::new(send_channel_created_request(msg.0, msg.1, msg.2))
+        Box::new(
+            result(HTTPTransportClient::new(msg.1.clone()))
+                .from_err()
+                .and_then(move |transport| {
+                    transport
+                        .send_channel_created_request(&msg.0.clone())
+                        .from_err()
+                        .and_then(move |_| Ok(msg.2.clone()))
+                        .into_future()
+                }),
+        )
     }
-}
-
-fn send_channel_created_request(
-    channel: Channel,
-    url: String,
-    manager: ChannelManager,
-) -> impl Future<Item = ChannelManager, Error = Error> {
-    trace!(
-        "network_requests.rs - Send created request channel={:?} url={} manager={:?}",
-        channel,
-        url,
-        manager
-    );
-    let socket: SocketAddr = url.parse().unwrap();
-    let endpoint = format!("http://[{}]:{}/channel_created", socket.ip(), socket.port());
-
-    let stream = TokioTcpStream::connect(&socket);
-
-    stream.from_err().and_then(move |stream| {
-        client::post(&endpoint)
-            .with_connection(Connection::from_stream(stream))
-            .json(NetworkRequest::wrap(channel))
-            .unwrap()
-            .send()
-            .from_err()
-            .and_then(move |response| {
-                response.body().from_err().and_then(move |res| {
-                    trace!("got {:?} back from sending channel_created to {}", res, url);
-                    Ok(manager)
-                })
-            })
-    })
 }
 
 #[derive(Debug)]
@@ -249,40 +222,47 @@ impl Handler<SendProposalRequest> for NetworkRequestActorImpl {
     type Result = ResponseFuture<ChannelManager, Error>;
 
     fn handle(&mut self, msg: SendProposalRequest, _ctx: &mut Context<Self>) -> Self::Result {
-        Box::new(send_proposal_request(msg.0, msg.1, msg.2))
+        Box::new(
+            result(HTTPTransportClient::new(msg.1.clone()))
+                .from_err()
+                .and_then(move |transport| {
+                    transport
+                        .send_proposal_request(&msg.0.clone())
+                        .from_err()
+                        .and_then(move |res| {
+                            let mut manager = msg.2.clone();
+                            manager
+                                .proposal_result(res, 0u64.into())
+                                .and_then(move |_| Ok(manager))
+                        }).into_future()
+                }),
+        )
     }
 }
 
-pub fn send_proposal_request(
-    channel: Channel,
-    url: String,
-    mut manager: ChannelManager,
-) -> impl Future<Item = ChannelManager, Error = Error> {
-    trace!(
-        "network_requests.rs - Send channel proposal request channel={:?} url={} manager={:?}",
-        channel,
-        url,
-        manager
-    );
-    let socket: SocketAddr = url.parse().expect("Unable to parse URL");
-    let endpoint = format!("http://[{}]:{}/propose", socket.ip(), socket.port());
+#[derive(Debug)]
+pub struct SendChannelJoined(pub Channel, pub String, pub ChannelManager);
 
-    let stream = TokioTcpStream::connect(&socket);
+impl Message for SendChannelJoined {
+    type Result = Result<ChannelManager, Error>;
+}
 
-    stream.from_err().and_then(move |stream| {
-        client::post(&endpoint)
-            .with_connection(Connection::from_stream(stream))
-            .json(NetworkRequest::wrap(channel))
-            .unwrap()
-            .send()
-            .from_err()
-            .and_then(move |response| {
-                response.json().from_err().and_then(move |res: bool| {
-                    manager.proposal_result(res, 0u64.into())?;
-                    Ok(manager)
-                })
-            })
-    })
+impl Handler<SendChannelJoined> for NetworkRequestActorImpl {
+    type Result = ResponseFuture<ChannelManager, Error>;
+
+    fn handle(&mut self, msg: SendChannelJoined, _ctx: &mut Context<Self>) -> Self::Result {
+        Box::new(
+            result(HTTPTransportClient::new(msg.1.clone()))
+                .from_err()
+                .and_then(move |transport| {
+                    transport
+                        .send_channel_joined(&msg.0)
+                        .from_err()
+                        .and_then(|_| Ok(msg.2))
+                        .into_future()
+                }),
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -296,73 +276,20 @@ impl Handler<SendChannelUpdate> for NetworkRequestActorImpl {
     type Result = ResponseFuture<ChannelManager, Error>;
 
     fn handle(&mut self, msg: SendChannelUpdate, _ctx: &mut Context<Self>) -> Self::Result {
-        Box::new(send_channel_update(msg.0, msg.1, msg.2))
+        Box::new(
+            result(HTTPTransportClient::new(msg.1.clone()))
+                .from_err()
+                .and_then(move |transport| {
+                    transport
+                        .send_channel_update(&msg.0.clone())
+                        .from_err()
+                        .and_then(move |res| {
+                            let mut manager = msg.2.clone();
+                            manager
+                                .received_updated_state(&res)
+                                .and_then(|_| Ok(manager))
+                        }).into_future()
+                }),
+        )
     }
-}
-
-fn send_channel_update(
-    update: UpdateTx,
-    url: String,
-    mut manager: ChannelManager,
-) -> impl Future<Item = ChannelManager, Error = Error> {
-    trace!(
-        "network_requests.rs - Send channel update request update={:?} url={} manager={:?}",
-        update,
-        url,
-        manager
-    );
-    let socket: SocketAddr = url.parse().unwrap();
-    let endpoint = format!("http://[{}]:{}/update", socket.ip(), socket.port());
-
-    let stream = TokioTcpStream::connect(&socket);
-
-    stream.from_err().and_then(move |stream| {
-        client::post(&endpoint)
-            .with_connection(Connection::from_stream(stream))
-            .json(NetworkRequest::wrap(update))
-            .unwrap()
-            .send()
-            .from_err()
-            .and_then(move |response| {
-                response
-                    .json()
-                    .from_err()
-                    .and_then(move |res_update: UpdateTx| {
-                        manager.received_updated_state(&res_update)?;
-                        Ok(manager)
-                    })
-            })
-    })
-}
-
-pub fn send_channel_joined(
-    new_channel: Channel,
-    url: String,
-    manager: ChannelManager,
-) -> impl Future<Item = ChannelManager, Error = Error> {
-    trace!(
-        "network_requests.rs - Send channel joined request channel={:?} url={} manager={:?}",
-        new_channel,
-        url,
-        manager
-    );
-    let socket: SocketAddr = url.parse().unwrap();
-    let endpoint = format!("http://[{}]:{}/channel_joined", socket.ip(), socket.port());
-
-    let stream = TokioTcpStream::connect(&socket);
-
-    stream.from_err().and_then(move |stream| {
-        client::post(&endpoint)
-            .with_connection(Connection::from_stream(stream))
-            .json(NetworkRequest::wrap(new_channel))
-            .unwrap()
-            .send()
-            .from_err()
-            .and_then(move |response| {
-                response.body().from_err().and_then(move |res| {
-                    trace!("got {:?} back from sending pip to {}", res, url);
-                    Ok(manager)
-                })
-            })
-    })
 }

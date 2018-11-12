@@ -15,15 +15,10 @@ use guac_core::channel_client::channel_manager::ChannelManager;
 use guac_core::crypto::Config;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
-use guac_core::eth_client::create_close_channel_payload;
-use guac_core::eth_client::create_join_channel_payload;
-use guac_core::eth_client::create_open_channel_payload;
-use guac_core::eth_client::create_start_challenge_payload;
-use guac_core::eth_client::{
-    close_channel, join_channel, open_channel, start_challenge, update_channel,
-};
+use guac_core::eth_client::EthClient;
 use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
 use guac_core::network::Web3Handle;
+use guac_core::payment_contract::PaymentContract;
 use num256::Uint256;
 use rand::{OsRng, Rng};
 use std::env;
@@ -170,6 +165,9 @@ fn contract() {
             .unwrap(),
     };
     CRYPTO.init(&cfg).unwrap();
+
+    let contract: Box<PaymentContract> = Box::new(EthClient::new());
+
     println!("Address {:?}", &*CHANNEL_ADDRESS);
     println!("Network ID {:?}", &*NETWORK_ID);
     // Set up both parties (alice and bob)
@@ -203,12 +201,13 @@ fn contract() {
     let gas_price = WEB3.eth().gas_price().wait().unwrap();
     let gas_price: Uint256 = gas_price.to_string().parse().unwrap();
 
-    let channel_id = open_channel(
-        bob.to_public_key().unwrap(),
-        challenge,
-        "1000000000000000000".parse().unwrap(),
-    ).wait()
-    .unwrap();
+    let channel_id = contract
+        .open_channel(
+            bob.to_public_key().unwrap(),
+            challenge,
+            "1000000000000000000".parse().unwrap(),
+        ).wait()
+        .unwrap();
 
     // Switch to bob
     *CRYPTO.secret_mut() = bob.clone();
@@ -216,7 +215,8 @@ fn contract() {
     println!("bob {:?}", CRYPTO.secret());
 
     // Bob joins Alice's channel
-    join_channel(channel_id, "1000000000000000000".parse().unwrap())
+    contract
+        .join_channel(channel_id, "1000000000000000000".parse().unwrap())
         .wait()
         .unwrap();
 
@@ -240,22 +240,23 @@ fn contract() {
 
     *CRYPTO.secret_mut() = alice.clone();
     assert_eq!(CRYPTO.secret(), alice);
-    update_channel(
-        channel_id,
-        Uint256::from(channel_nonce),
-        balance_a.clone(),
-        balance_b.clone(),
-        alice.sign_msg(&proof),
-        bob.sign_msg(&proof),
-    ).wait()
-    .unwrap();
+    contract
+        .update_channel(
+            channel_id,
+            Uint256::from(channel_nonce),
+            balance_a.clone(),
+            balance_b.clone(),
+            alice.sign_msg(&proof),
+            bob.sign_msg(&proof),
+        ).wait()
+        .unwrap();
 
     // Switch to bob
     *CRYPTO.secret_mut() = bob.clone();
     assert_eq!(CRYPTO.secret(), bob);
 
     // Bob starts challenge on channel
-    start_challenge(channel_id).wait().unwrap();
+    contract.start_challenge(channel_id).wait().unwrap();
 
     //
     // Switch to alice (keep in mind that Bob started the closing challenge)
@@ -263,7 +264,7 @@ fn contract() {
     *CRYPTO.secret_mut() = alice.clone();
     assert_eq!(CRYPTO.secret(), alice);
 
-    close_channel(channel_id).wait().unwrap();
+    contract.close_channel(channel_id).wait().unwrap();
 
     let alice_balance: Uint256 = WEB3
         .eth()

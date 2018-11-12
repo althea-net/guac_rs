@@ -4,16 +4,20 @@ use actix::prelude::*;
 use clarity::Address;
 use clarity::Signature;
 use failure::Error;
-use guac_core::eth_client::{
-    close_channel, join_channel, open_channel, start_challenge, update_channel, ChannelId,
-};
+use guac_core::eth_client::EthClient;
+use guac_core::payment_contract::{ChannelId, PaymentContract};
 use num256::Uint256;
 
-pub struct ChannelActorImpl;
+pub struct ChannelActorImpl {
+    contract: Box<PaymentContract>,
+}
 
 impl Default for ChannelActorImpl {
-    fn default() -> Self {
-        Self {}
+    fn default() -> ChannelActorImpl {
+        ChannelActorImpl {
+            /// Creates default implementation with Ethcalate contract
+            contract: Box::new(EthClient::new()),
+        }
     }
 }
 
@@ -47,7 +51,7 @@ impl Handler<OpenChannel> for ChannelActorImpl {
     type Result = ResponseFuture<ChannelId, Error>;
 
     fn handle(&mut self, msg: OpenChannel, _ctx: &mut Context<Self>) -> Self::Result {
-        open_channel(msg.0, msg.1, msg.2)
+        self.contract.open_channel(msg.0, msg.1, msg.2)
     }
 }
 
@@ -62,7 +66,7 @@ impl Handler<JoinChannel> for ChannelActorImpl {
     type Result = ResponseFuture<(), Error>;
 
     fn handle(&mut self, msg: JoinChannel, _ctx: &mut Context<Self>) -> Self::Result {
-        join_channel(msg.0, msg.1)
+        self.contract.join_channel(msg.0, msg.1)
     }
 }
 
@@ -77,7 +81,8 @@ impl Handler<UpdateChannel> for ChannelActorImpl {
     type Result = ResponseFuture<(), Error>;
 
     fn handle(&mut self, msg: UpdateChannel, _ctx: &mut Context<Self>) -> Self::Result {
-        update_channel(msg.0, msg.1, msg.2, msg.3, msg.4, msg.5)
+        self.contract
+            .update_channel(msg.0, msg.1, msg.2, msg.3, msg.4, msg.5)
     }
 }
 
@@ -92,7 +97,7 @@ impl Handler<StartChallenge> for ChannelActorImpl {
     type Result = ResponseFuture<(), Error>;
 
     fn handle(&mut self, msg: StartChallenge, _ctx: &mut Context<Self>) -> Self::Result {
-        start_challenge(msg.0)
+        self.contract.start_challenge(msg.0)
     }
 }
 
@@ -107,7 +112,7 @@ impl Handler<CloseChannel> for ChannelActorImpl {
     type Result = ResponseFuture<(), Error>;
 
     fn handle(&mut self, msg: CloseChannel, _ctx: &mut Context<Self>) -> Self::Result {
-        close_channel(msg.0)
+        self.contract.close_channel(msg.0)
     }
 }
 
