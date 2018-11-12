@@ -312,7 +312,7 @@ fn invalid_channel_created() {
     let sys = System::new("test");
     Arbiter::spawn({
         client.send_channel_created_request(&channel).then(|res| {
-            let err = res.expect_err("Expected an erro but got valid error instead");
+            let err = res.expect_err("Expected an error but got valid error instead");
             assert!(format!("{}", err).starts_with("Received client error from server: 404"));
             System::current().stop();
             Ok(())
