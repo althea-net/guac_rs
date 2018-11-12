@@ -37,38 +37,12 @@ mod network_requests;
 
 pub use network_endpoints::init_server;
 
-use actix::dev::{ContextParts, Mailbox};
-use actix::prelude::*;
 use althea_types::Identity;
-use channel_actor::{ChannelActor, OpenChannel};
 use clarity::Address;
-use clarity::Signature;
-use futures::future::ok;
 use network_requests::tick;
-use network_requests::{
-    NetworkRequestActor, SendChannelCreatedRequest, SendChannelUpdate, SendProposalRequest,
-};
 use num256::Uint256;
-use std::any::Any;
 use std::net::{IpAddr, Ipv6Addr};
-use std::ops::{Add, Sub};
-
-/// A data type which wraps all network requests that guac makes, to check who the request is from
-/// easily without request specific pattern matching
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct NetworkRequest<T> {
-    pub from_addr: Address,
-    pub data: T,
-}
-
-impl<T> NetworkRequest<T> {
-    pub fn wrap(data: T) -> NetworkRequest<T> {
-        NetworkRequest {
-            from_addr: CRYPTO.own_eth_addr(),
-            data,
-        }
-    }
-}
+use std::ops::Add;
 
 pub struct PaymentController {}
 
@@ -199,6 +173,8 @@ impl Handler<GetOwnBalance> for PaymentController {
 
 #[test]
 fn get_own_balance() {
+    use futures::future::ok;
+
     let system = System::new("test");
     let addr = PaymentController::default().start();
     let res = addr.send(GetOwnBalance);
@@ -246,7 +222,14 @@ impl log::Log for ConsoleLogger {
 
 #[test]
 fn make_payment() {
+    use channel_actor::{ChannelActor, OpenChannel};
+    use clarity::Signature;
+    use futures::future::ok;
     use guac_core::payment_contract::ChannelId;
+    use network_requests::{
+        NetworkRequestActor, SendChannelCreatedRequest, SendChannelUpdate, SendProposalRequest,
+    };
+    use std::any::Any;
     *CRYPTO.get_balance_mut() = Uint256::from(100_000_000_000_000u64);
 
     use std::sync::{Arc, Mutex};
