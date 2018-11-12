@@ -145,7 +145,6 @@ impl Message for Withdraw {
     type Result = Result<Uint256, Error>;
 }
 
-
 impl Handler<Withdraw> for PaymentController {
     type Result = ResponseFuture<Uint256, Error>;
     fn handle(&mut self, msg: Withdraw, _: &mut Context<Self>) -> Self::Result {
