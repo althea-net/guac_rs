@@ -1,4 +1,3 @@
-
 # Introduction
 
 Guac is an Ethereum single hop payment channel client for guac Bi-Directional Payment
@@ -43,7 +42,11 @@ Party B accepts the proposal automatically and stores the information about the 
 
 Parameters:
 
-- `signature` - Signed a fingerprint _TODO: Describe how to derive fingerprint for proposal stage_
+- `signature` - Signed a fingerprint which is defined as following
+
+  ```rust
+  let fingerprint = keccak256(abi.encodePacked("newChannel", address0, address1, balance0, balance1)
+  ```
 
 - `HTTP 400 BAD REQUEST`
 
@@ -67,9 +70,62 @@ Notification succeed. B knows that the channel is opened already, and the state 
 
 ### Closing a channel
 
-_TBD_
+- `POST /close_channel_fast`
+
+A request sent from party A to party B to notify it about the intention to close the channel.
+
+Request parameters:
+
+- `channel_id` - Channel ID
+- `nonce` - A non-decreasing seqeuence number for given Channel ID
+- `balance0` - Deposit of proposing party
+- `balance1` - Initial deposit of the other party
+
+Possible responses:
+
+- `HTTP 200 OK`
+
+Request succeed. Respond with a signed fingerprint for a given operation that is computed as:
+
+```rust
+fingerprint = keccak256(abi.encodePacked("closeChannelFast", channel_id, nonce, balance0, balance1))
+```
+
+Parameters of the response:
+
+```json
+{
+  "fingerprint": "0x..."
+}
+```
+
+- `HTTP 400 BAD REQUEST`
+
+The request was invalid for any reason (invalid or wrong parameters, invalid address, malformed parameters).
 
 ### Refilling a channel
+
+- `POST /redraw`
+
+This request signalizes the intention to refill the channel. To do that it first needs to contact other party about this and receive two signatures: one for `closeChannelFast` and second one for `newChannel` with new parameters.
+
+`closeChannelFast` fingerprint is defined as
+
+```rust
+let fingerprint = keccak256(abi.encodePacked("closeChannelFast", channel_id, nonce, balance0, balance1))
+```
+
+`newChannel` fingerprint is defined exactly the same as in section [Proposing a channel](#proposing-a-channel).
+
+Request parameters:
+
+- `channel_id` - Channel ID
+- `nonce` - A non-decreasing seqeuence number for given Channel ID
+- `balance0` - Deposit of proposing party
+- `balance1` - Initial deposit of the other party
+
+
+Response:
 
 _TBD_
 
@@ -122,6 +178,7 @@ trait CryptoService {
         value: Uint256,
     ) -> impl Future<Item = Uint256, Error = Error>;
 }
+```
 
 ## Storage
 
