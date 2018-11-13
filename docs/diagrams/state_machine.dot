@@ -9,6 +9,8 @@ digraph G {
     OtherProposing -> Creating [ label="from user:\nfillChannel\nout: " ];
     Creating -> Open [ label="from counterparty:\nok response to\nchannelOpened notification" ];
     OtherCreating -> Open [ label="from chain:\nchannelOpened" ];
+    OtherCreating -> New [ label="internal:\nnewChannel expiration" ];
+    Creating -> New [ label="internal:\nnewChannel expiration" ];
     Open -> OtherCreating [ label="from counterparty:\nproposeChannel" ];
     Open -> Creating [ label="from counterparty:\nnewChannel\n(as response to proposal)" ];
 }
