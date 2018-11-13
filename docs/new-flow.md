@@ -9,6 +9,8 @@ Guac manages channel payments between Althea nodes. It has only a few main point
 
 We call `Register` and supply the information of a new counterparty. This includes the counterparty's ethereum address and its network address.
 
+## Opening from scratch
+
 When we decide that it would like to lock up some money to pay the counterparty we call `FillChannel`. This includes `fill_amount`, how much money we would like to lock up in a channel to the counterparty.
 
 `FillChannel` will do different things based on whether or not there is a channel open already with the counterparty. In this case, since the counterparty was just added, there is no channel open.
@@ -17,4 +19,4 @@ Guac calls `ProposeChannel` on the counterparty with the amount that it wants to
 
 The `Creating` and `OtherCreating` states signify that the `newChannel` transaction has been submitted to the blockchain but has not been confirmed yet. During these states, Guac will not sign another `newChannel` transaction or sign or accept any state updates to the channel. The `newChannel` transaction includes an expiration time. The `Creating` and `OtherCreating` states will transition back to `New` when this time has elapsed.
 
-But hopefully, the `newChannel` transaction will have been confirmed before then. To find out when the confirmation has happened, the node in the `Creating` state (this is us),
+But hopefully, the `newChannel` transaction will have been confirmed before it expires. To find out when the confirmation has happened, the node in the `Creating` state (this is us) listens for the `channelOpened` event from the Guac contract on the blockchain. When we recieve this event we call `ChannelOpened` on the counterparty. The counterparty checks the blockchain to see whether it really has been opened and goes into the `Open` state. When we receive the response from the `ChannelOpened` endpoint, we go into the `Open` state as well. Guac nodes in the `Open` state are able to send and accept channel updates.
