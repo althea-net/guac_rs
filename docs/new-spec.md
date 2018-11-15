@@ -54,7 +54,7 @@ Party B considers the request invalid (i.e. malicious balances, address0 is on b
 
 - `POST /channel_created`
 
-A request sent from proposing party (party A) to party B to notify it about the fact that the channel is open on the network. Party B is required to check if the channel is in fact open by querying a contract _Open question: How?_
+A request sent from proposing party (party A) to party B to notify it about the fact that the channel is open on the network.
 
 Request parameters:
 
