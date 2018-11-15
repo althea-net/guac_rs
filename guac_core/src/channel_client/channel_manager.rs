@@ -104,6 +104,7 @@ impl ChannelManager {
         self.sanity_check(&my_address);
         match self.clone() {
             ChannelManager::New | ChannelManager::Proposed { .. } => {
+                // Will continue to propose channel until successful every tick
                 self.propose_channel(my_address, their_address, 100_000_000_000_000u64.into()) // 0.0001ETH
             }
             ChannelManager::PendingOtherCreation { state, .. } => {
@@ -177,7 +178,7 @@ impl ChannelManager {
             ChannelManager::New => {
                 // TODO make the defaults configurable
                 let proposal = Channel {
-                    channel_id: 0u32.into(),
+                    channel_id: None,
                     address_a: from,
                     address_b: to,
                     channel_status: ChannelStatus::Joined,
@@ -258,13 +259,13 @@ impl ChannelManager {
         Ok(())
     }
 
-    pub fn proposal_result(&mut self, decision: bool) -> Result<(), Error> {
+    pub fn proposal_result(&mut self, decision: bool, pending_send: Uint256) -> Result<(), Error> {
         *self = match self {
             ChannelManager::Proposed { accepted, state } => {
                 if decision {
                     ChannelManager::PendingCreation {
                         state: state.clone(),
-                        pending_send: 0u32.into(),
+                        pending_send,
                     }
                 } else {
                     ChannelManager::Proposed {
@@ -466,6 +467,23 @@ impl ChannelManager {
             _ => bail!("we can only receive updated state in open or joined"),
         }
     }
+
+    pub fn channel_open_event(&mut self, channel_id: &Uint256) -> Result<(), Error> {
+        trace!("Channel open event {:?} {:?}", *self, channel_id);
+        match *self {
+            ChannelManager::Proposed { ref mut state, .. }
+            | ChannelManager::PendingCreation { ref mut state, .. }
+            | ChannelManager::PendingOtherCreation { ref mut state, .. } => {
+                ensure!(
+                    state.channel_id.is_none(),
+                    "Unable to handle channel open event twice"
+                );
+                state.channel_id = Some(channel_id.clone());
+                Ok(())
+            }
+            ref cm => bail!("Unable to set channel id with a state of {:?}", cm),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -511,15 +529,18 @@ mod tests {
                     .unwrap(),
             ).unwrap();
 
-        let channel_prop = match proposal {
+        let mut channel_prop = match proposal {
             ChannelManagerAction::SendChannelProposal(channel) => channel,
             _ => panic!("Wrong action returned"),
         };
 
-        assert!(manager_b.check_proposal(&channel_prop).unwrap());
-        manager_a.proposal_result(true).unwrap();
+        channel_prop.channel_id = Some(42u64.into());
 
-        let (channel_a, channel_b) = Channel::new_pair(100u32.into(), 0u32.into());
+        assert!(manager_b.check_proposal(&channel_prop).unwrap());
+        manager_a.proposal_result(true, 0u64.into()).unwrap();
+        manager_a.channel_open_event(&Uint256::from(42u64)).unwrap();
+
+        let (channel_a, channel_b) = Channel::new_pair(42u64.into(), 100u32.into(), 0u32.into());
 
         assert_eq!(
             manager_a,
@@ -581,8 +602,8 @@ mod tests {
 
         assert!(manager_b.check_proposal(&channel_prop_a).unwrap());
         assert!(!manager_a.check_proposal(&channel_prop_b).unwrap());
-        manager_a.proposal_result(true).unwrap();
-        manager_b.proposal_result(false).unwrap();
+        manager_a.proposal_result(true, 0u64.into()).unwrap();
+        manager_b.proposal_result(false, 0u64.into()).unwrap();
 
         assert_eq!(
             manager_a,

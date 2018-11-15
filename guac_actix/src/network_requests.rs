@@ -1,6 +1,6 @@
-use actix_web::client;
-use actix_web::client::Connection;
-use actix_web::HttpMessage;
+#[cfg(test)]
+use actix::actors::mocker::Mocker;
+use actix::prelude::*;
 
 use guac_core::channel_client::types::{Channel, UpdateTx};
 use guac_core::crypto::CryptoService;
@@ -9,16 +9,16 @@ use guac_core::STORAGE;
 
 use failure::Error;
 use futures;
+use futures::future::result;
 use futures::Future;
+use futures::IntoFuture;
 
-use NetworkRequest;
-
-use std::net::SocketAddr;
-
-use tokio::net::TcpStream as TokioTcpStream;
-
+use channel_actor::{ChannelActor, OpenChannel};
 use guac_core::channel_client::{ChannelManager, ChannelManagerAction};
 use guac_core::counterparty::Counterparty;
+use guac_core::transport_protocol::TransportProtocol;
+use guac_core::transports::http::client::HTTPTransportClient;
+use num256::Uint256;
 
 /// This function needs to be called periodically for every counterparty to to do things which
 /// happen on a cycle.
@@ -34,6 +34,12 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
             // "commit" the changes when the tick is successful (could include network requests,
             // etc.)
             let mut temp_channel_manager = channel_manager.clone();
+            trace!(
+                "Tick: got channel for counterparty {:?} = {:?}",
+                counterparty,
+                temp_channel_manager
+            );
+
             trace!(
                 "counterparty {:?} is in state {:?}",
                 counterparty.clone(),
@@ -53,14 +59,45 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
             // not be mutated during the lifecycle of the request
             match action {
                 ChannelManagerAction::SendChannelProposal(channel) => Box::new(
-                    send_proposal_request(channel, counterparty.url, temp_channel_manager)
+                    // This will do an HTTP request on other party HTTP server
+                    // i.e. POST http://bob:1234/propose
+                    NetworkRequestActor::from_registry()
+                        .send(SendProposalRequest(
+                            channel.clone(),
+                            counterparty.url,
+                            temp_channel_manager,
+                        ))
                         // we move the mutex guarded channel manager through to the closure, which
                         // ensures nothing else tampers with it
-                        .and_then(move |cm| {
-                            // only when the request is successful, we `commit` it to `channel_manager`
-                            // (which makes the state change permanent)
-                            *channel_manager = cm;
-                            Ok(())
+                        .then(move |cm| {
+                            trace!(
+                                "After send proposal request channel={:?} cm={:?}",
+                                channel.clone(),
+                                cm
+                            );
+                            // Create a channel by contacting a channel actor after this request
+                            // was successful
+                            ChannelActor::from_registry()
+                                .send(OpenChannel(
+                                    channel.address_b.clone(),
+                                    Uint256::from(42u64),
+                                    Uint256::from(100_000_000_000_000u64),
+                                )).from_err()
+                                .and_then(move |channel_id| {
+                                    trace!(
+                                        "After open channel was sent {:?} ({:?})",
+                                        channel_id,
+                                        cm
+                                    );
+                                    // only when all the requests were successful, we commit it to `channel_manager`
+                                    // (which makes the state change permanent)
+                                    // channel_manager.received_channel_id();
+                                    // CM should be in PendingCreation state
+                                    let mut cm = cm.unwrap().unwrap();
+                                    cm.channel_open_event(&Uint256::from(channel_id.unwrap()))?;
+                                    *channel_manager = cm;
+                                    Ok(())
+                                })
                         }),
                 )
                     as Box<Future<Item = (), Error = Error>>,
@@ -68,33 +105,46 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
                     *channel_manager = temp_channel_manager;
                     Box::new(futures::future::ok(())) as Box<Future<Item = (), Error = Error>>
                 }
-                ChannelManagerAction::SendChannelJoinTransaction(channel) => {
-                    Box::new(
-                        send_channel_joined(channel, counterparty.url, temp_channel_manager)
-                            .and_then(move |cm| {
-                                *channel_manager = cm;
-                                Ok(())
-                            }),
-                    ) as Box<Future<Item = (), Error = Error>>
-                }
-
+                ChannelManagerAction::SendChannelJoinTransaction(channel) => Box::new(
+                    NetworkRequestActor::from_registry()
+                        .send(SendChannelJoined(
+                            channel,
+                            counterparty.url,
+                            temp_channel_manager,
+                        )).then(move |cm| {
+                            *channel_manager = cm.unwrap().unwrap();
+                            Ok(())
+                        }),
+                ),
                 ChannelManagerAction::SendChannelCreatedUpdate(channel) => Box::new(
-                    send_channel_created_request(channel, counterparty.url, temp_channel_manager)
-                        .and_then(move |cm| {
-                            *channel_manager = cm;
+                    NetworkRequestActor::from_registry()
+                        .send(SendChannelCreatedRequest(
+                            channel,
+                            counterparty.url,
+                            temp_channel_manager,
+                        )).then(move |cm| {
+                            trace!(
+                                "Send channel created requested returned old_cm={:?} new={:?}",
+                                channel_manager,
+                                cm
+                            );
+                            *channel_manager = cm.unwrap().unwrap();
                             Ok(())
                         }),
                 )
                     as Box<Future<Item = (), Error = Error>>,
-                ChannelManagerAction::SendUpdatedState(update) => {
-                    Box::new(
-                        send_channel_update(update, counterparty.url, temp_channel_manager)
-                            .and_then(move |cm| {
-                                *channel_manager = cm;
-                                Ok(())
-                            }),
-                    ) as Box<Future<Item = (), Error = Error>>
-                }
+                ChannelManagerAction::SendUpdatedState(update) => Box::new(
+                    NetworkRequestActor::from_registry()
+                        .send(SendChannelUpdate(
+                            update,
+                            counterparty.url,
+                            temp_channel_manager,
+                        )).then(move |cm| {
+                            *channel_manager = cm.unwrap().unwrap();
+                            Ok(())
+                        }),
+                )
+                    as Box<Future<Item = (), Error = Error>>,
                 ChannelManagerAction::None => {
                     *channel_manager = temp_channel_manager;
                     Box::new(futures::future::ok(())) as Box<Future<Item = (), Error = Error>>
@@ -103,109 +153,143 @@ pub fn tick(counterparty: Counterparty) -> impl Future<Item = (), Error = Error>
         })
 }
 
-pub fn send_channel_created_request(
-    channel: Channel,
-    url: String,
-    manager: ChannelManager,
-) -> impl Future<Item = ChannelManager, Error = Error> {
-    let socket: SocketAddr = url.parse().unwrap();
-    let endpoint = format!("http://[{}]:{}/channel_created", socket.ip(), socket.port());
+#[cfg(not(test))]
+pub type NetworkRequestActor = NetworkRequestActorImpl;
+#[cfg(test)]
+pub type NetworkRequestActor = Mocker<NetworkRequestActorImpl>;
 
-    let stream = TokioTcpStream::connect(&socket);
+/// An actor that is responsible for communication with other parties through HTTP.
+pub struct NetworkRequestActorImpl;
 
-    stream.from_err().and_then(move |stream| {
-        client::post(&endpoint)
-            .with_connection(Connection::from_stream(stream))
-            .json(NetworkRequest::wrap(channel))
-            .unwrap()
-            .send()
-            .from_err()
-            .and_then(move |response| {
-                response.body().from_err().and_then(move |res| {
-                    trace!("got {:?} back from sending channel_created to {}", res, url);
-                    Ok(manager)
-                })
-            })
-    })
+impl Default for NetworkRequestActorImpl {
+    fn default() -> Self {
+        Self {}
+    }
 }
 
-pub fn send_proposal_request(
-    channel: Channel,
-    url: String,
-    mut manager: ChannelManager,
-) -> impl Future<Item = ChannelManager, Error = Error> {
-    let socket: SocketAddr = url.parse().unwrap();
-    let endpoint = format!("http://[{}]:{}/propose", socket.ip(), socket.port());
+impl Supervised for NetworkRequestActorImpl {}
 
-    let stream = TokioTcpStream::connect(&socket);
+impl SystemService for NetworkRequestActorImpl {
+    fn service_started(&mut self, _ctx: &mut Context<Self>) {
+        info!("Network request actor system service started");
+    }
+}
+impl Actor for NetworkRequestActorImpl {
+    type Context = Context<Self>;
 
-    stream.from_err().and_then(move |stream| {
-        client::post(&endpoint)
-            .with_connection(Connection::from_stream(stream))
-            .json(NetworkRequest::wrap(channel))
-            .unwrap()
-            .send()
-            .from_err()
-            .and_then(move |response| {
-                response.json().from_err().and_then(move |res: bool| {
-                    manager.proposal_result(res)?;
-                    Ok(manager)
-                })
-            })
-    })
+    fn started(&mut self, _ctx: &mut Context<Self>) {
+        trace!("Network request actor is alive");
+    }
+
+    fn stopped(&mut self, _ctx: &mut Context<Self>) {
+        trace!("Network request actor is stopped");
+    }
 }
 
-pub fn send_channel_update(
-    update: UpdateTx,
-    url: String,
-    mut manager: ChannelManager,
-) -> impl Future<Item = ChannelManager, Error = Error> {
-    let socket: SocketAddr = url.parse().unwrap();
-    let endpoint = format!("http://[{}]:{}/update", socket.ip(), socket.port());
+#[derive(Debug)]
+pub struct SendChannelCreatedRequest(pub Channel, pub String, pub ChannelManager);
 
-    let stream = TokioTcpStream::connect(&socket);
-
-    stream.from_err().and_then(move |stream| {
-        client::post(&endpoint)
-            .with_connection(Connection::from_stream(stream))
-            .json(NetworkRequest::wrap(update))
-            .unwrap()
-            .send()
-            .from_err()
-            .and_then(move |response| {
-                response
-                    .json()
-                    .from_err()
-                    .and_then(move |res_update: UpdateTx| {
-                        manager.received_updated_state(&res_update)?;
-                        Ok(manager)
-                    })
-            })
-    })
+impl Message for SendChannelCreatedRequest {
+    type Result = Result<ChannelManager, Error>;
 }
 
-pub fn send_channel_joined(
-    new_channel: Channel,
-    url: String,
-    manager: ChannelManager,
-) -> impl Future<Item = ChannelManager, Error = Error> {
-    let socket: SocketAddr = url.parse().unwrap();
-    let endpoint = format!("http://[{}]:{}/channel_joined", socket.ip(), socket.port());
+impl Handler<SendChannelCreatedRequest> for NetworkRequestActorImpl {
+    type Result = ResponseFuture<ChannelManager, Error>;
 
-    let stream = TokioTcpStream::connect(&socket);
+    fn handle(&mut self, msg: SendChannelCreatedRequest, _ctx: &mut Context<Self>) -> Self::Result {
+        Box::new(
+            result(HTTPTransportClient::new(msg.1.clone()))
+                .from_err()
+                .and_then(move |transport| {
+                    transport
+                        .send_channel_created_request(&msg.0.clone())
+                        .from_err()
+                        .and_then(move |_| Ok(msg.2.clone()))
+                        .into_future()
+                }),
+        )
+    }
+}
 
-    stream.from_err().and_then(move |stream| {
-        client::post(&endpoint)
-            .with_connection(Connection::from_stream(stream))
-            .json(NetworkRequest::wrap(new_channel))
-            .unwrap()
-            .send()
-            .from_err()
-            .and_then(move |response| {
-                response.body().from_err().and_then(move |res| {
-                    trace!("got {:?} back from sending pip to {}", res, url);
-                    Ok(manager)
-                })
-            })
-    })
+#[derive(Debug)]
+pub struct SendProposalRequest(pub Channel, pub String, pub ChannelManager);
+
+impl Message for SendProposalRequest {
+    type Result = Result<ChannelManager, Error>;
+}
+
+impl Handler<SendProposalRequest> for NetworkRequestActorImpl {
+    type Result = ResponseFuture<ChannelManager, Error>;
+
+    fn handle(&mut self, msg: SendProposalRequest, _ctx: &mut Context<Self>) -> Self::Result {
+        Box::new(
+            result(HTTPTransportClient::new(msg.1.clone()))
+                .from_err()
+                .and_then(move |transport| {
+                    transport
+                        .send_proposal_request(&msg.0.clone())
+                        .from_err()
+                        .and_then(move |res| {
+                            let mut manager = msg.2.clone();
+                            manager
+                                .proposal_result(res, 0u64.into())
+                                .and_then(move |_| Ok(manager))
+                        }).into_future()
+                }),
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct SendChannelJoined(pub Channel, pub String, pub ChannelManager);
+
+impl Message for SendChannelJoined {
+    type Result = Result<ChannelManager, Error>;
+}
+
+impl Handler<SendChannelJoined> for NetworkRequestActorImpl {
+    type Result = ResponseFuture<ChannelManager, Error>;
+
+    fn handle(&mut self, msg: SendChannelJoined, _ctx: &mut Context<Self>) -> Self::Result {
+        Box::new(
+            result(HTTPTransportClient::new(msg.1.clone()))
+                .from_err()
+                .and_then(move |transport| {
+                    transport
+                        .send_channel_joined(&msg.0)
+                        .from_err()
+                        .and_then(|_| Ok(msg.2))
+                        .into_future()
+                }),
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct SendChannelUpdate(pub UpdateTx, pub String, pub ChannelManager);
+
+impl Message for SendChannelUpdate {
+    type Result = Result<ChannelManager, Error>;
+}
+
+impl Handler<SendChannelUpdate> for NetworkRequestActorImpl {
+    type Result = ResponseFuture<ChannelManager, Error>;
+
+    fn handle(&mut self, msg: SendChannelUpdate, _ctx: &mut Context<Self>) -> Self::Result {
+        Box::new(
+            result(HTTPTransportClient::new(msg.1.clone()))
+                .from_err()
+                .and_then(move |transport| {
+                    transport
+                        .send_channel_update(&msg.0.clone())
+                        .from_err()
+                        .and_then(move |res| {
+                            let mut manager = msg.2.clone();
+                            manager
+                                .received_updated_state(&res)
+                                .and_then(|_| Ok(manager))
+                        }).into_future()
+                }),
+        )
+    }
 }

@@ -1,4 +1,3 @@
-
 # Introduction
 
 Guac is an Ethereum single hop payment channel client for guac Bi-Directional Payment
@@ -29,7 +28,7 @@ Proposes a channel from party A to party B.
 
 Request parameters:
 
-- `channel_id` - A random 32 bytes string that matches the regexp `[a-f0-9]{32}`.
+- `channel_id` - A string that represents 32 bytes in a hexadecimal form with `0x` prefix as explained in [Serializing binary data](#serializing-binary-data) . This string matches the regexp `0x[a-f0-9]{64}`.
 - `address0` - Address of proposing party's address
 - `address1` - Address of the other party's address
 - `balance0` - Deposit of proposing party
@@ -65,6 +64,14 @@ Possible responses:
 
 Notification succeed. B knows that the channel is opened already, and the state will be updated after that to `Created`.
 
+### Closing a channel
+
+_TBD_
+
+### Refilling a channel
+
+_TBD_
+
 ## Contract layer
 
 This component should reflect the functionality of the guac payment channel contract
@@ -79,19 +86,10 @@ trait CryptoService {
     fn own_eth_addr(&self) -> Address;
     fn secret(&self) -> PrivateKey;
     fn secret_mut<'ret, 'me: 'ret>(&'me self) -> RwLockWriteGuardRefMut<'ret, Crypto, PrivateKey>;
-    fn get_balance_mut<'ret, 'me: 'ret>(&'me self)
-        -> RwLockWriteGuardRefMut<'ret, Crypto, Uint256>;
-    /// Access local balance without querying network.
-    ///
-    /// This is different from get_network_balance, where an actual
-    /// network call is made to retrieve up to date balance. This method
-    /// should be preferred over querying the network.
-    fn get_balance(&self) -> Uint256;
     fn eth_sign(&self, data: &[u8]) -> Signature;
     fn hash_bytes(&self, x: &[&[u8]]) -> Uint256;
     fn verify(_fingerprint: &Uint256, _signature: &Signature, _address: Address) -> bool;
     fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Handle>;
-
     // Async stuff
     fn get_network_id(&self) -> impl Future<Item = u64, Error = Error>;
     fn get_nonce(&self) -> impl Future<Item = Uint256, Error = Error>;
@@ -103,7 +101,7 @@ trait CryptoService {
     /// This function shouldn't be called every time. Ideally it should be
     /// called once when initializing private key, or periodically to synchronise
     /// local and network balance.
-    fn get_network_balance(&self) -> impl Future<Item = Uint256, Error = Error>;
+    fn get_balance(&self) -> impl Future<Item = Uint256, Error = Error>;
     /// Waits for an event on the network using the event name.
     ///
     /// * `event` - Event signature
@@ -249,8 +247,14 @@ This is what `guac_actix`'s `PaymentController` used to be, but is not tied to a
 
 /// Tries to resemble most of the guac_actix's PaymentController stuff
 trait PaymentManager {
-    fn withdraw(&self, ...) -> impl Future<Item = (), Error = Error>;
-    fn make_payment(&self, counterparty: &Counterparty) -> impl Future<Item = (), Error = Error>;
+    /// This message needs to be sent periodically for every single address the application is
+    /// interested in, and it returns the amount of money we can consider to have "received"
+    /// from a counterparty
+    fn withdraw(&self) -> impl Future<Item = Uint256, Error = Error>;
+    /// Makes payment to other party.
+    fn make_payment(&self, counterparty: &Counterparty, value: &Uint256) -> impl Future<Item = (), Error = Error>;
+    /// Open channel
+    fn open_channel(&self, counterparty: &Counterparty) -> impl Future<Item = (), Error = Error>;
 }
 
 struct GuacPaymentManager<T, C, S>
@@ -274,10 +278,11 @@ struct GuacPaymentManager<T, C, S>
 }
 
 impl<T, C, S> PaymentManager for GuacPaymentManager<T, C, S> {
-    fn withdraw(&self, ...) -> impl Future<Item = (), Error = Error> {
-        /// TODO
+    fn withdraw(&self) -> impl Future<Item = Uint256, Error = Error> {
+        // ...
+        unimplemented!();
     }
-    fn make_payment(&self, counterparty: &Counterparty, amount: Uint256) -> impl Future<Item = (), Error = Error> {
+    fn make_payment(&self, counterparty: &Counterparty, value: Uint256) -> impl Future<Item = (), Error = Error> {
         Box::new(self.storage.get_channel(counterparty.eth_address).and_then(
             move |mut channel_manager| {
                 channel_manager.pay_counterparty(Uint256(amount));
@@ -307,40 +312,35 @@ impl<T, C, S> PaymentManager for GuacPaymentManager<T, C, S> {
 
 ```
 
-### Channel manager
-
-Channel manager is code is mostly left in place, just removed parts of code where it does not match the functionality in Guac contract.
-
-```rust
-enum ChannelManager {
-    // This code is mostly left intact
-    New,
-    Proposed {
-        state: Channel,
-        accepted: bool,
-    },
-    Open {
-        state: CombinedState,
-    },
-    Closed {
-        state: CombinedState,
-    }
-    // ...
-}
-
-impl ChannelManager {
-    // Code left intact
-    fn tick(&self) -> Result<ChannelManagerAction, Error>;
-}
-```
-
 ## Actix adapter
 
 _Open question: Combining PaymentManager, CryptoService and exposing their functionality through messages like MakePayment (compatibliity), GetOwnBalance (compat) etc?_
 
-TBD
+```
+pub struct PaymentController {
+    /// Uses payment manager "backend" by a trait
+    manager: Box<PaymentManager>,
+}
+
+impl Default for PaymentController {
+    fn default() -> PaymentController {
+        // This, or passing through `new` function
+        PaymentController { manager: Box::new(GuacPaymentManager::new()) }
+    }
+}
+```
 
 # Appendix
+
+## Serializing binary data
+
+A binary data of any size have to be expressed as its hexadecimal representation with `0x` prefix. Length of the string is always even, and greater than 2.
+
+Examples of valid binary data serialized to strings:
+
+* `0x6333c17b8b1e713b002079309152e2c4ff26f2ab70d428486c5addd9da4695e2`
+
+This convention would make it clear on the other side that the string contains binary data that can be deserialized easily.
 
 ## Channel IDs
 
