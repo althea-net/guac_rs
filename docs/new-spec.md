@@ -1,4 +1,3 @@
-
 # Introduction
 
 Guac is an Ethereum single hop payment channel client for guac Bi-Directional Payment

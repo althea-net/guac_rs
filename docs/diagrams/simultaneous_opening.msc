@@ -1,0 +1,33 @@
+// command to render: mscgen -Tsvg -o simultaneous_opening.svg simultaneous_opening.msc
+msc {
+  hscale = "2";
+  u,a,b,c;
+
+  u=>a [label="registerCounterparty B"];
+  b=>b [label="registerCounterparty A"];
+  a box a [label="state New"];
+  b box b [label="state New"];
+  u=>a [label="fillChannel B, 10"];
+  a box a [label="state Proposing A: 10, B: 0"];
+  a=>b [label="propose newChannel A: 10, B: 0"];
+  b box b [label="state OtherProposing A: 10, B: 0"];
+  |||;
+  ...  [ label = "Propose timer..." ];
+
+  b=>b [label="fillChannel A, 10"];
+  a<=b [label="propose newChannel A: 10, B: 10"];
+  a box a [label="state OtherCreating A: 10, B: 10"];
+  a>>b [label="signature newChannel A: 10, B: 10"];
+  b box b [label="state Creating A: 10, B: 10"];
+  b=>c [label="submit newChannel A: 10, B: 10"];
+
+  ...  [ label = "After some polling..." ];
+  b<<c [label="channelOpened event A: 10, B: 10"];
+  a<=b [label="channelOpened notification"];
+  a=>c [label="verify channelOpened"];
+  a<<c [label="channelOpened success"];
+  a box a [label="state Open"];
+  a>>b [label="channelOpened success"];
+  b box b [label="state Open"];
+  ---  [ label = "Channel is ready to use" ];
+}

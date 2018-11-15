@@ -1,0 +1,31 @@
+// command to render: mscgen -Tsvg -o open_from_scratch.svg open_from_scratch.msc
+msc {
+  hscale = "2";
+  u,a,b,c;
+
+  u=>a [label="registerCounterparty B"],
+  b=>b [label="registerCounterparty A"];
+  a box a [label="state New"],
+  b box b [label="state New"];
+  |||;
+  u=>a [label="fillChannel B, 10"];
+  a box a [label="state Proposing A: 10, B: 0"];
+  a=>b [label="propose newChannel A: 10, B:0"];
+  b box b [label="state OtherProposing A: 10, B: 0"];
+  |||;
+  ...  [ label = "Propose timer..." ];
+  b box b [label="state OtherCreating"];
+  a<<b [label="signed newChannel A: 10, B:0"];
+  a box a [label="state Creating"];
+  a=>c [label="submit newChannel A: 10, B:0"];
+  ...  [ label = "After some polling..." ];
+  a<<c [label="channelOpened event"];
+  a=>b [label="channelOpened notification"],
+  b=>c [label="verify channelOpened"];
+  b<<c [label="channelOpened success"];
+  b box b [label="state Open"];
+  a<<b [label="channelOpened success"];
+  a box a [label="state Open"];
+  ---  [ label = "Channel is ready to use" ];
+
+}
