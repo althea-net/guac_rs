@@ -10,12 +10,18 @@ use num256::Uint256;
 pub type ChannelId = [u8; 32];
 
 pub trait PaymentContract {
-    fn open_channel(
+    fn new_channel(
         &self,
-        to: Address,
-        challenge: Uint256,
-        value: Uint256,
-    ) -> Box<Future<Item = ChannelId, Error = Error>>;
+        channel_id: ChannelId,
+        address0: Address,
+        address1: Address,
+        balance0: Uint256,
+        balance1: Uint256,
+        signature0: Signature,
+        signature1: Signature,
+        expiration: Uint256,
+        settling_period: Uint256,
+    ) -> Box<Future<Item = (), Error = Error>>;
     fn join_channel(
         &self,
         channel_id: ChannelId,
@@ -32,4 +38,6 @@ pub trait PaymentContract {
     ) -> Box<Future<Item = (), Error = Error>>;
     fn start_challenge(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>>;
     fn close_channel(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>>;
+
+    fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
 }

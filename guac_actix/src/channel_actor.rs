@@ -51,7 +51,7 @@ impl Handler<OpenChannel> for ChannelActorImpl {
     type Result = ResponseFuture<ChannelId, Error>;
 
     fn handle(&mut self, msg: OpenChannel, _ctx: &mut Context<Self>) -> Self::Result {
-        self.contract.open_channel(msg.0, msg.1, msg.2)
+        unimplemented!();
     }
 }
 

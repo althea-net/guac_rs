@@ -7,9 +7,9 @@ extern crate rand;
 #[macro_use]
 extern crate failure;
 extern crate num256;
-
+extern crate sha3;
 use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
-use clarity::{Address, PrivateKey, Transaction};
+use clarity::{Address, PrivateKey, Signature, Transaction};
 use failure::Error;
 use guac_core::channel_client::channel_manager::ChannelManager;
 use guac_core::crypto::Config;
@@ -18,9 +18,11 @@ use guac_core::crypto::CRYPTO;
 use guac_core::eth_client::EthClient;
 use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
 use guac_core::network::Web3Handle;
-use guac_core::payment_contract::PaymentContract;
+use guac_core::payment_contract::{ChannelId, PaymentContract};
 use num256::Uint256;
 use rand::{OsRng, Rng};
+use sha3::Digest;
+use sha3::{Keccak256, Sha3_256};
 use std::env;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -91,6 +93,15 @@ lazy_static! {
          .into_iter()
          .nth(0)
          .expect("Unable to obtain first address from the test network");
+
+    static ref BLOCK_NUMBER : Uint256 = WEB3
+        .eth()
+        .block_number()
+        .wait()
+        .expect("Unable to retrieve block number")
+        .to_string()
+        .parse()
+        .expect("Unable to convert block number");
 }
 
 /// Creates a random private key
@@ -154,6 +165,59 @@ fn poll_for_event(event: &str) -> web3::Result<Log> {
     )
 }
 
+fn create_newchannel_fingerprint(
+    secret0: &PrivateKey,
+    secret1: &PrivateKey,
+    channel_id: ChannelId,
+    address0: Address,
+    address1: Address,
+    balance0: Uint256,
+    balance1: Uint256,
+    expiration: Uint256,
+    settling: Uint256,
+) -> (Signature, Signature) {
+    let (secret0, secret1, address0, address1, balance0, balance1) = if address0 > address1 {
+        (secret1, secret0, address1, address0, balance1, balance0)
+    } else {
+        (secret0, secret1, address0, address1, balance0, balance1)
+    };
+
+    assert!(address0 < address1);
+
+    // let salt = "newChannel";
+
+    // println!("args = (\"{}\", {:?}", salt, )
+
+    // According to docs sha3 uses "nonstandard pack mode" and is also alias for
+    // 0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000d26e65774368616e6e656ce4d91b559c64a6e39332f7979563b0503d0a609468bccfc388cf052a4762b1c55b7c35c65f4bc675e3fc49aedd059919c90cf18db328a14b412807c4541020662e1ebd498bf92f400000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000000000008700000000000000000000000000000000000000000000000000000000000000c80000000000000000000000000000\
+    // let mut msg = "newChannel".as_bytes().to_vec();
+    // msg.extend(channel_id.iter());
+    // msg.extend(address0.as_bytes());
+    // msg.extend(address1.as_bytes());
+    // msg.extend(balance0.to_bytes_be());
+    // msg.extend(balance1.to_bytes_be());
+    // msg.extend(expiration.to_bytes_be());
+    // msg.extend(settling.to_bytes_be());
+
+    // On the other hand connectix uses keccak256(abi.encodePacked(...)) which seems like
+    // sha3 was before.
+    let msg = encode_tokens(&[
+        "newChannel".into(),
+        Token::Bytes(channel_id.to_vec().into()),
+        address0.into(),
+        address1.into(),
+        balance0.into(),
+        balance1.into(),
+        expiration.into(),
+        settling.into(),
+    ]);
+
+    // let h = Sha3_256::digest(&msg);
+
+    // println!("msg = {:x?}", msg);
+    (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
+}
+
 #[test]
 #[ignore]
 fn contract() {
@@ -193,7 +257,7 @@ fn contract() {
     println!("action {:?}", action);
     println!("cm {:?}", cm);
 
-    let challenge = Uint256::from(42u32);
+    let channel_id: ChannelId = rand::random();
 
     // Call openChannel
 
@@ -201,94 +265,132 @@ fn contract() {
     let gas_price = WEB3.eth().gas_price().wait().unwrap();
     let gas_price: Uint256 = gas_price.to_string().parse().unwrap();
 
-    let channel_id = contract
-        .open_channel(
-            bob.to_public_key().unwrap(),
-            challenge,
-            "1000000000000000000".parse().unwrap(),
-        ).wait()
-        .unwrap();
-
-    // Switch to bob
-    *CRYPTO.secret_mut() = bob.clone();
-    assert_eq!(CRYPTO.secret(), bob);
-    println!("bob {:?}", CRYPTO.secret());
-
-    // Bob joins Alice's channel
-    contract
-        .join_channel(channel_id, "1000000000000000000".parse().unwrap())
-        .wait()
-        .unwrap();
-
     // This has to be updated on every state update
     let mut channel_nonce = 0u32;
 
-    //
-    // Alice calls updateState
-    //
-    channel_nonce += 1;
-    let balance_a: Uint256 = "500000000000000000".parse().unwrap();
-    let balance_b: Uint256 = "1500000000000000000".parse().unwrap();
+    let alice_balance: Uint256 = "1000000000000000000".parse().unwrap();
+    let bob_balance: Uint256 = "1000000000000000000".parse().unwrap();
+    let expiration: Uint256 = (BLOCK_NUMBER.clone() + 100u64).into();
+    let settling: Uint256 = 200u64.into();
 
-    // Proof is the same for both parties
-    let proof = create_signature_data(
+    contract
+        .quick_deposit(alice_balance.clone())
+        .wait()
+        .unwrap();
+
+    // let event = CRYPTO.wait_for_event(
+    //     "Debug(bytes)",
+    //     None
+    // ).then(move |log| {
+    //     println!("log {:?}", log);
+    //     Ok(log)
+    // });
+
+    let (sig0, sig1) = create_newchannel_fingerprint(
+        &alice,
+        &bob,
         channel_id,
-        channel_nonce.into(),
-        balance_a.clone(),
-        balance_b.clone(),
+        alice.to_public_key().unwrap(),
+        bob.to_public_key().unwrap(),
+        alice_balance.clone(),
+        bob_balance.clone(),
+        expiration.clone(),
+        settling.clone(),
     );
 
-    *CRYPTO.secret_mut() = alice.clone();
-    assert_eq!(CRYPTO.secret(), alice);
-    contract
-        .update_channel(
-            channel_id,
-            Uint256::from(channel_nonce),
-            balance_a.clone(),
-            balance_b.clone(),
-            alice.sign_msg(&proof),
-            bob.sign_msg(&proof),
-        ).wait()
-        .unwrap();
+    let fut = contract.new_channel(
+        channel_id,
+        alice.to_public_key().unwrap(),
+        bob.to_public_key().unwrap(),
+        alice_balance.clone().into(),
+        bob_balance.clone().into(),
+        sig0,
+        sig1,
+        expiration.clone().into(),
+        settling.clone().into(),
+    );
 
-    // Switch to bob
-    *CRYPTO.secret_mut() = bob.clone();
-    assert_eq!(CRYPTO.secret(), bob);
+    fut.wait().unwrap();
+    // println!("Debug {:?}", event.wait().unwrap());
 
-    // Bob starts challenge on channel
-    contract.start_challenge(channel_id).wait().unwrap();
+    // fut.wait().unwrap();
+    // let f = fut.join(event).wait();
+    // println!("{:?}", f);
+    // println!("event {:?}", log);
 
-    //
-    // Switch to alice (keep in mind that Bob started the closing challenge)
-    //
-    *CRYPTO.secret_mut() = alice.clone();
-    assert_eq!(CRYPTO.secret(), alice);
+    // println!("channel id {:x?}", channel_id);
 
-    contract.close_channel(channel_id).wait().unwrap();
+    // // Switch to bob
+    // *CRYPTO.secret_mut() = bob.clone();
+    // assert_eq!(CRYPTO.secret(), bob);
+    // println!("bob {:?}", CRYPTO.secret());
 
-    let alice_balance: Uint256 = WEB3
-        .eth()
-        .balance(alice.to_public_key().unwrap().as_bytes().into(), None)
-        .wait()
-        .unwrap()
-        // Convert U256 to Uint256
-        .to_string()
-        .parse()
-        .unwrap();
-    println!("Alice {:?}", alice_balance);
-    let bob_balance: Uint256 = WEB3
-        .eth()
-        .balance(bob.to_public_key().unwrap().as_bytes().into(), None)
-        .wait()
-        .unwrap()
-        // Convert U256 to Uint256
-        .to_string()
-        .parse()
-        .unwrap();
-    println!("Bob {:?}", bob_balance);
+    // //
+    // // Alice calls updateState
+    // //
+    // channel_nonce += 1;
+    // let balance_a: Uint256 = "500000000000000000".parse().unwrap();
+    // let balance_b: Uint256 = "1500000000000000000".parse().unwrap();
 
-    assert!(alice_balance < Uint256::from_str("9500000000000000000").unwrap());
-    assert!(bob_balance >= Uint256::from_str("10490000000000000000").unwrap());
+    // // Proof is the same for both parties
+    // // let proof = create_signature_data(
+    // //     channel_id,
+    // //     channel_nonce.into(),
+    // //     balance_a.clone(),
+    // //     balance_b.clone(),
+    // // );
+
+    // *CRYPTO.secret_mut() = alice.clone();
+    // assert_eq!(CRYPTO.secret(), alice);
+    // contract
+    //     .update_channel(
+    //         channel_id,
+    //         Uint256::from(channel_nonce),
+    //         balance_a.clone(),
+    //         balance_b.clone(),
+    //         alice.sign_msg(&proof),
+    //         bob.sign_msg(&proof),
+    //     ).wait()
+    //     .unwrap();
+
+    // // Switch to bob
+    // *CRYPTO.secret_mut() = bob.clone();
+    // assert_eq!(CRYPTO.secret(), bob);
+
+    // // Bob starts challenge on channel
+    // contract.start_challenge(channel_id).wait().unwrap();
+
+    // //
+    // // Switch to alice (keep in mind that Bob started the closing challenge)
+    // //
+    // *CRYPTO.secret_mut() = alice.clone();
+    // assert_eq!(CRYPTO.secret(), alice);
+
+    // contract.close_channel(channel_id).wait().unwrap();
+
+    // let alice_balance: Uint256 = WEB3
+    //     .eth()
+    //     .balance(alice.to_public_key().unwrap().as_bytes().into(), None)
+    //     .wait()
+    //     .unwrap()
+    //     // Convert U256 to Uint256
+    //     .to_string()
+    //     .parse()
+    //     .unwrap();
+    // println!("Alice {:?}", alice_balance);
+    // let bob_balance: Uint256 = WEB3
+    //     .eth()
+    //     .balance(bob.to_public_key().unwrap().as_bytes().into(), None)
+    //     .wait()
+    //     .unwrap()
+    //     // Convert U256 to Uint256
+    //     .to_string()
+    //     .parse()
+    //     .unwrap();
+    // println!("Bob {:?}", bob_balance);
+
+    // assert!(alice_balance < Uint256::from_str("9500000000000000000").unwrap());
+    // assert!(bob_balance >= Uint256::from_str("10490000000000000000").unwrap());
 }
 
 #[test]

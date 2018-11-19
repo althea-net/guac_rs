@@ -58,28 +58,6 @@ pub fn create_update_tx(update: UpdateTx) -> Transaction {
     }.sign(&CRYPTO.secret(), None)
 }
 
-/// Creates a payload for "openChannel" contract call.
-///
-/// * `to` - Who is expected to be join on the other side of the channel.
-/// * `challenge` - A channel challenge which should be unique.
-pub fn create_open_channel_payload(to: Address, challenge: Uint256) -> Vec<u8> {
-    let challenge: [u8; 32] = challenge.into();
-
-    encode_call(
-        "openChannel(address,address,uint256,uint256)",
-        &[
-            // to
-            to.into(),
-            // tokenContract (we use ETH)
-            Address::default().into(),
-            // tokenAmount
-            0u32.into(),
-            // SigA
-            Token::Bytes(challenge.to_vec().into()),
-        ],
-    )
-}
-
 /// Creates a payload for "joinChannel" contract call.
 ///
 /// * `channel_id` - A valid channel ID
@@ -169,36 +147,81 @@ impl EthClient {
 }
 
 impl PaymentContract for EthClient {
+    fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
+        let payload = encode_call("quickDeposit()", &[]);
+        let call = CRYPTO
+            .broadcast_transaction(Action::Call(payload), value)
+            .map(|_| ());
+        Box::new(call)
+    }
     /// Calls ChannelOpen on the contract and waits for event.
     ///
-    /// * `to` - Other party
-    /// * `challenge` - Challenge
-    /// * `value` - Initial deposit
-    fn open_channel(
+    /// * `channel_id` - Channel ID
+    /// * `address0` - Source address
+    /// * `address1` - Destination address
+    /// * `balance0` - Source balance (own balance)
+    /// * `balance1` - Other party initial balance
+    /// * `signature0` - Fingerprint signed by source address
+    /// * `signature1` - Fingerprint signed by destination address
+    /// * `expiration` - Block number which this call will be expired
+    /// * `settling_period` - Max. blocks for a settling period to finish
+    fn new_channel(
         &self,
-        to: Address,
-        challenge: Uint256,
-        value: Uint256,
-    ) -> Box<Future<Item = ChannelId, Error = Error>> {
-        // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
-        let event = CRYPTO.wait_for_event(
-            "ChannelOpen(bytes32,address,address,address,uint256,uint256)",
-            None,
-        );
-
+        channel_id: ChannelId,
+        address0: Address,
+        address1: Address,
+        balance0: Uint256,
+        balance1: Uint256,
+        signature0: Signature,
+        signature1: Signature,
+        expiration: Uint256,
+        settling_period: Uint256,
+    ) -> Box<Future<Item = (), Error = Error>> {
         // Broadcast a transaction on the network with data
-        let call = CRYPTO.broadcast_transaction(
-            Action::Call(create_open_channel_payload(to, challenge)),
-            value,
-        );
+        assert!(address0 != address1, "Unable to open channel to yourself");
+        // Reorder addresses
+        let (address0, address1, balance0, balance1, signature0, signature1) =
+            if address0 > address1 {
+                (
+                    address1, address0, balance1, balance0, signature1, signature0,
+                )
+            } else {
+                (
+                    address0, address1, balance0, balance1, signature0, signature1,
+                )
+            };
+        assert!(address0 < address1);
 
-        Box::new(
-            call.join(event)
-                .and_then(|(_tx, response)| {
-                    let channel_id: ChannelId = response.topics[1].into();
-                    ok(channel_id)
-                }).into_future(),
-        )
+        let payload = encode_call(
+            "newChannel(bytes32,address,address,uint256,uint256,uint256,uint256,bytes,bytes)",
+            &[
+                // channelId
+                Token::Bytes(channel_id.to_vec().into()),
+                // address0
+                address0.into(),
+                // address1
+                address1.into(),
+                // balance0
+                balance0.into(),
+                // balance1
+                balance1.into(),
+                // expiration
+                expiration.into(),
+                // settlingPeriodLength in blocks
+                settling_period.into(),
+                // signature0
+                signature0.into_bytes().to_vec().into(),
+                // signature1
+                signature1.into_bytes().to_vec().into(),
+            ],
+        );
+        let call = CRYPTO
+            .broadcast_transaction(Action::Call(payload), 0u64.into())
+            .map(|txid| {
+                println!("new channel txid {:?}", txid);
+                ()
+            });
+        Box::new(call)
     }
 
     /// Calls JoinChannel on the contract and waits for event.
@@ -310,12 +333,6 @@ fn test_create_update_tx() {
         signature_b: Some(Signature::new(4u32.into(), 5u32.into(), 6u32.into())),
     });
     trace!("tx: {:?}", tx);
-}
-
-#[test]
-fn test_new_channel_tx() {
-    let data = create_open_channel_payload(Address::default(), "12345".parse().unwrap());
-    trace!("payload: {:?}", data);
 }
 
 #[test]
