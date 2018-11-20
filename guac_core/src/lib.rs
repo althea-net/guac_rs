@@ -41,6 +41,8 @@ pub mod crypto;
 pub mod error;
 pub mod eth_client;
 pub mod network;
+pub mod payment_manager;
+pub mod payments;
 pub mod storage;
 pub mod transport_protocol;
 pub mod transports;
