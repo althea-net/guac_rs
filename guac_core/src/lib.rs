@@ -29,6 +29,9 @@ extern crate num256;
 extern crate sha3;
 extern crate tokio;
 extern crate web3;
+#[cfg(test)]
+#[macro_use]
+extern crate double;
 
 // Traits
 pub mod payment_contract;

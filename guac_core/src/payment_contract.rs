@@ -10,6 +10,7 @@ use num256::Uint256;
 pub type ChannelId = [u8; 32];
 
 pub trait PaymentContract {
+    fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
     fn open_channel(
         &self,
         to: Address,

@@ -169,6 +169,11 @@ impl EthClient {
 }
 
 impl PaymentContract for EthClient {
+    /// Calls `quickDeposit` on the contract to deposit an amount
+    /// of ETH into the wallet.
+    fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
+        unimplemented!();
+    }
     /// Calls ChannelOpen on the contract and waits for event.
     ///
     /// * `to` - Other party
