@@ -1,4 +1,5 @@
 use channel_client::types::{Channel, ChannelStatus};
+use channel_storage::ChannelStorage;
 use clarity::Address;
 use crypto::CryptoService;
 use failure::Error;
@@ -10,7 +11,6 @@ use rand;
 use rand::prelude::*;
 use rand::RngCore;
 use std::collections::HashMap;
-use storage::Storage;
 
 /// A in-memory storage that stores data in
 pub struct InMemoryStorage {
@@ -25,13 +25,15 @@ impl InMemoryStorage {
     }
 }
 
-impl Storage for InMemoryStorage {
-    /// Registers new counterparty
+impl ChannelStorage for InMemoryStorage {
+    /// Registers new channel
     ///
     /// * `url` - Remote URL
-    /// * `url` - Remote ETH address
-    /// * `balance` - Our initial deposit
-    fn register(
+    /// * `address0` - Source ETH address (us)
+    /// * `address1` - Destination ETH address (them)
+    /// * `balance0` - Our initial deposit
+    /// * `balance` - Their initial deposit
+    fn register_channel(
         &self,
         url: String,
         address0: Address,
@@ -39,10 +41,8 @@ impl Storage for InMemoryStorage {
         balance0: Uint256,
         balance1: Uint256,
     ) -> Box<Future<Item = Channel, Error = Error>> {
-        // rand::thread_rng()
         let channel_id: Uint256 = {
-            let mut data: [u8; 32] = Default::default();
-            rand::thread_rng().fill_bytes(&mut data);
+            let data: [u8; 32] = rand::random();
             data.into()
         };
 
@@ -113,7 +113,7 @@ impl Storage for InMemoryStorage {
 fn register() {
     let channels = InMemoryStorage::new();
     let channel = channels
-        .register(
+        .register_channel(
             "42.42.42.42:4242".to_string(),
             "0x0000000000000000000000000000000000000001"
                 .parse()

@@ -40,6 +40,7 @@ pub mod payment_contract;
 // Code
 pub mod api;
 pub mod channel_client;
+pub mod channel_storage;
 pub mod counterparty;
 pub mod crypto;
 pub mod error;
@@ -48,7 +49,6 @@ pub mod network;
 pub mod payment_manager;
 pub mod payments;
 pub mod storage;
-pub mod storages;
 pub mod transport_protocol;
 pub mod transports;
 

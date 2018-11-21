@@ -1,3 +1,4 @@
+use channel_storage::ChannelStorage;
 use clarity::{Address, Signature};
 use eth_client::EthClient;
 use failure::Error;
@@ -7,8 +8,7 @@ use num256::Uint256;
 use payment_contract::PaymentContract;
 use payment_manager::PaymentManager;
 use std::sync::Arc;
-use storage::Storage;
-use storages::in_memory::InMemoryStorage;
+use storage::in_memory::InMemoryStorage;
 use transport_protocol::TransportFactory;
 use transports::http::client_factory::HTTPTransportFactory;
 
@@ -20,7 +20,7 @@ use transports::http::client_factory::HTTPTransportFactory;
 struct Guac {
     contract: Box<PaymentContract>,
     transport_factory: Arc<Box<TransportFactory>>,
-    storage: Box<Storage>,
+    storage: Box<ChannelStorage>,
 }
 
 impl Guac {
@@ -35,7 +35,7 @@ impl Guac {
     pub fn new(
         contract: Box<PaymentContract>,
         transport_factory: Box<TransportFactory>,
-        storage: Box<Storage>,
+        storage: Box<ChannelStorage>,
     ) -> Self {
         Self {
             contract,
@@ -77,7 +77,7 @@ impl PaymentManager for Guac {
     ) -> Box<Future<Item = (), Error = Error>> {
         Box::new(
             self.storage
-                .register(remote.to_string(), address0, address1, balance0, balance1)
+                .register_channel(remote.to_string(), address0, address1, balance0, balance1)
                 .and_then(|_channel| Ok(())),
         )
     }
@@ -265,7 +265,7 @@ mod tests {
     }
 
     struct MockStorage {
-        mock_register:
+        mock_register_channel:
             Rc<Mock<(String, Address, Address, Uint256, Uint256), Result<Channel, CloneableError>>>,
         mock_get_channel: Rc<Mock<(Uint256), Result<Channel, CloneableError>>>,
         mock_update_channel: Rc<Mock<(Uint256, Channel), Result<(), CloneableError>>>,
@@ -274,15 +274,15 @@ mod tests {
     impl Default for MockStorage {
         fn default() -> Self {
             Self {
-                mock_register: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
+                mock_register_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
                 mock_get_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
                 mock_update_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
             }
         }
     }
 
-    impl Storage for MockStorage {
-        fn register(
+    impl ChannelStorage for MockStorage {
+        fn register_channel(
             &self,
             url: String,
             address0: Address,
@@ -292,7 +292,7 @@ mod tests {
         ) -> Box<Future<Item = Channel, Error = Error>> {
             Box::new(
                 future::result(
-                    self.mock_register
+                    self.mock_register_channel
                         .call((url, address0, address1, balance0, balance1)),
                 ).from_err()
                 .into_future(),
@@ -347,7 +347,7 @@ mod tests {
         let factory = MockTransportFactory::default();
 
         // Specify behaviour for deposit() contract call
-        let mock_register = storage.mock_register.clone();
+        let mock_register = storage.mock_register_channel.clone();
 
         let channel = Channel {
             channel_id: Some(42u32.into()),

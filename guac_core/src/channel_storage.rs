@@ -19,9 +19,9 @@ use std::collections::HashMap;
 /// This may allow multiple implementations such as in-memory storage,
 /// or a storage thats backed by a bounty hunter. One could chain in-memory storage
 /// with a BH storage to replicate local state with remote server for consistency.
-pub trait Storage {
+pub trait ChannelStorage {
     /// Creates a new channel for given parameters of a counterparty.
-    fn register(
+    fn register_channel(
         &self,
         url: String,
         address0: Address,
