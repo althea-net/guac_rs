@@ -24,7 +24,9 @@ pub trait Storage {
     fn register(
         &self,
         url: String,
-        address: Address,
-        balance: Uint256,
+        address0: Address,
+        address1: Address,
+        balance0: Uint256,
+        balance1: Uint256,
     ) -> Box<Future<Item = Channel, Error = Error>>;
 }

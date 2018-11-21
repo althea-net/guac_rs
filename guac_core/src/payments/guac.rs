@@ -1,4 +1,4 @@
-use clarity::Signature;
+use clarity::{Address, Signature};
 use eth_client::EthClient;
 use failure::Error;
 use futures::future;
@@ -6,6 +6,8 @@ use futures::Future;
 use num256::Uint256;
 use payment_contract::PaymentContract;
 use payment_manager::PaymentManager;
+use storage::Storage;
+use storages::in_memory::InMemoryStorage;
 use transport_protocol::TransportFactory;
 use transports::http::client_factory::HTTPTransportFactory;
 
@@ -17,6 +19,7 @@ use transports::http::client_factory::HTTPTransportFactory;
 struct Guac {
     contract: Box<PaymentContract>,
     transport_factory: Box<TransportFactory>,
+    storage: Box<Storage>,
 }
 
 impl Guac {
@@ -28,10 +31,15 @@ impl Guac {
     /// instances for production use.
     ///
     /// * `contract` - A boxed instance of a PaymentContract trait.
-    pub fn new(contract: Box<PaymentContract>, transport_factory: Box<TransportFactory>) -> Self {
+    pub fn new(
+        contract: Box<PaymentContract>,
+        transport_factory: Box<TransportFactory>,
+        storage: Box<Storage>,
+    ) -> Self {
         Self {
             contract,
             transport_factory,
+            storage,
         }
     }
 }
@@ -44,6 +52,7 @@ impl Default for Guac {
         Self {
             contract: Box::new(EthClient::new()),
             transport_factory: Box::new(HTTPTransportFactory::new()),
+            storage: Box::new(InMemoryStorage::new()),
         }
     }
 }
@@ -55,6 +64,21 @@ impl PaymentManager for Guac {
     /// network.
     fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
         self.contract.deposit(value)
+    }
+    /// Register a counterparty
+    fn register_counterparty(
+        &self,
+        remote: &str,
+        address0: Address,
+        address1: Address,
+        balance0: Uint256,
+        balance1: Uint256,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        Box::new(
+            self.storage
+                .register(remote.to_string(), address0, address1, balance0, balance1)
+                .and_then(|_channel| Ok(())),
+        )
     }
     /// Propose a
     /// On a successful call it returns a signature signed by other party. Later this
@@ -82,7 +106,7 @@ impl PaymentManager for Guac {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use channel_client::types::{Channel, UpdateTx};
+    use channel_client::types::{Channel, ChannelStatus, UpdateTx};
     use clarity::{Address, Signature};
     #[cfg(test)]
     use double::Mock;
@@ -241,8 +265,41 @@ mod tests {
         }
     }
 
+    struct MockStorage {
+        mock_register:
+            Rc<Mock<(String, Address, Address, Uint256, Uint256), Result<Channel, CloneableError>>>,
+    }
+
+    impl Default for MockStorage {
+        fn default() -> Self {
+            Self {
+                mock_register: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
+            }
+        }
+    }
+
+    impl Storage for MockStorage {
+        fn register(
+            &self,
+            url: String,
+            address0: Address,
+            address1: Address,
+            balance0: Uint256,
+            balance1: Uint256,
+        ) -> Box<Future<Item = Channel, Error = Error>> {
+            Box::new(
+                future::result(
+                    self.mock_register
+                        .call((url, address0, address1, balance0, balance1)),
+                ).from_err()
+                .into_future(),
+            )
+        }
+    }
+
     #[test]
     fn deposit() {
+        let storage = MockStorage::default();
         let contract = MockContract::default();
         // let transport = RefCell::new(MockTransport::default());
         let factory = MockTransportFactory::default();
@@ -254,7 +311,7 @@ mod tests {
         // Specify behaviour for transport
         let mock_create_transport_protocol = factory.mock_create_transport_protocol.clone();
 
-        let guac = Guac::new(Box::new(contract), Box::new(factory));
+        let guac = Guac::new(Box::new(contract), Box::new(factory), Box::new(storage));
         guac.deposit(123u64.into()).wait().unwrap();
 
         // Verify calls to the contract happened
@@ -262,7 +319,70 @@ mod tests {
     }
 
     #[test]
+    fn register() {
+        let storage = MockStorage::default();
+        let contract = MockContract::default();
+        let transport = RefCell::new(Box::new(MockTransport::default()));
+        let factory = MockTransportFactory::default();
+
+        // Specify behaviour for deposit() contract call
+        let mock_register = storage.mock_register.clone();
+
+        let channel = Channel {
+            channel_id: Some(42u32.into()),
+            address_a: Address::new(),
+            address_b: Address::new(),
+            channel_status: ChannelStatus::New,
+            deposit_a: 0u64.into(),
+            deposit_b: 0u64.into(),
+            challenge: 0u64.into(),
+            nonce: 0u64.into(),
+            close_time: 0u64.into(),
+            balance_a: 0u64.into(),
+            balance_b: 0u64.into(),
+            is_a: true,
+        };
+        mock_register.return_ok(channel.clone());
+
+        // Specify behaviour for transport
+        let mock_create_transport_protocol = factory.mock_create_transport_protocol.clone();
+        mock_create_transport_protocol.use_closure(Box::new(move |_params| {
+            // This will always return clones of the same transport instance.
+            let instance = transport.clone();
+            Ok(instance)
+        }));
+
+        let guac = Guac::new(Box::new(contract), Box::new(factory), Box::new(storage));
+
+        let address0: Address = "0x0000000000000000000000000000000000000001"
+            .parse()
+            .unwrap();
+        let address1: Address = "0x0000000000000000000000000000000000000002"
+            .parse()
+            .unwrap();
+
+        guac.register_counterparty(
+            "42.42.42.42:4242",
+            address0.clone(),
+            address1.clone(),
+            42u64.into(),
+            0u64.into(),
+        ).wait()
+        .unwrap();
+
+        // Verify that counterparty is registered
+        assert!(mock_register.has_calls_exactly(vec![(
+            "42.42.42.42:4242".to_string(),
+            address0,
+            address1,
+            42u64.into(),
+            0u64.into()
+        )]));
+    }
+
+    #[test]
     fn propose() {
+        let storage = MockStorage::default();
         let contract = MockContract::default();
         let transport = RefCell::new(Box::new(MockTransport::default()));
         let factory = MockTransportFactory::default();
@@ -279,8 +399,8 @@ mod tests {
             Ok(instance)
         }));
 
-        let guac = Guac::new(Box::new(contract), Box::new(factory));
-        guac.propose("42.42.42.42:4242", 100u64.into(), 0u64.into())
+        let guac = Guac::new(Box::new(contract), Box::new(factory), Box::new(storage));
+        guac.propose("42.42.42.42:4242", 0u64.into(), 0u64.into())
             .wait()
             .unwrap();
 
