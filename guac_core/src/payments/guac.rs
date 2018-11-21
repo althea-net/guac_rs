@@ -268,12 +268,14 @@ mod tests {
     struct MockStorage {
         mock_register:
             Rc<Mock<(String, Address, Address, Uint256, Uint256), Result<Channel, CloneableError>>>,
+        mock_get_url_for_channel: Rc<Mock<(Uint256), Result<String, CloneableError>>>,
     }
 
     impl Default for MockStorage {
         fn default() -> Self {
             Self {
                 mock_register: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
+                mock_get_url_for_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
             }
         }
     }
@@ -293,6 +295,16 @@ mod tests {
                         .call((url, address0, address1, balance0, balance1)),
                 ).from_err()
                 .into_future(),
+            )
+        }
+        fn get_url_for_channel(
+            &self,
+            channel_id: Uint256,
+        ) -> Box<Future<Item = String, Error = Error>> {
+            Box::new(
+                future::result(self.mock_get_url_for_channel.call((channel_id)))
+                    .from_err()
+                    .into_future(),
             )
         }
     }

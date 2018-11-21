@@ -5,7 +5,6 @@ use failure::Error;
 use futures::future::ok;
 use futures::Future;
 use num256::Uint256;
-use payment_contract::ChannelId;
 use qutex::Qutex;
 use rand;
 use rand::prelude::*;
@@ -22,7 +21,7 @@ struct ChannelData {
 
 /// A in-memory storage that stores data in
 pub struct InMemoryStorage {
-    channels: Qutex<HashMap<ChannelId, ChannelData>>,
+    channels: Qutex<HashMap<Uint256, ChannelData>>,
 }
 
 impl InMemoryStorage {
@@ -48,15 +47,15 @@ impl Storage for InMemoryStorage {
         balance1: Uint256,
     ) -> Box<Future<Item = Channel, Error = Error>> {
         // rand::thread_rng()
-        let channel_id: ChannelId = {
-            let mut data: ChannelId = Default::default();
+        let channel_id: Uint256 = {
+            let mut data: [u8; 32] = Default::default();
             rand::thread_rng().fill_bytes(&mut data);
-            data
+            data.into()
         };
 
         // Prepare channel data
         let channel = Channel {
-            channel_id: Some(channel_id.into()),
+            channel_id: Some(channel_id.clone().into()),
             address_a: address0,
             address_b: address1,
             channel_status: ChannelStatus::New,
@@ -79,9 +78,26 @@ impl Storage for InMemoryStorage {
                 .clone()
                 .lock()
                 .and_then(move |mut channels| {
-                    channels.insert(channel_id, data);
+                    channels.insert(channel_id.clone(), data);
                     Ok(channel.clone())
                 }).from_err(),
+        )
+    }
+    fn get_url_for_channel(
+        &self,
+        channel_id: Uint256,
+    ) -> Box<Future<Item = String, Error = Error>> {
+        Box::new(
+            self.channels
+                .clone()
+                .lock()
+                .from_err()
+                .and_then(move |channels| {
+                    channels
+                        .get(&channel_id)
+                        .ok_or(format_err!("Unable to find channel {:x?}", &channel_id))
+                        .map(move |value| value.url.clone())
+                }),
         )
     }
 }
@@ -89,7 +105,7 @@ impl Storage for InMemoryStorage {
 #[test]
 fn register() {
     let channels = InMemoryStorage::new();
-    channels
+    let channel = channels
         .register(
             "42.42.42.42:4242".to_string(),
             "0x0000000000000000000000000000000000000001"
@@ -102,4 +118,12 @@ fn register() {
             0u64.into(),
         ).wait()
         .unwrap();
+
+    assert_eq!(
+        channels
+            .get_url_for_channel(channel.channel_id.clone().unwrap())
+            .wait()
+            .unwrap(),
+        "42.42.42.42:4242"
+    );
 }
