@@ -6,6 +6,7 @@ use futures::Future;
 use num256::Uint256;
 use payment_contract::PaymentContract;
 use payment_manager::PaymentManager;
+use std::sync::Arc;
 use storage::Storage;
 use storages::in_memory::InMemoryStorage;
 use transport_protocol::TransportFactory;
@@ -18,7 +19,7 @@ use transports::http::client_factory::HTTPTransportFactory;
 /// flow complete and that will include network to network.
 struct Guac {
     contract: Box<PaymentContract>,
-    transport_factory: Box<TransportFactory>,
+    transport_factory: Arc<Box<TransportFactory>>,
     storage: Box<Storage>,
 }
 
@@ -38,7 +39,7 @@ impl Guac {
     ) -> Self {
         Self {
             contract,
-            transport_factory,
+            transport_factory: Arc::new(transport_factory),
             storage,
         }
     }
@@ -51,7 +52,7 @@ impl Default for Guac {
     fn default() -> Self {
         Self {
             contract: Box::new(EthClient::new()),
-            transport_factory: Box::new(HTTPTransportFactory::new()),
+            transport_factory: Arc::new(Box::new(HTTPTransportFactory::new())),
             storage: Box::new(InMemoryStorage::new()),
         }
     }
@@ -85,20 +86,19 @@ impl PaymentManager for Guac {
     /// signature is combined with our signature signed, and sent to the contract
     ///
     /// * `remote` - A remote address in a format of "addr:port" t
-    fn propose(
-        &self,
-        remote: &str,
-        balance0: Uint256,
-        balance1: Uint256,
-    ) -> Box<Future<Item = Signature, Error = Error>> {
+    fn propose(&self, channel_id: Uint256) -> Box<Future<Item = Signature, Error = Error>> {
+        let factory = self.transport_factory.clone();
+
         Box::new(
-            future::result(
-                self.transport_factory
-                    .create_transport_protocol(remote.to_string()),
-            ).and_then(move |transport| {
-                // TODO: This is dummy value to get futures together
-                Ok(Signature::new(0u64.into(), 1u64.into(), 2u64.into()))
-            }),
+            self.storage
+                .get_channel(channel_id)
+                .and_then(move |channel| {
+                    future::result(factory.create_transport_protocol(channel.url.clone()))
+                        .and_then(move |transport| transport.send_proposal_request(&channel))
+                }).and_then(move |_result| {
+                    // TODO: This is dummy value to get futures together
+                    Ok(Signature::new(0u64.into(), 1u64.into(), 2u64.into()))
+                }),
         )
     }
 }
@@ -115,7 +115,6 @@ mod tests {
     use std::cell::RefCell;
     #[cfg(test)]
     use std::rc::Rc;
-    use std::sync::Arc;
     #[cfg(test)]
     use tokio::prelude::*;
     use transport_protocol::{TransportFactory, TransportProtocol};
@@ -268,14 +267,16 @@ mod tests {
     struct MockStorage {
         mock_register:
             Rc<Mock<(String, Address, Address, Uint256, Uint256), Result<Channel, CloneableError>>>,
-        mock_get_url_for_channel: Rc<Mock<(Uint256), Result<String, CloneableError>>>,
+        mock_get_channel: Rc<Mock<(Uint256), Result<Channel, CloneableError>>>,
+        mock_update_channel: Rc<Mock<(Uint256, Channel), Result<(), CloneableError>>>,
     }
 
     impl Default for MockStorage {
         fn default() -> Self {
             Self {
                 mock_register: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
-                mock_get_url_for_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
+                mock_get_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
+                mock_update_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
             }
         }
     }
@@ -297,12 +298,20 @@ mod tests {
                 .into_future(),
             )
         }
-        fn get_url_for_channel(
+        fn get_channel(&self, channel_id: Uint256) -> Box<Future<Item = Channel, Error = Error>> {
+            Box::new(
+                future::result(self.mock_get_channel.call((channel_id)))
+                    .from_err()
+                    .into_future(),
+            )
+        }
+        fn update_channel(
             &self,
             channel_id: Uint256,
-        ) -> Box<Future<Item = String, Error = Error>> {
+            channel: Channel,
+        ) -> Box<Future<Item = (), Error = Error>> {
             Box::new(
-                future::result(self.mock_get_url_for_channel.call((channel_id)))
+                future::result(self.mock_update_channel.call((channel_id, channel)))
                     .from_err()
                     .into_future(),
             )
@@ -353,6 +362,7 @@ mod tests {
             balance_a: 0u64.into(),
             balance_b: 0u64.into(),
             is_a: true,
+            url: "42.42.42.42:4242".to_string(),
         };
         mock_register.return_ok(channel.clone());
 
@@ -399,7 +409,26 @@ mod tests {
         let transport = RefCell::new(Box::new(MockTransport::default()));
         let factory = MockTransportFactory::default();
 
+        let mock_channel = Channel {
+            channel_id: Some(42u32.into()),
+            address_a: Address::new(),
+            address_b: Address::new(),
+            channel_status: ChannelStatus::New,
+            deposit_a: 0u64.into(),
+            deposit_b: 0u64.into(),
+            challenge: 0u64.into(),
+            nonce: 0u64.into(),
+            close_time: 0u64.into(),
+            balance_a: 0u64.into(),
+            balance_b: 0u64.into(),
+            is_a: true,
+            url: "42.42.42.42:4242".to_string(),
+        };
+
         // Specify behaviour for deposit() contract call
+        let mock_get_channel = storage.mock_get_channel.clone();
+        mock_get_channel.return_ok(mock_channel.clone());
+
         let mock_propose = transport.borrow().mock_send_proposal_request.clone();
         mock_propose.return_ok(true);
 
@@ -412,15 +441,16 @@ mod tests {
         }));
 
         let guac = Guac::new(Box::new(contract), Box::new(factory), Box::new(storage));
-        guac.propose("42.42.42.42:4242", 0u64.into(), 0u64.into())
-            .wait()
-            .unwrap();
+        guac.propose(42u64.into()).wait().unwrap();
 
         // Verify calls to the contract happened
         assert!(
             mock_create_transport_protocol.has_calls_exactly(vec!["42.42.42.42:4242".to_string()])
         );
         // XXX: This fails because we don't know yet what channel is it
-        assert!(mock_propose.called(), "Proposal not sent to other node!");
+        assert!(
+            mock_propose.has_calls_exactly(vec![mock_channel.clone()]),
+            "Proposal not sent to other node!"
+        );
     }
 }

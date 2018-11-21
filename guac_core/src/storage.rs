@@ -29,11 +29,14 @@ pub trait Storage {
         balance0: Uint256,
         balance1: Uint256,
     ) -> Box<Future<Item = Channel, Error = Error>>;
-    /// Gets URL for a given channel, or return an
-    /// error when given URL can't be found.
+    /// Get channel struct for a given channel ID.
     ///
-    /// Given channel_id has to exist and could be obtained by
-    /// `channel_id` attribute of a `Channel` structure.
-    fn get_url_for_channel(&self, channel_id: Uint256)
-        -> Box<Future<Item = String, Error = Error>>;
+    /// - `channel_id` - A valid channel ID
+    fn get_channel(&self, channel_id: Uint256) -> Box<Future<Item = Channel, Error = Error>>;
+    /// Update a channel by its ID
+    fn update_channel(
+        &self,
+        channel_id: Uint256,
+        channel: Channel,
+    ) -> Box<Future<Item = (), Error = Error>>;
 }

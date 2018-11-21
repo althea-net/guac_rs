@@ -190,6 +190,7 @@ impl ChannelManager {
                     balance_a: deposit.clone(),
                     balance_b: 0u32.into(),
                     is_a: true,
+                    url: String::new(),
                 };
                 ret = ChannelManagerAction::SendChannelProposal(proposal.swap());
                 ChannelManager::Proposed {

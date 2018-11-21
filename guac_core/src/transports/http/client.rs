@@ -210,6 +210,7 @@ fn make_channel() -> Channel {
         balance_a: 0u64.into(),
         balance_b: 1u64.into(),
         is_a: true,
+        url: "42.42.42.42:4242".to_string(),
     }
 }
 

@@ -12,16 +12,9 @@ use rand::RngCore;
 use std::collections::HashMap;
 use storage::Storage;
 
-struct ChannelData {
-    url: String,
-
-    // TODO: Channel structure needs some changes but we can reuse it at this point
-    channel: Channel,
-}
-
 /// A in-memory storage that stores data in
 pub struct InMemoryStorage {
-    channels: Qutex<HashMap<Uint256, ChannelData>>,
+    channels: Qutex<HashMap<Uint256, Channel>>,
 }
 
 impl InMemoryStorage {
@@ -67,10 +60,7 @@ impl Storage for InMemoryStorage {
             balance_a: balance0,
             balance_b: balance1,
             is_a: true, // TODO: not necessary as addresses are supposed to be ordered?
-        };
-        let data = ChannelData {
             url,
-            channel: channel.clone(),
         };
 
         Box::new(
@@ -78,15 +68,12 @@ impl Storage for InMemoryStorage {
                 .clone()
                 .lock()
                 .and_then(move |mut channels| {
-                    channels.insert(channel_id.clone(), data);
-                    Ok(channel.clone())
+                    channels.insert(channel_id.clone(), channel.clone());
+                    Ok(channel)
                 }).from_err(),
         )
     }
-    fn get_url_for_channel(
-        &self,
-        channel_id: Uint256,
-    ) -> Box<Future<Item = String, Error = Error>> {
+    fn get_channel(&self, channel_id: Uint256) -> Box<Future<Item = Channel, Error = Error>> {
         Box::new(
             self.channels
                 .clone()
@@ -96,7 +83,27 @@ impl Storage for InMemoryStorage {
                     channels
                         .get(&channel_id)
                         .ok_or(format_err!("Unable to find channel {:x?}", &channel_id))
-                        .map(move |value| value.url.clone())
+                        .map(move |value| value.clone())
+                }),
+        )
+    }
+
+    fn update_channel(
+        &self,
+        channel_id: Uint256,
+        channel: Channel,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        Box::new(
+            self.channels
+                .clone()
+                .lock()
+                .from_err()
+                .and_then(move |mut channels| {
+                    let mut entry = channels
+                        .get_mut(&channel_id)
+                        .ok_or(format_err!("Unable to find channel {:x?}", &channel_id))?;
+                    *entry = channel;
+                    Ok(())
                 }),
         )
     }
@@ -119,11 +126,16 @@ fn register() {
         ).wait()
         .unwrap();
 
-    assert_eq!(
-        channels
-            .get_url_for_channel(channel.channel_id.clone().unwrap())
-            .wait()
-            .unwrap(),
-        "42.42.42.42:4242"
-    );
+    let mut stored_channel = channels
+        .get_channel(channel.channel_id.clone().unwrap())
+        .wait()
+        .unwrap();
+    assert_eq!(stored_channel.url, "42.42.42.42:4242");
+
+    stored_channel.nonce += 1;
+
+    channels
+        .update_channel(channel.channel_id.clone().unwrap(), channel.clone())
+        .wait()
+        .unwrap();
 }

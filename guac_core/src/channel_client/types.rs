@@ -29,6 +29,9 @@ pub struct Channel {
     pub balance_a: Uint256,
     pub balance_b: Uint256,
     pub is_a: bool,
+
+    /// URL of the counterparty
+    pub url: String,
 }
 
 impl Channel {
@@ -54,6 +57,7 @@ impl Channel {
             balance_a: deposit_a,
             balance_b: deposit_b,
             is_a: true,
+            url: String::new(),
         };
 
         let channel_b = Channel {

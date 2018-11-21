@@ -33,10 +33,5 @@ pub trait PaymentManager {
     /// * `remote` - Remote address
     /// * `balance0` - Our proposed amount
     /// * `balance1` - Other proposed amount
-    fn propose(
-        &self,
-        remote: &str,
-        balance0: Uint256,
-        balance1: Uint256,
-    ) -> Box<Future<Item = Signature, Error = Error>>;
+    fn propose(&self, channel_id: Uint256) -> Box<Future<Item = Signature, Error = Error>>;
 }
