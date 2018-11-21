@@ -20,6 +20,19 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug unit tests in library 'guac_core' module combined_state",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=guac_core"],
+        "filter": {
+          "kind": "lib"
+        }
+      },
+      "args": ["combined_state"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug test 'contract_test'",
       "cargo": {
         "args": ["build", "--test=contract_test", "--package=guac_core"],
