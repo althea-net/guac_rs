@@ -1,3 +1,4 @@
+use clarity::Signature;
 use failure::Error;
 use futures::Future;
 use num256::Uint256;
@@ -15,4 +16,17 @@ pub trait PaymentManager {
     /// is sure that the transaction went through, and the user deposited
     /// provided amount into his wallet in contract.
     fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
+    /// Proposes a channel to the other party.
+    ///
+    /// This method should resolve future with a valid signature of the other party.
+    ///
+    /// * `remote` - Remote address
+    /// * `balance0` - Our proposed amount
+    /// * `balance1` - Other proposed amount
+    fn propose(
+        &self,
+        remote: &str,
+        balance0: Uint256,
+        balance1: Uint256,
+    ) -> Box<Future<Item = Signature, Error = Error>>;
 }

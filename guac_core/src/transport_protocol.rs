@@ -22,3 +22,17 @@ pub trait TransportProtocol {
     /// Send channel joined
     fn send_channel_joined(&self, channel: &Channel) -> Box<Future<Item = (), Error = Error>>;
 }
+
+/// Defines a functionality of a transport factory.
+///
+/// A transport factory provides instances of TransportProtocol instances for
+/// a given URL.
+///
+/// One usage example of such trait would be to implement a factory that
+/// would spawn instances of client TransportProtocol with an URL passed
+/// already. A transport factory could select a specific transport implementation
+/// given the url.
+pub trait TransportFactory {
+    /// Creates a transport for a given URL.
+    fn create_transport_protocol(&self, url: String) -> Result<Box<TransportProtocol>, Error>;
+}

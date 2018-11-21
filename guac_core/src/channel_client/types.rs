@@ -6,7 +6,7 @@ use crypto::CryptoService;
 use std::ops::Add;
 use CRYPTO;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub enum ChannelStatus {
     Open,
     Joined,
@@ -14,7 +14,7 @@ pub enum ChannelStatus {
     Closed,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Channel {
     pub channel_id: Option<Uint256>,
     pub address_a: Address,
@@ -199,7 +199,7 @@ impl Channel {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UpdateTx {
     pub channel_id: Uint256,
     pub nonce: Uint256,
