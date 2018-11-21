@@ -8,6 +8,7 @@ use CRYPTO;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub enum ChannelStatus {
+    New,
     Open,
     Joined,
     Challenge,

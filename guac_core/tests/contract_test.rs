@@ -20,7 +20,8 @@ use guac_core::eth_client::{create_signature_data, create_update_channel_payload
 use guac_core::network::Web3Handle;
 use guac_core::payment_contract::PaymentContract;
 use num256::Uint256;
-use rand::{OsRng, Rng};
+use rand::{rngs::OsRng, Rng, RngCore};
+
 use std::env;
 use std::ops::Deref;
 use std::str::FromStr;
