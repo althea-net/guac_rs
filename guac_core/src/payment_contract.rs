@@ -12,7 +12,6 @@ pub type ChannelId = [u8; 32];
 pub trait PaymentContract {
     fn new_channel(
         &self,
-        channel_id: ChannelId,
         address0: Address,
         address1: Address,
         balance0: Uint256,
@@ -21,7 +20,7 @@ pub trait PaymentContract {
         signature1: Signature,
         expiration: Uint256,
         settling_period: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>>;
+    ) -> Box<Future<Item = Uint256, Error = Error>>;
     fn join_channel(
         &self,
         channel_id: ChannelId,

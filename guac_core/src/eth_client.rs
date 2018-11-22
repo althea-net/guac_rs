@@ -167,7 +167,6 @@ impl PaymentContract for EthClient {
     /// * `settling_period` - Max. blocks for a settling period to finish
     fn new_channel(
         &self,
-        channel_id: ChannelId,
         address0: Address,
         address1: Address,
         balance0: Uint256,
@@ -176,9 +175,10 @@ impl PaymentContract for EthClient {
         signature1: Signature,
         expiration: Uint256,
         settling_period: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> Box<Future<Item = Uint256, Error = Error>> {
         // Broadcast a transaction on the network with data
         assert!(address0 != address1, "Unable to open channel to yourself");
+
         // Reorder addresses
         let (address0, address1, balance0, balance1, signature0, signature1) =
             if address0 > address1 {
@@ -192,11 +192,25 @@ impl PaymentContract for EthClient {
             };
         assert!(address0 < address1);
 
+        let addr0_bytes: [u8; 32] = {
+            let mut data: [u8; 32] = Default::default();
+            data[12..].copy_from_slice(&address0.as_bytes());
+            data
+        };
+        let addr1_bytes: [u8; 32] = {
+            let mut data: [u8; 32] = Default::default();
+            data[12..].copy_from_slice(&address1.as_bytes());
+            data
+        };
+        let event = CRYPTO.wait_for_event(
+            "ChannelOpened(address,address,bytes32)",
+            Some(vec![addr0_bytes]),
+            Some(vec![addr1_bytes]),
+        );
+
         let payload = encode_call(
-            "newChannel(bytes32,address,address,uint256,uint256,uint256,uint256,bytes,bytes)",
+            "newChannel(address,address,uint256,uint256,uint256,uint256,bytes,bytes)",
             &[
-                // channelId
-                Token::Bytes(channel_id.to_vec().into()),
                 // address0
                 address0.into(),
                 // address1
@@ -215,13 +229,20 @@ impl PaymentContract for EthClient {
                 signature1.into_bytes().to_vec().into(),
             ],
         );
-        let call = CRYPTO
-            .broadcast_transaction(Action::Call(payload), 0u64.into())
-            .map(|txid| {
-                println!("new channel txid {:?}", txid);
-                ()
-            });
-        Box::new(call)
+        let call = CRYPTO.broadcast_transaction(Action::Call(payload), 0u64.into());
+
+        Box::new(
+            call.join(event)
+                .and_then(|(_tx, response)| {
+                    let mut data: [u8; 32] = Default::default();
+                    ensure!(
+                        response.data.0.len() == 32,
+                        "Invalid data length in ChannelOpened event"
+                    );
+                    data.copy_from_slice(&response.data.0);
+                    Ok(data.into())
+                }).into_future(),
+        )
     }
 
     /// Calls JoinChannel on the contract and waits for event.
@@ -238,7 +259,8 @@ impl PaymentContract for EthClient {
 
         let event = CRYPTO.wait_for_event(
             "ChannelJoin(bytes32,address,address,uint256,uint256)",
-            Some(channel_id.into()),
+            Some(vec![channel_id.into()]),
+            None,
         );
 
         // Broadcast a transaction on the network with data
@@ -263,7 +285,8 @@ impl PaymentContract for EthClient {
     ) -> Box<Future<Item = (), Error = Error>> {
         let event = CRYPTO.wait_for_event(
             "ChannelUpdateState(bytes32,uint256,uint256,uint256)",
-            Some(channel_id.into()),
+            Some(vec![channel_id.into()]),
+            None,
         );
 
         let data = create_update_channel_payload(
@@ -287,7 +310,8 @@ impl PaymentContract for EthClient {
 
         let event = CRYPTO.wait_for_event(
             "ChannelChallenge(bytes32,uint256,address)",
-            Some(channel_id.into()),
+            Some(vec![channel_id.into()]),
+            None,
         );
 
         // Broadcast a transaction on the network with data
@@ -306,7 +330,8 @@ impl PaymentContract for EthClient {
     fn close_channel(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>> {
         // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
 
-        let event = CRYPTO.wait_for_event("ChannelClose(bytes32)", Some(channel_id.into()));
+        let event =
+            CRYPTO.wait_for_event("ChannelClose(bytes32)", Some(vec![channel_id.into()]), None);
 
         // Broadcast a transaction on the network with data
         let call = CRYPTO.broadcast_transaction(

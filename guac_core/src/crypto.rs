@@ -89,7 +89,8 @@ pub trait CryptoService {
     fn wait_for_event(
         &self,
         event: &str,
-        topic: Option<[u8; 32]>,
+        topic1: Option<Vec<[u8; 32]>>,
+        topic2: Option<Vec<[u8; 32]>>,
     ) -> Box<Future<Item = Log, Error = Error>>;
     /// Broadcast a transaction on the network.
     ///
@@ -223,7 +224,8 @@ impl CryptoService for Arc<RwLock<Crypto>> {
     fn wait_for_event(
         &self,
         event: &str,
-        topic: Option<[u8; 32]>,
+        topic1: Option<Vec<[u8; 32]>>,
+        topic2: Option<Vec<[u8; 32]>>,
     ) -> Box<Future<Item = Log, Error = Error>> {
         // Build a filter with specified topics
         let filter = FilterBuilder::default()
@@ -234,8 +236,8 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                 Some(vec![derive_signature(event).into()]),
                 // This is a first, optional topic to filter. If specified it will be converted
                 // into a vector of values, otherwise a None.
-                topic.map(|v| vec![v.into()]),
-                None,
+                topic1.map(|v| v.iter().map(|&val| val.into()).collect()),
+                topic2.map(|v| v.iter().map(|&val| val.into()).collect()),
                 None,
             ).build();
 
