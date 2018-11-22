@@ -95,9 +95,6 @@ impl PaymentManager for Guac {
                 .and_then(move |channel| {
                     future::result(factory.create_transport_protocol(channel.url.clone()))
                         .and_then(move |transport| transport.send_proposal_request(&channel))
-                }).and_then(move |_result| {
-                    // TODO: This is dummy value to get futures together
-                    Ok(Signature::new(0u64.into(), 1u64.into(), 2u64.into()))
                 }),
         )
     }
@@ -433,8 +430,10 @@ mod tests {
 
         let mock_propose = transport.borrow().mock_send_proposal_request.clone();
 
+        let correct_signature = Signature::new(10u64.into(), 20u64.into(), 30u64.into());
+
         // Other node returns a valid signature
-        mock_propose.return_ok(Signature::new(1u64.into(), 2u64.into(), 3u64.into()));
+        mock_propose.return_ok(correct_signature.clone());
 
         // Specify behaviour for transport
         let mock_create_transport_protocol = factory.mock_create_transport_protocol.clone();
@@ -445,7 +444,8 @@ mod tests {
         }));
 
         let guac = Guac::new(Box::new(contract), Box::new(factory), Box::new(storage));
-        guac.propose(42u64.into()).wait().unwrap();
+        let res = guac.propose(42u64.into()).wait().unwrap();
+        assert_eq!(res, correct_signature);
 
         // Verify calls to the contract happened
         assert!(
