@@ -200,7 +200,7 @@ mod tests {
 
     #[derive(Clone)]
     struct MockTransport {
-        mock_send_proposal_request: Rc<Mock<(Channel), Result<bool, CloneableError>>>,
+        mock_send_proposal_request: Rc<Mock<(Channel), Result<Signature, CloneableError>>>,
     }
     impl Default for MockTransport {
         fn default() -> Self {
@@ -215,7 +215,7 @@ mod tests {
         fn send_proposal_request(
             &self,
             channel: &Channel,
-        ) -> Box<Future<Item = bool, Error = Error>> {
+        ) -> Box<Future<Item = Signature, Error = Error>> {
             Box::new(
                 future::result(self.mock_send_proposal_request.call((channel.clone())))
                     .from_err()
@@ -427,10 +427,14 @@ mod tests {
 
         // Specify behaviour for deposit() contract call
         let mock_get_channel = storage.mock_get_channel.clone();
+
+        // Channel is already registered in storage
         mock_get_channel.return_ok(mock_channel.clone());
 
         let mock_propose = transport.borrow().mock_send_proposal_request.clone();
-        mock_propose.return_ok(true);
+
+        // Other node returns a valid signature
+        mock_propose.return_ok(Signature::new(1u64.into(), 2u64.into(), 3u64.into()));
 
         // Specify behaviour for transport
         let mock_create_transport_protocol = factory.mock_create_transport_protocol.clone();
@@ -447,7 +451,6 @@ mod tests {
         assert!(
             mock_create_transport_protocol.has_calls_exactly(vec!["42.42.42.42:4242".to_string()])
         );
-        // XXX: This fails because we don't know yet what channel is it
         assert!(
             mock_propose.has_calls_exactly(vec![mock_channel.clone()]),
             "Proposal not sent to other node!"
