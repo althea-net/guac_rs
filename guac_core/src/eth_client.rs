@@ -174,6 +174,10 @@ impl PaymentContract for EthClient {
     fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
         unimplemented!();
     }
+    fn withdraw(&self, _value: Uint256) -> Box<Future<Item = (), Error = Error>> {
+        // TODO: Implementation is part of separate PR so to cut time this will be merged in with placeholders and later integrated together with real impl.
+        unimplemented!();
+    }
     /// Calls ChannelOpen on the contract and waits for event.
     ///
     /// * `to` - Other party

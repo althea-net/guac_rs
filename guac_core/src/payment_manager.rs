@@ -16,6 +16,14 @@ pub trait PaymentManager {
     /// is sure that the transaction went through, and the user deposited
     /// provided amount into his wallet in contract.
     fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
+    /// Withdraws an amount from the Wallet
+    ///
+    /// This returns a future which is resolved once the blockchain transaction
+    /// went through. It will resolve to an error when the provided value is
+    /// incorrect, or the transaction couldn't be sent properly to the network.
+    ///
+    /// Requires an amount of "value" to be in the wallet inside the contract.
+    fn withdraw(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
     /// Registers new counterparty for a given parameters.
     fn register_counterparty(
         &self,

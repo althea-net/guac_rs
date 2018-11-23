@@ -11,6 +11,7 @@ pub type ChannelId = [u8; 32];
 
 pub trait PaymentContract {
     fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
+    fn withdraw(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
     fn open_channel(
         &self,
         to: Address,

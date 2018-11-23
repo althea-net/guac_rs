@@ -66,6 +66,10 @@ impl PaymentManager for Guac {
     fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
         self.contract.deposit(value)
     }
+    /// Withdraw an amount of ETH from the Guac contract.
+    fn withdraw(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
+        self.contract.withdraw(value)
+    }
     /// Register a counterparty
     fn register_counterparty(
         &self,
@@ -131,6 +135,7 @@ mod tests {
     struct MockContract {
         // Rc here is used for the purpose of getting another reference to the same mock object.
         mock_deposit: Rc<Mock<(Uint256), Result<(), CloneableError>>>,
+        mock_withdraw: Rc<Mock<(Uint256,), Result<(), CloneableError>>>,
         mock_open_channel: Mock<(Address, Uint256, Uint256), (ChannelId)>,
         mock_join_channel: Mock<(ChannelId, Uint256), ()>,
         mock_update_channel: Mock<(ChannelId, Uint256, Uint256, Uint256, Signature, Signature), ()>,
@@ -144,6 +149,7 @@ mod tests {
                 // Return a "default error" to signalize that a behaviour should be
                 // modified in a test case.
                 mock_deposit: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
+                mock_withdraw: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
                 mock_open_channel: Mock::default(),
                 mock_join_channel: Mock::default(),
                 mock_update_channel: Mock::default(),
@@ -157,6 +163,13 @@ mod tests {
         fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
             Box::new(
                 future::result(self.mock_deposit.call((value)))
+                    .from_err()
+                    .into_future(),
+            )
+        }
+        fn withdraw(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
+            Box::new(
+                future::result(self.mock_withdraw.call((value,)))
                     .from_err()
                     .into_future(),
             )
@@ -334,6 +347,23 @@ mod tests {
 
         // Verify calls to the contract happened
         assert!(mock_deposit.has_calls_exactly(vec![Uint256::from(123u64)]));
+    }
+
+    #[test]
+    fn withdraw() {
+        let storage = MockStorage::default();
+        let contract = MockContract::default();
+        let factory = MockTransportFactory::default();
+
+        // Specify behaviour for deposit() contract call
+        let mock_withdraw = contract.mock_withdraw.clone();
+        mock_withdraw.return_ok(());
+
+        let guac = Guac::new(Box::new(contract), Box::new(factory), Box::new(storage));
+        guac.withdraw(456u64.into()).wait().unwrap();
+
+        // Verify calls to the contract happened
+        assert!(mock_withdraw.has_calls_exactly(vec![(Uint256::from(456u64),)]));
     }
 
     #[test]
