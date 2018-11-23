@@ -21,7 +21,7 @@ use transports::http::client_factory::HTTPTransportFactory;
 struct Guac {
     contract: Arc<Box<PaymentContract>>,
     transport_factory: Arc<Box<TransportFactory>>,
-    storage: Box<ChannelStorage>,
+    storage: Arc<Box<ChannelStorage>>,
 }
 
 impl Guac {
@@ -41,7 +41,7 @@ impl Guac {
         Self {
             contract: Arc::new(contract),
             transport_factory: Arc::new(transport_factory),
-            storage,
+            storage: Arc::new(storage),
         }
     }
 }
@@ -54,7 +54,7 @@ impl Default for Guac {
         Self {
             contract: Arc::new(Box::new(EthClient::new())),
             transport_factory: Arc::new(Box::new(HTTPTransportFactory::new())),
-            storage: Box::new(InMemoryStorage::new()),
+            storage: Arc::new(Box::new(InMemoryStorage::new())),
         }
     }
 }
@@ -112,25 +112,47 @@ impl PaymentManager for Guac {
     ) -> Box<Future<Item = (), Error = Error>> {
         // Acquire instance of contract
         let contract = self.contract.clone();
+        let storage = self.storage.clone();
+        let transport = self.transport_factory.clone();
 
         Box::new(
             self.storage
+                // Channel is in New state and we know only address of the counterparty
                 .get_channel(ChannelState::New(address))
-                .and_then(move |channel| {
-                    contract.new_channel(
-                        channel.address_a,
-                        channel.address_b,
-                        channel.balance_a,
-                        channel.balance_b,
-                        Signature::new(1u64.into(), 2u64.into(), 3u64.into()), // TODO: Prepare our own signature (placeholder)
-                        signature, // Signature we got from proposal step
-                        100u64.into(),
-                        200u64.into(),
-                    )
-                }).and_then(move |_channel_id| {
-                    unimplemented!("Got channel ID {}", _channel_id);
-                    // TODO: Send channel created notification to party B
-                    Ok(())
+                .and_then(move |mut channel| {
+                    contract
+                        .new_channel(
+                            channel.address_a.clone(),
+                            channel.address_b.clone(),
+                            channel.balance_a.clone(),
+                            channel.balance_b.clone(),
+                            Signature::new(1u64.into(), 2u64.into(), 3u64.into()), // TODO: Prepare our own signature (placeholder)
+                            signature, // Signature we got from proposal step
+                            100u64.into(),
+                            200u64.into(),
+                        ).and_then(move |channel_id| {
+                            // We know the channel is opened on chain and we should
+                            // update the local state of the channel since we can now
+                            // identify this channel using channel ID.
+                            let old_state = channel.state.clone();
+                            channel.state = ChannelState::Open(channel_id);
+                            Ok((old_state, channel))
+                        })
+                }).and_then(move |(old_state, channel)| {
+                    // Update a channel in the storage after changing its state
+                    storage
+                        .update_channel(old_state, channel.clone())
+                        .and_then(move |_| {
+                            // Pass the channel structure as we still need it
+                            Ok(channel)
+                        })
+                }).and_then(move |channel| {
+                    // Create a transport for a given url
+                    transport
+                        .create_transport_protocol(channel.url.clone())
+                        .and_then(move |transport| Ok((transport, channel)))
+                }).and_then(move |(transport, channel)| {
+                    transport.send_channel_created_request(&channel)
                 }),
         )
     }
@@ -290,6 +312,7 @@ mod tests {
     #[derive(Clone)]
     struct MockTransport {
         mock_send_proposal_request: Rc<Mock<(Channel), Result<Signature, CloneableError>>>,
+        mock_send_channel_created_request: Rc<Mock<(Channel,), Result<(), CloneableError>>>,
     }
     impl Default for MockTransport {
         fn default() -> Self {
@@ -297,6 +320,9 @@ mod tests {
                 mock_send_proposal_request: Rc::new(Mock::new(Err(CloneableError::DefaultError(
                     "send_proposal_request".to_string(),
                 )))),
+                mock_send_channel_created_request: Rc::new(Mock::new(Err(
+                    CloneableError::DefaultError("send_channel_created_request".to_string()),
+                ))),
             }
         }
     }
@@ -318,7 +344,13 @@ mod tests {
             &self,
             channel: &Channel,
         ) -> Box<Future<Item = (), Error = Error>> {
-            unimplemented!();
+            Box::new(
+                future::result(
+                    self.mock_send_channel_created_request
+                        .call((channel.clone(),)),
+                ).from_err()
+                .into_future(),
+            )
         }
         /// Send channel update
         fn send_channel_update(
@@ -638,15 +670,16 @@ mod tests {
         // Channel is already registered in storage
         mock_get_channel.return_ok(mock_channel.clone());
 
+        let mock_update_channel = storage.mock_update_channel.clone();
+        mock_update_channel.return_ok(());
+
         let mock_new_channel = contract.mock_new_channel.clone();
         mock_new_channel.return_ok(Uint256::from(42u64));
 
-        // let mock_propose = transport.borrow().mock_send_proposal_request.clone();
-
-        // let correct_signature = Signature::new(10u64.into(), 20u64.into(), 30u64.into());
-
-        // Other node returns a valid signature
-        // mock_propose.return_ok(correct_signature.clone());
+        // Send notification will return success
+        let mock_send_channel_created_request =
+            transport.borrow().mock_send_channel_created_request.clone();
+        mock_send_channel_created_request.return_ok(());
 
         // Specify behaviour for transport
         let mock_create_transport_protocol = factory.mock_create_transport_protocol.clone();
@@ -663,7 +696,6 @@ mod tests {
                 Signature::new(4u64.into(), 5u64.into(), 6u64.into()),
             ).wait()
             .unwrap();
-        // assert_eq!(res, correct_signature);
 
         // Verify calls to the contract happened
         assert!(
@@ -671,16 +703,57 @@ mod tests {
         );
         assert!(
             mock_new_channel.has_calls_exactly(vec![(
-                address1.clone(),
                 address0.clone(),
-                0u64.into(),
+                address1.clone(),
                 1000u64.into(),
+                0u64.into(),
+                Signature::new(1u64.into(), 2u64.into(), 3u64.into()), // TODO: This is our signature and this is a placeholder
                 Signature::new(4u64.into(), 5u64.into(), 6u64.into()),
-                Signature::new(1u64.into(), 2u64.into(), 3u64.into()),
                 100u64.into(), // exp
                 200u64.into(), // settling
             )]),
             "Proposal not sent to other node!"
+        );
+
+        assert!(
+            mock_update_channel.has_calls_exactly(vec![(
+                ChannelState::New(address1.clone()),
+                Channel {
+                    // This is the channel we recevied from newChannel contract call
+                    state: ChannelState::Open(42u64.into()),
+                    address_a: address0.clone(),
+                    address_b: address1.clone(),
+                    deposit_a: 1000u64.into(),
+                    deposit_b: 0u64.into(),
+                    challenge: 0u64.into(),
+                    nonce: 0u64.into(),
+                    close_time: 0u64.into(),
+                    balance_a: 1000u64.into(),
+                    balance_b: 0u64.into(),
+                    is_a: true,
+                    url: "42.42.42.42:4242".to_string(),
+                },
+            )]),
+            "Update channel is not called with proper arguments"
+        );
+
+        assert!(
+            mock_send_channel_created_request.has_calls_exactly(vec![(Channel {
+                // This is the channel we recevied from newChannel contract call
+                state: ChannelState::Open(42u64.into()),
+                address_a: address0.clone(),
+                address_b: address1.clone(),
+                deposit_a: 1000u64.into(),
+                deposit_b: 0u64.into(),
+                challenge: 0u64.into(),
+                nonce: 0u64.into(),
+                close_time: 0u64.into(),
+                balance_a: 1000u64.into(),
+                balance_b: 0u64.into(),
+                is_a: true,
+                url: "42.42.42.42:4242".to_string(),
+            },)]),
+            "Send channel created notification not sent"
         );
     }
 }
