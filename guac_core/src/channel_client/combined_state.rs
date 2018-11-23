@@ -56,20 +56,27 @@ impl CombinedState {
     /// we don't have enough monty in the channel
     pub fn pay_counterparty(&mut self, amount: Uint256) -> Result<Uint256, Error> {
         if amount > *self.my_state.my_balance_mut() {
+            // Figure out how much we will still owe them
             let remaining_amount = amount.clone() - self.my_state.my_balance().clone();
 
+            // Add our entire balance to their balance
             *self.my_state.their_balance_mut() = self
                 .my_state
                 .their_balance_mut()
                 .clone()
                 .add(self.my_state.my_balance().clone());
-            // self.my_state.their_balance_mut() += self.my_state.my_balance().clone();
+
+            // Set our balance to zero
             *self.my_state.my_balance_mut() = 0u32.into();
 
+            // Return how much we still owe them
             Ok(remaining_amount)
         } else {
+            // Subtract amount from our balance
             *self.my_state.my_balance_mut() =
                 self.my_state.my_balance_mut().clone().sub(amount.clone());
+
+            // Add amount to their balance
             *self.my_state.their_balance_mut() = self
                 .my_state
                 .their_balance_mut()
@@ -105,6 +112,10 @@ impl CombinedState {
             "Our state needs to be worse for us than their state"
         );
 
+        // Pending_pay is what we think they think our balance is minus
+        // what we think our balance is
+        // pending_pay is the amount that we want to pay them but have not
+        // yet sent them an update for.
         let pending_pay = self
             .their_state
             .my_balance()
@@ -113,7 +124,11 @@ impl CombinedState {
 
         // by applying their state update on top of their state, we can know how much they are going
         // to pay us, if we didn't do any transactions
+
+        // Save our previous balance in their state
         let our_prev_bal = self.their_state.my_balance().clone();
+
+        // Then apply the update
         self.their_state.apply_update(&update, false)?;
 
         ensure!(
@@ -121,15 +136,18 @@ impl CombinedState {
             "My balance needs to be bigger than our previous balance"
         );
 
+        // How much they have paid us with this update
         let transfer = self
             .their_state
             .my_balance()
             .clone()
             .sub(our_prev_bal.clone());
 
+        // Add that to the pending recieve
         self.pending_receive = self.pending_receive.clone().add(transfer.clone());
 
-        // This essentially "rolls back" any payments we have done
+        // This essentially "rolls back" any payments we have done and they have
+        // not acknowledged the update for
         self.my_state = self.their_state.clone();
 
         assert!(&pending_pay <= self.their_state.my_balance());
@@ -157,6 +175,8 @@ impl CombinedState {
             self,
             rec_update
         );
+
+        // Saving what we intend to pay them but have not yet
         let pending_pay = self
             .their_state
             .my_balance()
