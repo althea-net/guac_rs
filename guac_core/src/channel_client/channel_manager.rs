@@ -439,7 +439,7 @@ impl ChannelManager {
         match self {
             ChannelManager::Open { ref mut state }
             | ChannelManager::Joined { ref mut state }
-            | ChannelManager::PendingJoin { ref mut state, .. } => Ok(state.create_payment()?),
+            | ChannelManager::PendingJoin { ref mut state, .. } => Ok(state.create_update()?),
             // TODO: Handle close and dispute
             _ => bail!("we can only create payments in open or joined"),
         }

@@ -63,6 +63,7 @@ impl CombinedState {
                 .their_balance_mut()
                 .clone()
                 .add(self.my_state.my_balance().clone());
+            // self.my_state.their_balance_mut() += self.my_state.my_balance().clone();
             *self.my_state.my_balance_mut() = 0u32.into();
 
             Ok(remaining_amount)
@@ -87,7 +88,7 @@ impl CombinedState {
     /// This function creates a state update from our current state, which takes into account
     /// all the `pay_counterparty`'s which have happened between the last invocation of this
     /// function
-    pub fn create_payment(&mut self) -> Result<UpdateTx, Error> {
+    pub fn create_update(&mut self) -> Result<UpdateTx, Error> {
         let mut state = self.my_state.clone();
 
         state.nonce = state.nonce.add(1u8);
@@ -95,7 +96,7 @@ impl CombinedState {
         Ok(state.create_update()?)
     }
 
-    /// This is what processes the `UpdateTx` created by the `create_payment` on the counterparty.
+    /// This is what processes the `UpdateTx` created by the `create_update` on the counterparty.
     pub fn rec_payment(&mut self, update: &UpdateTx) -> Result<UpdateTx, Error> {
         trace!("applying update {:?} on top of {:?}", update, self);
 
@@ -145,7 +146,7 @@ impl CombinedState {
             .clone()
             .add(pending_pay.clone());
 
-        Ok(self.create_payment()?)
+        Ok(self.create_update()?)
     }
 
     /// This is what processes the `UpdateTx` created by the `rec_payment` on the counterparty.
@@ -199,10 +200,10 @@ mod tests {
     fn test_channel_manager_unidirectional_empty() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
-        let payment = a.create_payment().unwrap();
+        let payment = a.create_update().unwrap();
 
         b.rec_payment(&payment).unwrap();
-        let response = b.create_payment().unwrap();
+        let response = b.create_update().unwrap();
 
         a.received_updated_state(&response).unwrap();
 
@@ -218,10 +219,10 @@ mod tests {
 
         assert_eq!(overflow, 50u32.into());
 
-        let payment = a.create_payment().unwrap();
+        let payment = a.create_update().unwrap();
 
         b.rec_payment(&payment).unwrap();
-        let response = b.create_payment().unwrap();
+        let response = b.create_update().unwrap();
 
         a.received_updated_state(&response).unwrap();
 
@@ -235,10 +236,10 @@ mod tests {
 
         a.pay_counterparty(20u32.into()).unwrap();
 
-        let payment = a.create_payment().unwrap();
+        let payment = a.create_update().unwrap();
 
         b.rec_payment(&payment).unwrap();
-        let response = b.create_payment().unwrap();
+        let response = b.create_update().unwrap();
 
         a.received_updated_state(&&response).unwrap();
 
@@ -254,17 +255,17 @@ mod tests {
         // A -> B 5
         a.pay_counterparty(5u32.into()).unwrap();
 
-        let payment = a.create_payment().unwrap();
+        let payment = a.create_update().unwrap();
 
         b.rec_payment(&payment).unwrap();
-        let response = b.create_payment().unwrap();
+        let response = b.create_update().unwrap();
 
         a.received_updated_state(&response).unwrap();
 
         // B -> A 3
         b.pay_counterparty(3u32.into()).unwrap();
 
-        let payment = b.create_payment().unwrap();
+        let payment = b.create_update().unwrap();
 
         let response = a.rec_payment(&payment).unwrap();
 
@@ -282,8 +283,8 @@ mod tests {
         a.pay_counterparty(3u32.into()).unwrap();
         b.pay_counterparty(5u32.into()).unwrap();
 
-        let payment_a = a.create_payment().unwrap();
-        let payment_b = b.create_payment().unwrap();
+        let payment_a = a.create_update().unwrap();
+        let payment_b = b.create_update().unwrap();
 
         let response_b = b.rec_payment(&payment_a).unwrap();
         let response_a = a.rec_payment(&payment_b).unwrap();
@@ -293,7 +294,7 @@ mod tests {
 
         // unraced request
 
-        let payment = a.create_payment().unwrap();
+        let payment = a.create_update().unwrap();
 
         let response = b.rec_payment(&payment).unwrap();
 
@@ -311,13 +312,13 @@ mod tests {
         a.pay_counterparty(3u32.into()).unwrap();
         b.pay_counterparty(5u32.into()).unwrap();
 
-        let payment_a = a.create_payment().unwrap();
-        let payment_b = b.create_payment().unwrap();
+        let payment_a = a.create_update().unwrap();
+        let payment_b = b.create_update().unwrap();
 
         b.rec_payment(&payment_a).unwrap();
-        let response_b = b.create_payment().unwrap();
+        let response_b = b.create_update().unwrap();
         a.rec_payment(&payment_b).unwrap();
-        let response_a = a.create_payment().unwrap();
+        let response_a = a.create_update().unwrap();
 
         a.received_updated_state(&response_b).unwrap();
         b.received_updated_state(&response_a).unwrap();
@@ -325,10 +326,10 @@ mod tests {
         // A -> B 1
         a.pay_counterparty(1u8.into()).unwrap();
 
-        let payment = a.create_payment().unwrap();
+        let payment = a.create_update().unwrap();
 
         b.rec_payment(&payment).unwrap();
-        let response = b.create_payment().unwrap();
+        let response = b.create_update().unwrap();
 
         a.received_updated_state(&response).unwrap();
 
@@ -344,21 +345,21 @@ mod tests {
         // A -> B 2, B -> A 4
         a.pay_counterparty(1u8.into()).unwrap();
 
-        let payment_a1 = a.create_payment().unwrap();
+        let payment_a1 = a.create_update().unwrap();
 
         a.pay_counterparty(2u32.into()).unwrap();
         b.pay_counterparty(4u32.into()).unwrap();
 
-        let payment_a2 = a.create_payment().unwrap();
-        let payment_b = b.create_payment().unwrap();
+        let payment_a2 = a.create_update().unwrap();
+        let payment_b = b.create_update().unwrap();
 
         b.rec_payment(&payment_a1).unwrap();
-        let response_b1 = b.create_payment().unwrap();
+        let response_b1 = b.create_update().unwrap();
         b.rec_payment(&payment_a2).unwrap();
-        let response_b2 = b.create_payment().unwrap();
+        let response_b2 = b.create_update().unwrap();
 
         a.rec_payment(&payment_b).unwrap();
-        let response_a = a.create_payment().unwrap();
+        let response_a = a.create_update().unwrap();
 
         a.received_updated_state(&response_b1).unwrap();
         a.received_updated_state(&response_b2).unwrap();
@@ -366,17 +367,17 @@ mod tests {
 
         // unraced request
 
-        let payment = a.create_payment().unwrap();
+        let payment = a.create_update().unwrap();
 
         b.rec_payment(&payment).unwrap();
-        let response = b.create_payment().unwrap();
+        let response = b.create_update().unwrap();
 
         a.received_updated_state(&response).unwrap();
 
-        let payment = b.create_payment().unwrap();
+        let payment = b.create_update().unwrap();
 
         a.rec_payment(&payment).unwrap();
-        let response = a.create_payment().unwrap();
+        let response = a.create_update().unwrap();
 
         b.received_updated_state(&response).unwrap();
 
@@ -392,21 +393,21 @@ mod tests {
         // A -> B 3, B -> A 5
         a.pay_counterparty(3u32.into()).unwrap();
 
-        let payment_a1 = a.create_payment().unwrap();
+        let payment_a1 = a.create_update().unwrap();
 
         a.pay_counterparty(3u32.into()).unwrap();
         b.pay_counterparty(5u32.into()).unwrap();
 
-        let payment_a2 = a.create_payment().unwrap();
-        let payment_b = b.create_payment().unwrap();
+        let payment_a2 = a.create_update().unwrap();
+        let payment_b = b.create_update().unwrap();
 
         b.rec_payment(&payment_a1).unwrap();
-        let _ = b.create_payment().unwrap();
+        let _ = b.create_update().unwrap();
         b.rec_payment(&payment_a2).unwrap();
-        let response_b2 = b.create_payment().unwrap();
+        let response_b2 = b.create_update().unwrap();
 
         a.rec_payment(&payment_b).unwrap();
-        let response_a = a.create_payment().unwrap();
+        let response_a = a.create_update().unwrap();
 
         a.received_updated_state(&response_b2).unwrap();
         b.received_updated_state(&response_a).unwrap();
@@ -414,10 +415,10 @@ mod tests {
         // A -> B 10
         a.pay_counterparty(10u32.into()).unwrap();
 
-        let payment = a.create_payment().unwrap();
+        let payment = a.create_update().unwrap();
 
         b.rec_payment(&payment).unwrap();
-        let response = b.create_payment().unwrap();
+        let response = b.create_update().unwrap();
 
         a.received_updated_state(&response).unwrap();
 
