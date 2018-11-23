@@ -178,6 +178,19 @@ impl PaymentContract for EthClient {
         // TODO: Implementation is part of separate PR so to cut time this will be merged in with placeholders and later integrated together with real impl.
         unimplemented!();
     }
+    fn new_channel(
+        &self,
+        address0: Address,
+        address1: Address,
+        balance0: Uint256,
+        balance1: Uint256,
+        signature0: Signature,
+        signature1: Signature,
+        expiration: Uint256,
+        settling_period: Uint256,
+    ) -> Box<Future<Item = Uint256, Error = Error>> {
+        unimplemented!();
+    }
     /// Calls ChannelOpen on the contract and waits for event.
     ///
     /// * `to` - Other party

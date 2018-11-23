@@ -42,4 +42,11 @@ pub trait PaymentManager {
     /// * `balance0` - Our proposed amount
     /// * `balance1` - Other proposed amount
     fn propose(&self, channel_id: Uint256) -> Box<Future<Item = Signature, Error = Error>>;
+
+    /// Created new channel on the network and sends notification to other party.
+    fn new_channel(
+        &self,
+        channel_id: Uint256,
+        signature: Signature,
+    ) -> Box<Future<Item = (), Error = Error>>;
 }

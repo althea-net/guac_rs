@@ -12,6 +12,18 @@ pub type ChannelId = [u8; 32];
 pub trait PaymentContract {
     fn deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
     fn withdraw(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
+    fn new_channel(
+        &self,
+        address0: Address,
+        address1: Address,
+        balance0: Uint256,
+        balance1: Uint256,
+        signature0: Signature,
+        signature1: Signature,
+        expiration: Uint256,
+        settling_period: Uint256,
+    ) -> Box<Future<Item = Uint256, Error = Error>>;
+    #[deprecated(note = "Superseded by new_channel")]
     fn open_channel(
         &self,
         to: Address,

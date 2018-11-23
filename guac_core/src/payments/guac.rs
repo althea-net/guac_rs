@@ -18,7 +18,7 @@ use transports::http::client_factory::HTTPTransportFactory;
 /// This structure holds every information that it needs to make the payment
 /// flow complete and that will include network to network.
 struct Guac {
-    contract: Box<PaymentContract>,
+    contract: Arc<Box<PaymentContract>>,
     transport_factory: Arc<Box<TransportFactory>>,
     storage: Box<ChannelStorage>,
 }
@@ -38,7 +38,7 @@ impl Guac {
         storage: Box<ChannelStorage>,
     ) -> Self {
         Self {
-            contract,
+            contract: Arc::new(contract),
             transport_factory: Arc::new(transport_factory),
             storage,
         }
@@ -51,7 +51,7 @@ impl Default for Guac {
     /// contract
     fn default() -> Self {
         Self {
-            contract: Box::new(EthClient::new()),
+            contract: Arc::new(Box::new(EthClient::new())),
             transport_factory: Arc::new(Box::new(HTTPTransportFactory::new())),
             storage: Box::new(InMemoryStorage::new()),
         }
@@ -102,6 +102,36 @@ impl PaymentManager for Guac {
                 }),
         )
     }
+
+    fn new_channel(
+        &self,
+        channel_id: Uint256,
+        signature: Signature,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        // Acquire instance of contract
+        let contract = self.contract.clone();
+
+        Box::new(
+            self.storage
+                .get_channel(channel_id)
+                .and_then(move |channel| {
+                    contract.new_channel(
+                        channel.address_a,
+                        channel.address_b,
+                        channel.balance_a,
+                        channel.balance_b,
+                        Signature::new(1u64.into(), 2u64.into(), 3u64.into()), // TODO: Prepare our own signature (placeholder)
+                        signature, // Signature we got from proposal step
+                        100u64.into(),
+                        200u64.into(),
+                    )
+                }).and_then(move |_channel_id| {
+                    unimplemented!("Got channel ID {}", _channel_id);
+                    // TODO: Send channel created notification to party B
+                    Ok(())
+                }),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -124,8 +154,8 @@ mod tests {
     #[derive(Fail, Debug, Clone)]
     #[cfg(test)]
     enum CloneableError {
-        #[fail(display = "This is default error")]
-        DefaultError,
+        #[fail(display = "This is default error for {}", _0)]
+        DefaultError(String),
     }
 
     /// This contract implementation delegates calls to trait methods into a Mock objects.
@@ -141,20 +171,41 @@ mod tests {
         mock_update_channel: Mock<(ChannelId, Uint256, Uint256, Uint256, Signature, Signature), ()>,
         mock_start_challenge: Mock<(ChannelId), ()>,
         mock_close_channel: Mock<(ChannelId), ()>,
+        mock_new_channel: Rc<
+            Mock<
+                (
+                    Address,
+                    Address,
+                    Uint256,
+                    Uint256,
+                    Signature,
+                    Signature,
+                    Uint256,
+                    Uint256,
+                ),
+                Result<Uint256, CloneableError>,
+            >,
+        >,
     }
-
     impl Default for MockContract {
         fn default() -> Self {
             MockContract {
                 // Return a "default error" to signalize that a behaviour should be
                 // modified in a test case.
-                mock_deposit: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
-                mock_withdraw: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
+                mock_deposit: Rc::new(Mock::new(Err(CloneableError::DefaultError(
+                    "deposit".to_string(),
+                )))),
+                mock_withdraw: Rc::new(Mock::new(Err(CloneableError::DefaultError(
+                    "withdraw".to_string(),
+                )))),
                 mock_open_channel: Mock::default(),
                 mock_join_channel: Mock::default(),
                 mock_update_channel: Mock::default(),
                 mock_start_challenge: Mock::default(),
                 mock_close_channel: Mock::default(),
+                mock_new_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError(
+                    "new_channel".to_string(),
+                )))),
             }
         }
     }
@@ -206,6 +257,32 @@ mod tests {
         fn close_channel(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>> {
             unimplemented!();
         }
+
+        fn new_channel(
+            &self,
+            address0: Address,
+            address1: Address,
+            balance0: Uint256,
+            balance1: Uint256,
+            signature0: Signature,
+            signature1: Signature,
+            expiration: Uint256,
+            settling_period: Uint256,
+        ) -> Box<Future<Item = Uint256, Error = Error>> {
+            Box::new(
+                future::result(self.mock_new_channel.call((
+                    address0,
+                    address1,
+                    balance0,
+                    balance1,
+                    signature0,
+                    signature1,
+                    expiration,
+                    settling_period,
+                ))).from_err()
+                .into_future(),
+            )
+        }
     }
 
     #[derive(Clone)]
@@ -215,7 +292,9 @@ mod tests {
     impl Default for MockTransport {
         fn default() -> Self {
             Self {
-                mock_send_proposal_request: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
+                mock_send_proposal_request: Rc::new(Mock::new(Err(CloneableError::DefaultError(
+                    "send_proposal_request".to_string(),
+                )))),
             }
         }
     }
@@ -260,7 +339,7 @@ mod tests {
         fn default() -> Self {
             Self {
                 mock_create_transport_protocol: Rc::new(Mock::new(Err(
-                    CloneableError::DefaultError,
+                    CloneableError::DefaultError("create_transport_protocol".to_string()),
                 ))),
             }
         }
@@ -284,9 +363,15 @@ mod tests {
     impl Default for MockStorage {
         fn default() -> Self {
             Self {
-                mock_register_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
-                mock_get_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
-                mock_update_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError))),
+                mock_register_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError(
+                    "register_channel".to_string(),
+                )))),
+                mock_get_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError(
+                    "get_channel".to_string(),
+                )))),
+                mock_update_channel: Rc::new(Mock::new(Err(CloneableError::DefaultError(
+                    "update_channel".to_string(),
+                )))),
             }
         }
     }
@@ -451,13 +536,13 @@ mod tests {
             is_a: true,
             url: "42.42.42.42:4242".to_string(),
         };
-
         // Specify behaviour for deposit() contract call
         let mock_get_channel = storage.mock_get_channel.clone();
 
         // Channel is already registered in storage
         mock_get_channel.return_ok(mock_channel.clone());
 
+        // Channel is already registered in storage
         let mock_propose = transport.borrow().mock_send_proposal_request.clone();
 
         let correct_signature = Signature::new(10u64.into(), 20u64.into(), 30u64.into());
@@ -483,6 +568,90 @@ mod tests {
         );
         assert!(
             mock_propose.has_calls_exactly(vec![mock_channel.clone()]),
+            "Proposal not sent to other node!"
+        );
+    }
+
+    #[test]
+    fn new_channel() {
+        let storage = MockStorage::default();
+        let contract = MockContract::default();
+        let transport = RefCell::new(Box::new(MockTransport::default()));
+        let factory = MockTransportFactory::default();
+
+        // This will use address pair that will be reordered when passed to contract
+        let address0: Address = "0x0000000000000000000000000000000000000002"
+            .parse()
+            .unwrap();
+        let address1: Address = "0x0000000000000000000000000000000000000001"
+            .parse()
+            .unwrap();
+        assert!(address0 > address1);
+
+        let mock_channel = Channel {
+            channel_id: Some(42u32.into()),
+            address_a: address0.clone(),
+            address_b: address1.clone(),
+            channel_status: ChannelStatus::New,
+            deposit_a: 1000u64.into(),
+            deposit_b: 0u64.into(),
+            challenge: 0u64.into(),
+            nonce: 0u64.into(),
+            close_time: 0u64.into(),
+            balance_a: 1000u64.into(),
+            balance_b: 0u64.into(),
+            is_a: true,
+            url: "42.42.42.42:4242".to_string(),
+        };
+
+        // Specify behaviour for deposit() contract call
+        let mock_get_channel = storage.mock_get_channel.clone();
+
+        // Channel is already registered in storage
+        mock_get_channel.return_ok(mock_channel.clone());
+
+        let mock_new_channel = contract.mock_new_channel.clone();
+        mock_new_channel.return_ok(Uint256::from(42u64));
+
+        // let mock_propose = transport.borrow().mock_send_proposal_request.clone();
+
+        // let correct_signature = Signature::new(10u64.into(), 20u64.into(), 30u64.into());
+
+        // Other node returns a valid signature
+        // mock_propose.return_ok(correct_signature.clone());
+
+        // Specify behaviour for transport
+        let mock_create_transport_protocol = factory.mock_create_transport_protocol.clone();
+        mock_create_transport_protocol.use_closure(Box::new(move |_params| {
+            // This will always return clones of the same transport instance.
+            let instance = transport.clone();
+            Ok(instance)
+        }));
+
+        let guac = Guac::new(Box::new(contract), Box::new(factory), Box::new(storage));
+        let res = guac
+            .new_channel(
+                42u64.into(),
+                Signature::new(4u64.into(), 5u64.into(), 6u64.into()),
+            ).wait()
+            .unwrap();
+        // assert_eq!(res, correct_signature);
+
+        // Verify calls to the contract happened
+        assert!(
+            mock_create_transport_protocol.has_calls_exactly(vec!["42.42.42.42:4242".to_string()])
+        );
+        assert!(
+            mock_new_channel.has_calls_exactly(vec![(
+                address1.clone(),
+                address0.clone(),
+                0u64.into(),
+                1000u64.into(),
+                Signature::new(4u64.into(), 5u64.into(), 6u64.into()),
+                Signature::new(1u64.into(), 2u64.into(), 3u64.into()),
+                100u64.into(), // exp
+                200u64.into(), // settling
+            )]),
             "Proposal not sent to other node!"
         );
     }
