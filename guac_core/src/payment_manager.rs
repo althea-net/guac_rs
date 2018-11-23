@@ -46,5 +46,5 @@ pub trait PaymentManager {
         &self,
         address: Address,
         signature: Signature,
-    ) -> Box<Future<Item = (), Error = Error>>;
+    ) -> Box<Future<Item = Uint256, Error = Error>>;
 }

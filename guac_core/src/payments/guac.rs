@@ -109,7 +109,7 @@ impl PaymentManager for Guac {
         &self,
         address: Address,
         signature: Signature,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> Box<Future<Item = Uint256, Error = Error>> {
         // Acquire instance of contract
         let contract = self.contract.clone();
         let storage = self.storage.clone();
@@ -152,7 +152,11 @@ impl PaymentManager for Guac {
                         .create_transport_protocol(channel.url.clone())
                         .and_then(move |transport| Ok((transport, channel)))
                 }).and_then(move |(transport, channel)| {
-                    transport.send_channel_created_request(&channel)
+                    // This unwrap is safe as just earlier we updated the storage with new state.
+                    let channel_id = channel.state.get_channel_id_ref().unwrap().clone();
+                    transport
+                        .send_channel_created_request(&channel.clone())
+                        .and_then(move |_| Ok(channel_id))
                 }),
         )
     }
@@ -696,6 +700,7 @@ mod tests {
                 Signature::new(4u64.into(), 5u64.into(), 6u64.into()),
             ).wait()
             .unwrap();
+        assert_eq!(res, 42u64.into()); // Actual channel ID
 
         // Verify calls to the contract happened
         assert!(
