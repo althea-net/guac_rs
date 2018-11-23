@@ -38,15 +38,13 @@ pub trait PaymentManager {
     ///
     /// This method should resolve future with a valid signature of the other party.
     ///
-    /// * `remote` - Remote address
-    /// * `balance0` - Our proposed amount
-    /// * `balance1` - Other proposed amount
-    fn propose(&self, channel_id: Uint256) -> Box<Future<Item = Signature, Error = Error>>;
+    /// * `address` - ETH address of the other party
+    fn propose(&self, address: Address) -> Box<Future<Item = Signature, Error = Error>>;
 
     /// Created new channel on the network and sends notification to other party.
     fn new_channel(
         &self,
-        channel_id: Uint256,
+        address: Address,
         signature: Signature,
     ) -> Box<Future<Item = (), Error = Error>>;
 }

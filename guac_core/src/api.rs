@@ -1,5 +1,4 @@
-use channel_client::types::{Channel, UpdateTx};
-use channel_client::ChannelManager;
+use channel_client::types::{Channel, ChannelState, UpdateTx};
 use clarity::Address;
 use counterparty::Counterparty;
 use crypto::CryptoService;

@@ -11,7 +11,6 @@ extern crate num256;
 use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
 use clarity::{Address, PrivateKey, Transaction};
 use failure::Error;
-use guac_core::channel_client::channel_manager::ChannelManager;
 use guac_core::crypto::Config;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
@@ -186,110 +185,6 @@ fn contract() {
     println!("Alice PK {:?}", alice_pk.to_string());
     let bob_pk = bob.to_public_key().expect("Unable to get Bob's public key");
     println!("Bob PK {:?}", bob_pk.to_string());
-    // let alice_cm = ChannelManager::New;
-    // let bob_cm = ChannelManager::New;
-    let mut cm = ChannelManager::New;
-
-    let action = cm.tick(alice_pk, bob_pk).expect("Doesn't work");
-    println!("action {:?}", action);
-    println!("cm {:?}", cm);
-
-    let challenge = Uint256::from(42u32);
-
-    // Call openChannel
-
-    // Get gas price
-    let gas_price = WEB3.eth().gas_price().wait().unwrap();
-    let gas_price: Uint256 = gas_price.to_string().parse().unwrap();
-
-    let channel_id = contract
-        .open_channel(
-            bob.to_public_key().unwrap(),
-            challenge,
-            "1000000000000000000".parse().unwrap(),
-        ).wait()
-        .unwrap();
-
-    // Switch to bob
-    *CRYPTO.secret_mut() = bob.clone();
-    assert_eq!(CRYPTO.secret(), bob);
-    println!("bob {:?}", CRYPTO.secret());
-
-    // Bob joins Alice's channel
-    contract
-        .join_channel(channel_id, "1000000000000000000".parse().unwrap())
-        .wait()
-        .unwrap();
-
-    // This has to be updated on every state update
-    let mut channel_nonce = 0u32;
-
-    //
-    // Alice calls updateState
-    //
-    channel_nonce += 1;
-    let balance_a: Uint256 = "500000000000000000".parse().unwrap();
-    let balance_b: Uint256 = "1500000000000000000".parse().unwrap();
-
-    // Proof is the same for both parties
-    let proof = create_signature_data(
-        channel_id,
-        channel_nonce.into(),
-        balance_a.clone(),
-        balance_b.clone(),
-    );
-
-    *CRYPTO.secret_mut() = alice.clone();
-    assert_eq!(CRYPTO.secret(), alice);
-    contract
-        .update_channel(
-            channel_id,
-            Uint256::from(channel_nonce),
-            balance_a.clone(),
-            balance_b.clone(),
-            alice.sign_msg(&proof),
-            bob.sign_msg(&proof),
-        ).wait()
-        .unwrap();
-
-    // Switch to bob
-    *CRYPTO.secret_mut() = bob.clone();
-    assert_eq!(CRYPTO.secret(), bob);
-
-    // Bob starts challenge on channel
-    contract.start_challenge(channel_id).wait().unwrap();
-
-    //
-    // Switch to alice (keep in mind that Bob started the closing challenge)
-    //
-    *CRYPTO.secret_mut() = alice.clone();
-    assert_eq!(CRYPTO.secret(), alice);
-
-    contract.close_channel(channel_id).wait().unwrap();
-
-    let alice_balance: Uint256 = WEB3
-        .eth()
-        .balance(alice.to_public_key().unwrap().as_bytes().into(), None)
-        .wait()
-        .unwrap()
-        // Convert U256 to Uint256
-        .to_string()
-        .parse()
-        .unwrap();
-    println!("Alice {:?}", alice_balance);
-    let bob_balance: Uint256 = WEB3
-        .eth()
-        .balance(bob.to_public_key().unwrap().as_bytes().into(), None)
-        .wait()
-        .unwrap()
-        // Convert U256 to Uint256
-        .to_string()
-        .parse()
-        .unwrap();
-    println!("Bob {:?}", bob_balance);
-
-    assert!(alice_balance < Uint256::from_str("9500000000000000000").unwrap());
-    assert!(bob_balance >= Uint256::from_str("10490000000000000000").unwrap());
 }
 
 #[test]

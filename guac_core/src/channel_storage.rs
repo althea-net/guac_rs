@@ -9,7 +9,7 @@ use futures::Future;
 use crypto::CryptoService;
 use CRYPTO;
 
-use channel_client::types::Channel;
+use channel_client::types::{Channel, ChannelState};
 use num256::Uint256;
 use qutex::{FutureGuard, Guard, QrwLock, Qutex};
 use std::collections::HashMap;
@@ -32,11 +32,11 @@ pub trait ChannelStorage {
     /// Get channel struct for a given channel ID.
     ///
     /// - `channel_id` - A valid channel ID
-    fn get_channel(&self, channel_id: Uint256) -> Box<Future<Item = Channel, Error = Error>>;
+    fn get_channel(&self, state: ChannelState) -> Box<Future<Item = Channel, Error = Error>>;
     /// Update a channel by its ID
     fn update_channel(
         &self,
-        channel_id: Uint256,
+        state: ChannelState,
         channel: Channel,
     ) -> Box<Future<Item = (), Error = Error>>;
 }

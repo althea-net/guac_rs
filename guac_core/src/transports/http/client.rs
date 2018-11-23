@@ -3,7 +3,7 @@ use actix_web::client::ClientResponse;
 use actix_web::client::Connection;
 use actix_web::http::StatusCode;
 use actix_web::HttpMessage;
-use channel_client::types::{Channel, ChannelStatus, UpdateTx};
+use channel_client::types::{Channel, ChannelState, UpdateTx};
 use clarity::Signature;
 use failure::Error;
 use futures::future::err;
@@ -199,14 +199,13 @@ impl TransportProtocol for HTTPTransportClient {
 #[cfg(test)]
 fn make_channel() -> Channel {
     Channel {
-        channel_id: Some(42u64.into()),
+        state: ChannelState::Joined(42u64.into()),
         address_a: "0x0000000000000000000000000000000000000001"
             .parse()
             .unwrap(),
         address_b: "0x0000000000000000000000000000000000000002"
             .parse()
             .unwrap(),
-        channel_status: ChannelStatus::Joined,
         deposit_a: 0u64.into(),
         deposit_b: 1u64.into(),
         challenge: 0u64.into(),

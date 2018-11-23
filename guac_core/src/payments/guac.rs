@@ -1,3 +1,4 @@
+use channel_client::types::ChannelState;
 use channel_storage::ChannelStorage;
 use clarity::{Address, Signature};
 use eth_client::EthClient;
@@ -85,17 +86,18 @@ impl PaymentManager for Guac {
                 .and_then(|_channel| Ok(())),
         )
     }
-    /// Propose a
+    /// Propose a channel
+    ///
     /// On a successful call it returns a signature signed by other party. Later this
     /// signature is combined with our signature signed, and sent to the contract
     ///
-    /// * `remote` - A remote address in a format of "addr:port" t
-    fn propose(&self, channel_id: Uint256) -> Box<Future<Item = Signature, Error = Error>> {
+    /// * `address` - An ETH address of the other party
+    fn propose(&self, address: Address) -> Box<Future<Item = Signature, Error = Error>> {
         let factory = self.transport_factory.clone();
 
         Box::new(
             self.storage
-                .get_channel(channel_id)
+                .get_channel(ChannelState::New(address))
                 .and_then(move |channel| {
                     future::result(factory.create_transport_protocol(channel.url.clone()))
                         .and_then(move |transport| transport.send_proposal_request(&channel))
@@ -105,7 +107,7 @@ impl PaymentManager for Guac {
 
     fn new_channel(
         &self,
-        channel_id: Uint256,
+        address: Address,
         signature: Signature,
     ) -> Box<Future<Item = (), Error = Error>> {
         // Acquire instance of contract
@@ -113,7 +115,7 @@ impl PaymentManager for Guac {
 
         Box::new(
             self.storage
-                .get_channel(channel_id)
+                .get_channel(ChannelState::New(address))
                 .and_then(move |channel| {
                     contract.new_channel(
                         channel.address_a,
@@ -137,7 +139,7 @@ impl PaymentManager for Guac {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use channel_client::types::{Channel, ChannelStatus, UpdateTx};
+    use channel_client::types::{Channel, ChannelState, UpdateTx};
     use clarity::{Address, Signature};
     #[cfg(test)]
     use double::Mock;
@@ -356,8 +358,8 @@ mod tests {
     struct MockStorage {
         mock_register_channel:
             Rc<Mock<(String, Address, Address, Uint256, Uint256), Result<Channel, CloneableError>>>,
-        mock_get_channel: Rc<Mock<(Uint256), Result<Channel, CloneableError>>>,
-        mock_update_channel: Rc<Mock<(Uint256, Channel), Result<(), CloneableError>>>,
+        mock_get_channel: Rc<Mock<(ChannelState), Result<Channel, CloneableError>>>,
+        mock_update_channel: Rc<Mock<(ChannelState, Channel), Result<(), CloneableError>>>,
     }
 
     impl Default for MockStorage {
@@ -393,20 +395,20 @@ mod tests {
                 .into_future(),
             )
         }
-        fn get_channel(&self, channel_id: Uint256) -> Box<Future<Item = Channel, Error = Error>> {
+        fn get_channel(&self, state: ChannelState) -> Box<Future<Item = Channel, Error = Error>> {
             Box::new(
-                future::result(self.mock_get_channel.call((channel_id)))
+                future::result(self.mock_get_channel.call((state)))
                     .from_err()
                     .into_future(),
             )
         }
         fn update_channel(
             &self,
-            channel_id: Uint256,
+            state: ChannelState,
             channel: Channel,
         ) -> Box<Future<Item = (), Error = Error>> {
             Box::new(
-                future::result(self.mock_update_channel.call((channel_id, channel)))
+                future::result(self.mock_update_channel.call((state, channel)))
                     .from_err()
                     .into_future(),
             )
@@ -461,18 +463,32 @@ mod tests {
         // Specify behaviour for deposit() contract call
         let mock_register = storage.mock_register_channel.clone();
 
+        // TODO: Addresses should be reordered before going into storage
+
+        // "us"
+        let address0: Address = "0x0000000000000000000000000000000000000001"
+            .parse()
+            .unwrap();
+        let balance0: Uint256 = 1000u64.into();
+        // "them"
+        let address1: Address = "0x0000000000000000000000000000000000000002"
+            .parse()
+            .unwrap();
+        let balance1: Uint256 = 0u64.into();
+
+        assert!(address0 < address1);
+
         let channel = Channel {
-            channel_id: Some(42u32.into()),
-            address_a: Address::new(),
-            address_b: Address::new(),
-            channel_status: ChannelStatus::New,
-            deposit_a: 0u64.into(),
-            deposit_b: 0u64.into(),
+            state: ChannelState::New(address1.clone()),
+            address_a: address0.clone(),
+            address_b: address1.clone(),
+            deposit_a: balance0.clone(),
+            deposit_b: balance1.clone(),
             challenge: 0u64.into(),
             nonce: 0u64.into(),
             close_time: 0u64.into(),
-            balance_a: 0u64.into(),
-            balance_b: 0u64.into(),
+            balance_a: balance0.clone(),
+            balance_b: balance1.clone(),
             is_a: true,
             url: "42.42.42.42:4242".to_string(),
         };
@@ -521,11 +537,23 @@ mod tests {
         let transport = RefCell::new(Box::new(MockTransport::default()));
         let factory = MockTransportFactory::default();
 
+        // Addresses should be reordered before going into storage
+
+        // "us"
+        let address0: Address = "0x0000000000000000000000000000000000000001"
+            .parse()
+            .unwrap();
+        // "them"
+        let address1: Address = "0x0000000000000000000000000000000000000002"
+            .parse()
+            .unwrap();
+
+        assert!(address0 < address1);
+
         let mock_channel = Channel {
-            channel_id: Some(42u32.into()),
-            address_a: Address::new(),
-            address_b: Address::new(),
-            channel_status: ChannelStatus::New,
+            state: ChannelState::New(address1.clone()), // Channel ID is not yet know
+            address_a: address0.clone(),
+            address_b: address1.clone(),
             deposit_a: 0u64.into(),
             deposit_b: 0u64.into(),
             challenge: 0u64.into(),
@@ -559,7 +587,7 @@ mod tests {
         }));
 
         let guac = Guac::new(Box::new(contract), Box::new(factory), Box::new(storage));
-        let res = guac.propose(42u64.into()).wait().unwrap();
+        let res = guac.propose(address1.clone()).wait().unwrap();
         assert_eq!(res, correct_signature);
 
         // Verify calls to the contract happened
@@ -580,19 +608,19 @@ mod tests {
         let factory = MockTransportFactory::default();
 
         // This will use address pair that will be reordered when passed to contract
-        let address0: Address = "0x0000000000000000000000000000000000000002"
+        let address0: Address = "0x0000000000000000000000000000000000000001"
             .parse()
             .unwrap();
-        let address1: Address = "0x0000000000000000000000000000000000000001"
+        let address1: Address = "0x0000000000000000000000000000000000000002"
             .parse()
             .unwrap();
-        assert!(address0 > address1);
+        assert!(address0 < address1);
 
         let mock_channel = Channel {
-            channel_id: Some(42u32.into()),
+            // This is the node we registered by its Address
+            state: ChannelState::New(address1.clone()),
             address_a: address0.clone(),
             address_b: address1.clone(),
-            channel_status: ChannelStatus::New,
             deposit_a: 1000u64.into(),
             deposit_b: 0u64.into(),
             challenge: 0u64.into(),
@@ -631,7 +659,7 @@ mod tests {
         let guac = Guac::new(Box::new(contract), Box::new(factory), Box::new(storage));
         let res = guac
             .new_channel(
-                42u64.into(),
+                address1.clone(),
                 Signature::new(4u64.into(), 5u64.into(), 6u64.into()),
             ).wait()
             .unwrap();

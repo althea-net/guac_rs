@@ -1,4 +1,4 @@
-use channel_client::types::{Channel, ChannelStatus};
+use channel_client::types::{Channel, ChannelState};
 use channel_storage::ChannelStorage;
 use clarity::Address;
 use crypto::CryptoService;
@@ -7,20 +7,18 @@ use futures::future::ok;
 use futures::Future;
 use num256::Uint256;
 use qutex::Qutex;
-use rand;
-use rand::prelude::*;
-use rand::RngCore;
 use std::collections::HashMap;
 
 /// A in-memory storage that stores data in
 pub struct InMemoryStorage {
-    channels: Qutex<HashMap<Uint256, Channel>>,
+    // TODO: Optimize lookups
+    channels: Qutex<Vec<Channel>>,
 }
 
 impl InMemoryStorage {
     pub fn new() -> Self {
         Self {
-            channels: Qutex::new(HashMap::new()),
+            channels: Qutex::new(Vec::new()),
         }
     }
 }
@@ -41,17 +39,11 @@ impl ChannelStorage for InMemoryStorage {
         balance0: Uint256,
         balance1: Uint256,
     ) -> Box<Future<Item = Channel, Error = Error>> {
-        let channel_id: Uint256 = {
-            let data: [u8; 32] = rand::random();
-            data.into()
-        };
-
         // Prepare channel data
         let channel = Channel {
-            channel_id: Some(channel_id.clone().into()),
+            state: ChannelState::New(address1.clone()),
             address_a: address0,
             address_b: address1,
-            channel_status: ChannelStatus::New,
             deposit_a: balance0.clone(),
             deposit_b: balance1.clone(),
             challenge: 0u64.into(),
@@ -68,12 +60,12 @@ impl ChannelStorage for InMemoryStorage {
                 .clone()
                 .lock()
                 .and_then(move |mut channels| {
-                    channels.insert(channel_id.clone(), channel.clone());
+                    channels.push(channel.clone());
                     Ok(channel)
                 }).from_err(),
         )
     }
-    fn get_channel(&self, channel_id: Uint256) -> Box<Future<Item = Channel, Error = Error>> {
+    fn get_channel(&self, state: ChannelState) -> Box<Future<Item = Channel, Error = Error>> {
         Box::new(
             self.channels
                 .clone()
@@ -81,8 +73,10 @@ impl ChannelStorage for InMemoryStorage {
                 .from_err()
                 .and_then(move |channels| {
                     channels
-                        .get(&channel_id)
-                        .ok_or(format_err!("Unable to find channel {:x?}", &channel_id))
+                        .iter()
+                        .filter(|&channel| channel.state == state.clone())
+                        .nth(0)
+                        .ok_or(format_err!("Unable to find channel {:x?}", state))
                         .map(move |value| value.clone())
                 }),
         )
@@ -90,7 +84,7 @@ impl ChannelStorage for InMemoryStorage {
 
     fn update_channel(
         &self,
-        channel_id: Uint256,
+        state: ChannelState,
         channel: Channel,
     ) -> Box<Future<Item = (), Error = Error>> {
         Box::new(
@@ -100,8 +94,10 @@ impl ChannelStorage for InMemoryStorage {
                 .from_err()
                 .and_then(move |mut channels| {
                     let mut entry = channels
-                        .get_mut(&channel_id)
-                        .ok_or(format_err!("Unable to find channel {:x?}", &channel_id))?;
+                        .iter_mut()
+                        .filter(|ref existing_channel| existing_channel.state == state.clone())
+                        .nth(0)
+                        .ok_or(format_err!("Unable to find channel {:x?}", state))?;
                     *entry = channel;
                     Ok(())
                 }),
@@ -127,15 +123,25 @@ fn register() {
         .unwrap();
 
     let mut stored_channel = channels
-        .get_channel(channel.channel_id.clone().unwrap())
-        .wait()
+        .get_channel(ChannelState::New(
+            "0x0000000000000000000000000000000000000002"
+                .parse()
+                .unwrap(),
+        )).wait()
         .unwrap();
     assert_eq!(stored_channel.url, "42.42.42.42:4242");
 
+    stored_channel.state = ChannelState::Open(42u64.into());
     stored_channel.nonce += 1;
 
     channels
-        .update_channel(channel.channel_id.clone().unwrap(), channel.clone())
-        .wait()
+        .update_channel(
+            ChannelState::New(
+                "0x0000000000000000000000000000000000000002"
+                    .parse()
+                    .unwrap(),
+            ),
+            channel.clone(),
+        ).wait()
         .unwrap();
 }
