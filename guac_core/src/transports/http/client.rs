@@ -3,14 +3,16 @@ use actix_web::client::ClientResponse;
 use actix_web::client::Connection;
 use actix_web::http::StatusCode;
 use actix_web::HttpMessage;
-use channel_client::types::{Channel, ChannelStatus, UpdateTx};
+use channel_client::types::{Channel, ChannelState, UpdateTx};
+use clarity::Signature;
 use failure::Error;
 use futures::future::err;
 use futures::Future;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use transport_protocol::TransportProtocol;
-use transports::http::network_request::NetworkRequest;
+use transports::http::network_request::{NetworkRequest, SendProposalResponse};
+
 /// Represnetation of an transport client that works over HTTP.
 ///
 /// Contains useful properties to make an HTTP request. One instance
@@ -45,7 +47,10 @@ fn verify_client_error(response: ClientResponse) -> Result<ClientResponse, Error
 }
 
 impl TransportProtocol for HTTPTransportClient {
-    fn send_proposal_request(&self, channel: &Channel) -> Box<Future<Item = bool, Error = Error>> {
+    fn send_proposal_request(
+        &self,
+        channel: &Channel,
+    ) -> Box<Future<Item = Signature, Error = Error>> {
         trace!(
             "Send channel proposal request channel={:?} addr={}",
             channel.clone(),
@@ -69,7 +74,7 @@ impl TransportProtocol for HTTPTransportClient {
                     response
                         .json()
                         .from_err()
-                        .and_then(move |res: bool| Ok(res))
+                        .and_then(move |res: SendProposalResponse| Ok(res.signature.into()))
                 })
         }))
     }
@@ -194,14 +199,13 @@ impl TransportProtocol for HTTPTransportClient {
 #[cfg(test)]
 fn make_channel() -> Channel {
     Channel {
-        channel_id: Some(42u64.into()),
+        state: ChannelState::Joined(42u64.into()),
         address_a: "0x0000000000000000000000000000000000000001"
             .parse()
             .unwrap(),
         address_b: "0x0000000000000000000000000000000000000002"
             .parse()
             .unwrap(),
-        channel_status: ChannelStatus::Joined,
         deposit_a: 0u64.into(),
         deposit_b: 1u64.into(),
         challenge: 0u64.into(),
@@ -210,6 +214,7 @@ fn make_channel() -> Channel {
         balance_a: 0u64.into(),
         balance_b: 1u64.into(),
         is_a: true,
+        url: "42.42.42.42:4242".to_string(),
     }
 }
 
@@ -218,10 +223,19 @@ fn proposal() {
     use actix::{Arbiter, Handler, System};
     use mockito::mock;
 
+    let sig = concat!(
+        "{\"signature\": \"",
+        "0x",
+        "0000000000000000000000000000000000000000000000000000000000000002",
+        "0000000000000000000000000000000000000000000000000000000000000003",
+        "01",
+        "\"}",
+    ).to_string();
+
     let _m = mock("POST", "/propose")
         .with_status(200)
         .with_header("content-type", "application/json")
-        .with_body("true")
+        .with_body(sig)
         .create();
 
     let client = HTTPTransportClient {
@@ -231,12 +245,51 @@ fn proposal() {
     };
     let channel = make_channel();
     let sys = System::new("test");
+
     Arbiter::spawn({
         client.send_proposal_request(&channel).then(|res| {
             assert_eq!(
-                res.expect("Expected a valid bool response but got error instead"),
-                true
+                res.expect("Expected a valid signature response but got error instead"),
+                Signature::new(1u64.into(), 2u64.into(), 3u64.into())
             );
+            System::current().stop();
+            Ok(())
+        })
+    });
+    sys.run();
+}
+
+#[test]
+fn proposal_with_wrong_signature() {
+    use actix::{Arbiter, Handler, System};
+    use mockito::mock;
+
+    let sig = concat!(
+        "{\"signature\": \"",
+        "0x",
+        "000000000000000000000000000000000000000000000000000000000000002", // lacks 1 byte
+        "0000000000000000000000000000000000000000000000000000000000000003",
+        "01",
+        "\"}",
+    ).to_string();
+
+    let _m = mock("POST", "/propose")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(sig)
+        .create();
+
+    let client = HTTPTransportClient {
+        addr: mockito::SERVER_ADDRESS
+            .parse()
+            .expect("Invalid mockito address"),
+    };
+    let channel = make_channel();
+    let sys = System::new("test");
+
+    Arbiter::spawn({
+        client.send_proposal_request(&channel).then(|res| {
+            let err = res.expect_err("Expected an error but got a response instead");
             System::current().stop();
             Ok(())
         })

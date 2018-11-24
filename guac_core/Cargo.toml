@@ -6,7 +6,7 @@ authors = ["Ben Wang <wangben3@gmail.com>"]
 [dependencies]
 log = "0.4"
 env_logger = "0.5"
-rand = "0.4.2"
+rand = "0.6"
 futures = "0.1"
 failure_derive = "*"
 uuid = { version = "0.5", features = ["serde", "v4"] }
@@ -34,6 +34,6 @@ tokio = "0.1"
 
 [dev-dependencies]
 lazy_static = "1.0"
-rand = "0.3"
 mockito = "0.13"
 actix = "0.7"
+double = "0.2"

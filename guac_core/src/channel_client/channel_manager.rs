@@ -4,7 +4,7 @@ use clarity::Address;
 use num256::Uint256;
 
 use channel_client::combined_state::CombinedState;
-use channel_client::types::{ChannelStatus, UpdateTx};
+use channel_client::types::{ChannelState, UpdateTx};
 use channel_client::Channel;
 use std::ops::Add;
 
@@ -178,10 +178,9 @@ impl ChannelManager {
             ChannelManager::New => {
                 // TODO make the defaults configurable
                 let proposal = Channel {
-                    channel_id: None,
+                    state: ChannelState::New(to.clone()),
                     address_a: from,
-                    address_b: to,
-                    channel_status: ChannelStatus::Joined,
+                    address_b: to.clone(),
                     deposit_a: deposit.clone(),
                     deposit_b: 0u32.into(),
                     challenge: 0u32.into(),
@@ -190,6 +189,7 @@ impl ChannelManager {
                     balance_a: deposit.clone(),
                     balance_b: 0u32.into(),
                     is_a: true,
+                    url: String::new(),
                 };
                 ret = ChannelManagerAction::SendChannelProposal(proposal.swap());
                 ChannelManager::Proposed {
@@ -336,7 +336,7 @@ impl ChannelManager {
                     "Channel for wrong address"
                 );
                 ensure!(
-                    chan.channel_id == state.my_state().channel_id,
+                    chan.state == state.my_state().state,
                     "Wrong channelID"
                 );
                 ensure!(

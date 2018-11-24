@@ -6,20 +6,38 @@ use crypto::CryptoService;
 use std::ops::Add;
 use CRYPTO;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum ChannelStatus {
-    Open,
-    Joined,
-    Challenge,
-    Closed,
+/// This is a state that is able to identity a channel uniquely.
+///
+/// A channel is registered with New state for a given address, which
+/// later identified with a channel id once it arrives in the contract.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+pub enum ChannelState {
+    /// Registered with address of the other party
+    New(Address),
+    /// Opened with a Channel ID
+    Open(Uint256),
+    Joined(Uint256),
+    Challenge(Uint256),
+    Closed(Uint256),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+impl ChannelState {
+    pub fn get_channel_id_ref(&self) -> Option<&Uint256> {
+        match *self {
+            ChannelState::Open(ref channel_id)
+            | ChannelState::Joined(ref channel_id)
+            | ChannelState::Challenge(ref channel_id)
+            | ChannelState::Closed(ref channel_id) => Some(&channel_id),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Channel {
-    pub channel_id: Option<Uint256>,
+    pub state: ChannelState,
     pub address_a: Address,
     pub address_b: Address,
-    pub channel_status: ChannelStatus,
     pub deposit_a: Uint256,
     pub deposit_b: Uint256,
     pub challenge: Uint256,
@@ -28,41 +46,12 @@ pub struct Channel {
     pub balance_a: Uint256,
     pub balance_b: Uint256,
     pub is_a: bool,
+
+    /// URL of the counterparty
+    pub url: String,
 }
 
 impl Channel {
-    pub fn new_pair(
-        channel_id: Uint256,
-        deposit_a: Uint256,
-        deposit_b: Uint256,
-    ) -> (Channel, Channel) {
-        let channel_a = Channel {
-            channel_id: Some(channel_id.clone()),
-            address_a: "0x0000000000000000000000000000000000000001"
-                .parse()
-                .unwrap(),
-            address_b: "0x0000000000000000000000000000000000000002"
-                .parse()
-                .unwrap(),
-            channel_status: ChannelStatus::Joined,
-            deposit_a: deposit_a.clone(),
-            deposit_b: deposit_b.clone(),
-            challenge: 0u64.into(),
-            nonce: 0u64.into(),
-            close_time: 10u64.into(),
-            balance_a: deposit_a,
-            balance_b: deposit_b,
-            is_a: true,
-        };
-
-        let channel_b = Channel {
-            is_a: false,
-            ..channel_a.clone()
-        };
-
-        (channel_a, channel_b)
-    }
-
     pub fn total_deposit(&self) -> Uint256 {
         self.deposit_a.clone() + self.deposit_b.clone()
     }
@@ -137,9 +126,13 @@ impl Channel {
         }
     }
     pub fn create_update(&self) -> Result<UpdateTx, Error> {
-        let channel_id = self.channel_id.as_ref().ok_or(err_msg(
-            "Unable to create update before channel is open on the network",
-        ))?;
+        let channel_id = match self.state {
+            ChannelState::Open(ref channel_id)
+            | ChannelState::Joined(ref channel_id)
+            | ChannelState::Challenge(ref channel_id)
+            | ChannelState::Closed(ref channel_id) => channel_id.clone(),
+            _ => bail!("Unable to create update before channel is open on the network"),
+        };
 
         let mut update_tx = UpdateTx {
             channel_id: channel_id.clone(),
@@ -153,53 +146,53 @@ impl Channel {
         update_tx.sign(self.is_a, channel_id.clone());
         Ok(update_tx)
     }
-    pub fn apply_update(&mut self, update: &UpdateTx, validate_balance: bool) -> Result<(), Error> {
-        trace!(
-            "Apply update for channel {:?} with {:?}",
-            self.channel_id,
-            update.channel_id
-        );
-        ensure!(
-            self.channel_id.is_some(),
-            "Unable to apply update before opening a channel on the network"
-        );
-        if update.channel_id != *self.channel_id.as_ref().unwrap() {
-            bail!("update not for the right channel")
-        }
+    // pub fn apply_update(&mut self, update: &UpdateTx, validate_balance: bool) -> Result<(), Error> {
+    //     trace!(
+    //         "Apply update for channel {:?} with {:?}",
+    //         self.state,
+    //         update.state
+    //     );
+    //     ensure!(
+    //         self.get_channel_id_ref().is_some(),
+    //         "Unable to apply update before opening a channel on the network"
+    //     );
+    //     if update.state != self.state {
+    //         bail!("update not for the right channel")
+    //     }
 
-        if !update.validate_their_signature(self.is_a) {
-            bail!("sig is bad")
-        }
+    //     if !update.validate_their_signature(self.is_a) {
+    //         bail!("sig is bad")
+    //     }
 
-        ensure!(
-            update.their_balance(self.is_a).clone() + update.my_balance(self.is_a).clone()
-                == self.my_balance().clone() + self.their_balance().clone(),
-            "balance does not add up"
-        );
+    //     ensure!(
+    //         update.their_balance(self.is_a).clone() + update.my_balance(self.is_a).clone()
+    //             == self.my_balance().clone() + self.their_balance().clone(),
+    //         "balance does not add up"
+    //     );
 
-        ensure!(
-            update.their_balance(self.is_a).clone() + update.my_balance(self.is_a).clone()
-                == self.deposit_a.clone() + self.deposit_b.clone(),
-            "balance does not add up to deposit values"
-        );
+    //     ensure!(
+    //         update.their_balance(self.is_a).clone() + update.my_balance(self.is_a).clone()
+    //             == self.deposit_a.clone() + self.deposit_b.clone(),
+    //         "balance does not add up to deposit values"
+    //     );
 
-        if self.nonce > update.nonce {
-            bail!("Update too old");
-        }
+    //     if self.nonce > update.nonce {
+    //         bail!("Update too old");
+    //     }
 
-        if update.my_balance(self.is_a) < self.my_balance() && validate_balance {
-            bail!("balance validation failed")
-        }
+    //     if update.my_balance(self.is_a) < self.my_balance() && validate_balance {
+    //         bail!("balance validation failed")
+    //     }
 
-        self.balance_a = update.balance_a.clone();
-        self.balance_b = update.balance_b.clone();
-        self.nonce = update.nonce.clone();
+    //     self.balance_a = update.balance_a.clone();
+    //     self.balance_b = update.balance_b.clone();
+    //     self.nonce = update.nonce.clone();
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UpdateTx {
     pub channel_id: Uint256,
     pub nonce: Uint256,

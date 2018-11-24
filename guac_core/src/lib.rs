@@ -29,6 +29,10 @@ extern crate num256;
 extern crate sha3;
 extern crate tokio;
 extern crate web3;
+#[cfg(test)]
+#[macro_use]
+extern crate double;
+extern crate rand;
 
 // Traits
 pub mod payment_contract;
@@ -36,14 +40,16 @@ pub mod payment_contract;
 // Code
 pub mod api;
 pub mod channel_client;
+pub mod channel_storage;
 pub mod counterparty;
 pub mod crypto;
 pub mod error;
 pub mod eth_client;
 pub mod network;
+pub mod payment_manager;
+pub mod payments;
 pub mod storage;
 pub mod transport_protocol;
 pub mod transports;
 
 pub use crypto::CRYPTO;
-pub use storage::STORAGE;
