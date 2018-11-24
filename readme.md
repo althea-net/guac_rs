@@ -14,19 +14,30 @@ Guac effectively has 2 APIs- a counterparty API which is called by other Guac no
 
 ## Counterparty API
 
-#### Propose Channel
+This is called by other Guac nodes.
 
-Tells a neighbor if you would like to accept a channel from them
+### Propose Channel
 
-Endpoint: /propose
+Asks a counterparty to sign a newChannel contract tx
+
+Endpoint: /propose_channel
 
 Request data type: `Channel` (basically all the info you need to call the
-`openChannel` contract call. Important values to check are the challenge period and the token
-contract (if using erc20 tokens))
+`newChannel` contract call.
 
-return type: `bool` accept or reject (maybe a enum in the future for different rejection reasons)
+return type: Signature on the newChannel contract tx
 
-#### Update
+### Propose ReDraw
+
+Asks a counterparty to sign a reDraw contract tx, to add or withdraw money on our side from the channel.
+
+Endpoint: /propose_redraw
+
+Request data type: TBD
+
+return type: Signature on the newChannel call
+
+### Update
 
 Tells your counterparty about your new state
 
@@ -35,18 +46,17 @@ Endpoint: /update
 Request data type: `UpdateTx`
 Return data type: `UpdateTx` (containing the newest transaction data from their local state)
 
-#### Channel Created
+### ChannelOpened notification
 
-Tells your neighbor who has previously accepted your proposal that the your channel creation transaction
-has been confirmed
+Notifies a counterparty who has just responded affirmatively to a propose channel call that the channel has been opened on the blockchain.
 
 Request data type: `Channel`
 
 return data type: `null`
 
-#### Channel Joined
+### ReDraw notification
 
-Tells your neighbor who has a channel open with you that your channel join transaction has been confirmed
+Notifies a counterparty who has just responded affirmatively to a reDraw call that the channel has been reDrawn on the blockchain.
 
 Request data type: `Channel`
 
@@ -54,52 +64,58 @@ return data type: `null`
 
 ## User API
 
-#### Register
+This is called by the user (or a piece of software acting on behalf of the user).
+
+### Register
 
 This is used to register a new counterparty.
 
-#### Open Channel
+### Fill Channel
 
 This is used to open a channel with a counterparty that we wish to pay in the future. This incurs a gas cost.
 
-#### Make Payment
+### Make Payment
 
 This is used to make a payment to a counterparty. This does not incur a gas cost.
 
-#### Check Received
+### Check Accrual
 
 NOTE: This is currently called "Withdraw" in the code. It needs to be renamed to avoid confusion.
 
-This method is somewhat nuanced. It is used to check how much payment has been received from a counterparty since the last time the method was called. It does not take payments we send the counterparty into account. That is, if you send me 10, then I send you 5, then I call "Check Received", I will see that I have received 10 from you.
+This method is somewhat nuanced. It is used to check how much payment has been received from a counterparty since the last time the method was called. It does not take payments we send the counterparty into account. That is, if you send me 10, then I send you 5, then I call "Check Accrual", I will see that I have received 10 from you.
 
 for example:
 
-A: 100, B: 100
-A <-10-- B
-A: 110, B: 90
-A calls "Check Received": 10
-A calls "Check Received": 0
+- A: 100, B: 100
+- A <-10-- B
+- A: 110, B: 90
+- A calls "Check Accrual": 10
+- A calls "Check Accrual": 0
 
-A <-10-- B
-A: 120, B:80
-A --5-> B
-A: 115, B:85
-A calls "Check Received": 10
+---
 
-A --10-> B
-A: 105, B: 95
-A <-5-- B
-A calls "Check Received": 5
+- A <-10-- B
+- A: 120, B:80
+- A --5-> B
+- A: 115, B:85
+- A calls "Check Accrual": 10
 
-#### Withdraw
+---
+
+- A --10-> B
+- A: 105, B: 95
+- A <-5-- B
+- A calls "Check Accrual": 5
+
+### Withdraw
 
 This allows you to withdraw some or all of your balance from a channel. This incurs a gas cost.
 
-#### Refill
+### Refill
 
 This allows you to refill a channel that is getting low to avoid a disruption of service by not being able to pay a counterparty while a new channel is being opened. This incurs a gas cost.
 
-#### Close
+### Close
 
 This is used to close a channel. Under the hood, it calls the blockchain to start the channel's challenge period. Then it tells the counterparty to call the close channel function on the contract, resulting in a fast close.
 
@@ -122,7 +138,7 @@ ln -s ../../.git-hooks/pre-commit
 
 This is a work in progress of integration tests that will involve state changes, and actual contract calls.
 
-This test expects $CONTRACT_ADDRESS variable, and $GANACHE_HOST for a
+This test expects $CONTRACT_ADDRESS variable, and$GANACHE_HOST for a
 network.
 
 # Running contract tests

@@ -1,8 +1,8 @@
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg version="1.1"
- width="1200px" height="678px"
- viewBox="0 0 1200 678"
+ width="1200px" height="700px"
+ viewBox="0 0 1200 700"
  xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"
  stroke-width="1" text-rendering="geometricPrecision">
 <polygon fill="white" points="145,7 153,7 153,16 145,16"/>
@@ -84,210 +84,218 @@ fillChannel B, 10
 <line x1="450" y1="162" x2="450" y2="190" stroke="black"/>
 <line x1="750" y1="162" x2="750" y2="190" stroke="black"/>
 <line x1="1050" y1="162" x2="1050" y2="190" stroke="black"/>
-<polygon fill="white" points="308,162 592,162 592,184 308,184"/>
-<line x1="308" y1="162" x2="592" y2="162" stroke="black"/>
-<line x1="308" y1="184" x2="592" y2="184" stroke="black"/>
-<line x1="308" y1="162" x2="308" y2="184" stroke="black"/>
-<line x1="592" y1="162" x2="592" y2="184" stroke="black"/>
-<polygon fill="white" points="377,169 522,169 522,178 377,178"/>
-<text x="378" y="178" textLength="143" font-family="Helvetica" font-size="12" fill="black">
-state Proposing A: 10, B: 0
+<line x1="450" y1="173" x2="750" y2="173" stroke="black"/>
+<polygon fill="black" points="750,173 740,179 740,167"/>
+<polygon fill="white" points="525,163 674,163 674,172 525,172"/>
+<text x="526" y="172" textLength="147" font-family="Helvetica" font-size="12" fill="black">
+proposeChannel A: 10, B: 0
 </text>
 <line x1="150" y1="190" x2="150" y2="218" stroke="black"/>
 <line x1="450" y1="190" x2="450" y2="218" stroke="black"/>
 <line x1="750" y1="190" x2="750" y2="218" stroke="black"/>
 <line x1="1050" y1="190" x2="1050" y2="218" stroke="black"/>
-<line x1="450" y1="201" x2="750" y2="201" stroke="black"/>
-<polygon fill="black" points="750,201 740,207 740,195"/>
-<polygon fill="white" points="512,191 687,191 687,200 512,200"/>
-<text x="513" y="200" textLength="173" font-family="Helvetica" font-size="12" fill="black">
-propose newChannel A: 10, B: 0
+<polygon fill="white" points="608,190 892,190 892,212 608,212"/>
+<line x1="608" y1="190" x2="892" y2="190" stroke="black"/>
+<line x1="608" y1="212" x2="892" y2="212" stroke="black"/>
+<line x1="608" y1="190" x2="608" y2="212" stroke="black"/>
+<line x1="892" y1="190" x2="892" y2="212" stroke="black"/>
+<polygon fill="white" points="666,197 832,197 832,206 666,206"/>
+<text x="667" y="206" textLength="164" font-family="Helvetica" font-size="12" fill="black">
+state OtherCreating A: 10, B: 0
 </text>
 <line x1="150" y1="218" x2="150" y2="246" stroke="black"/>
 <line x1="450" y1="218" x2="450" y2="246" stroke="black"/>
 <line x1="750" y1="218" x2="750" y2="246" stroke="black"/>
 <line x1="1050" y1="218" x2="1050" y2="246" stroke="black"/>
-<polygon fill="white" points="608,218 892,218 892,240 608,240"/>
-<line x1="608" y1="218" x2="892" y2="218" stroke="black"/>
-<line x1="608" y1="240" x2="892" y2="240" stroke="black"/>
-<line x1="608" y1="218" x2="608" y2="240" stroke="black"/>
-<line x1="892" y1="218" x2="892" y2="240" stroke="black"/>
-<polygon fill="white" points="662,225 837,225 837,234 662,234"/>
-<text x="663" y="234" textLength="173" font-family="Helvetica" font-size="12" fill="black">
-state OtherProposing A: 10, B: 0
+<line x1="750" y1="229" x2="450" y2="229" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="black" points="450,229 460,235 460,223"/>
+<polygon fill="white" points="501,219 698,219 698,228 501,228"/>
+<text x="502" y="228" textLength="195" font-family="Helvetica" font-size="12" fill="black">
+signature on newChannel A: 10, B: 0
 </text>
-<line x1="150" y1="246" x2="150" y2="263" stroke="black"/>
-<line x1="450" y1="246" x2="450" y2="263" stroke="black"/>
-<line x1="750" y1="246" x2="750" y2="263" stroke="black"/>
-<line x1="1050" y1="246" x2="1050" y2="263" stroke="black"/>
-<line x1="150" y1="263" x2="150" y2="280" stroke="black" stroke-dasharray="2,2"/>
-<line x1="450" y1="263" x2="450" y2="280" stroke="black" stroke-dasharray="2,2"/>
-<line x1="750" y1="263" x2="750" y2="280" stroke="black" stroke-dasharray="2,2"/>
-<line x1="1050" y1="263" x2="1050" y2="280" stroke="black" stroke-dasharray="2,2"/>
-<polygon fill="white" points="556,264 643,264 643,273 556,273"/>
-<text x="557" y="273" textLength="85" font-family="Helvetica" font-size="12" fill="black">
-Propose timer...
+<line x1="150" y1="246" x2="150" y2="274" stroke="black"/>
+<line x1="450" y1="246" x2="450" y2="274" stroke="black"/>
+<line x1="750" y1="246" x2="750" y2="274" stroke="black"/>
+<line x1="1050" y1="246" x2="1050" y2="274" stroke="black"/>
+<polygon fill="white" points="308,246 592,246 592,268 308,268"/>
+<line x1="308" y1="246" x2="592" y2="246" stroke="black"/>
+<line x1="308" y1="268" x2="592" y2="268" stroke="black"/>
+<line x1="308" y1="246" x2="308" y2="268" stroke="black"/>
+<line x1="592" y1="246" x2="592" y2="268" stroke="black"/>
+<polygon fill="white" points="381,253 517,253 517,262 381,262"/>
+<text x="382" y="262" textLength="134" font-family="Helvetica" font-size="12" fill="black">
+state Creating A: 10, B: 0
 </text>
-<line x1="150" y1="280" x2="150" y2="308" stroke="black"/>
-<line x1="450" y1="280" x2="450" y2="308" stroke="black"/>
-<line x1="750" y1="280" x2="750" y2="308" stroke="black"/>
-<line x1="1050" y1="280" x2="1050" y2="308" stroke="black"/>
-<path d="M 750 285 A150,6 0 0,1 750,297" stroke="black" fill="none"/><polygon fill="black" points="750,297 760,303 760,291"/>
-<polygon fill="white" points="659,281 748,281 748,290 659,290"/>
-<text x="660" y="290" textLength="87" font-family="Helvetica" font-size="12" fill="black">
+<line x1="150" y1="274" x2="150" y2="302" stroke="black"/>
+<line x1="450" y1="274" x2="450" y2="302" stroke="black"/>
+<line x1="750" y1="274" x2="750" y2="302" stroke="black"/>
+<line x1="1050" y1="274" x2="1050" y2="302" stroke="black"/>
+<line x1="450" y1="285" x2="1050" y2="285" stroke="black"/>
+<polygon fill="black" points="1050,285 1040,291 1040,279"/>
+<polygon fill="white" points="685,275 813,275 813,284 685,284"/>
+<text x="686" y="284" textLength="126" font-family="Helvetica" font-size="12" fill="black">
+newChannel A: 10, B: 0
+</text>
+<line x1="150" y1="302" x2="150" y2="330" stroke="black"/>
+<line x1="450" y1="302" x2="450" y2="330" stroke="black"/>
+<line x1="750" y1="302" x2="750" y2="330" stroke="black"/>
+<line x1="1050" y1="302" x2="1050" y2="330" stroke="black"/>
+<path d="M 750 307 A150,6 0 0,1 750,319" stroke="black" fill="none"/><polygon fill="black" points="750,319 760,325 760,313"/>
+<polygon fill="white" points="659,303 748,303 748,312 659,312"/>
+<text x="660" y="312" textLength="87" font-family="Helvetica" font-size="12" fill="black">
 fillChannel A, 10
 </text>
-<line x1="150" y1="308" x2="150" y2="336" stroke="black"/>
-<line x1="450" y1="308" x2="450" y2="336" stroke="black"/>
-<line x1="750" y1="308" x2="750" y2="336" stroke="black"/>
-<line x1="1050" y1="308" x2="1050" y2="336" stroke="black"/>
-<line x1="750" y1="319" x2="450" y2="319" stroke="black"/>
-<polygon fill="black" points="450,319 460,325 460,313"/>
-<polygon fill="white" points="509,309 690,309 690,318 509,318"/>
-<text x="510" y="318" textLength="179" font-family="Helvetica" font-size="12" fill="black">
-propose newChannel A: 10, B: 10
+<line x1="150" y1="330" x2="150" y2="358" stroke="black"/>
+<line x1="450" y1="330" x2="450" y2="358" stroke="black"/>
+<line x1="750" y1="330" x2="750" y2="358" stroke="black"/>
+<line x1="1050" y1="330" x2="1050" y2="358" stroke="black"/>
+<line x1="750" y1="341" x2="450" y2="341" stroke="black"/>
+<polygon fill="black" points="450,341 460,347 460,335"/>
+<polygon fill="white" points="523,331 676,331 676,340 523,340"/>
+<text x="524" y="340" textLength="151" font-family="Helvetica" font-size="12" fill="black">
+propose reDraw A: 10, B: 10
 </text>
-<line x1="150" y1="336" x2="150" y2="364" stroke="black"/>
-<line x1="450" y1="336" x2="450" y2="364" stroke="black"/>
-<line x1="750" y1="336" x2="750" y2="364" stroke="black"/>
-<line x1="1050" y1="336" x2="1050" y2="364" stroke="black"/>
-<polygon fill="white" points="308,336 592,336 592,358 308,358"/>
-<line x1="308" y1="336" x2="592" y2="336" stroke="black"/>
+<line x1="150" y1="358" x2="150" y2="386" stroke="black"/>
+<line x1="450" y1="358" x2="450" y2="386" stroke="black"/>
+<line x1="750" y1="358" x2="750" y2="386" stroke="black"/>
+<line x1="1050" y1="358" x2="1050" y2="386" stroke="black"/>
+<polygon fill="white" points="308,358 592,358 592,380 308,380"/>
 <line x1="308" y1="358" x2="592" y2="358" stroke="black"/>
-<line x1="308" y1="336" x2="308" y2="358" stroke="black"/>
-<line x1="592" y1="336" x2="592" y2="358" stroke="black"/>
-<polygon fill="white" points="363,343 536,343 536,352 363,352"/>
-<text x="364" y="352" textLength="171" font-family="Helvetica" font-size="12" fill="black">
+<line x1="308" y1="380" x2="592" y2="380" stroke="black"/>
+<line x1="308" y1="358" x2="308" y2="380" stroke="black"/>
+<line x1="592" y1="358" x2="592" y2="380" stroke="black"/>
+<polygon fill="white" points="363,365 536,365 536,374 363,374"/>
+<text x="364" y="374" textLength="171" font-family="Helvetica" font-size="12" fill="black">
 state OtherCreating A: 10, B: 10
 </text>
-<line x1="150" y1="364" x2="150" y2="392" stroke="black"/>
-<line x1="450" y1="364" x2="450" y2="392" stroke="black"/>
-<line x1="750" y1="364" x2="750" y2="392" stroke="black"/>
-<line x1="1050" y1="364" x2="1050" y2="392" stroke="black"/>
-<line x1="450" y1="375" x2="750" y2="375" stroke="black" stroke-dasharray="2,2"/>
-<polygon fill="black" points="750,375 740,381 740,369"/>
-<polygon fill="white" points="506,365 693,365 693,374 506,374"/>
-<text x="507" y="374" textLength="185" font-family="Helvetica" font-size="12" fill="black">
-signature newChannel A: 10, B: 10
+<line x1="150" y1="386" x2="150" y2="414" stroke="black"/>
+<line x1="450" y1="386" x2="450" y2="414" stroke="black"/>
+<line x1="750" y1="386" x2="750" y2="414" stroke="black"/>
+<line x1="1050" y1="386" x2="1050" y2="414" stroke="black"/>
+<line x1="450" y1="397" x2="750" y2="397" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="black" points="750,397 740,403 740,391"/>
+<polygon fill="white" points="511,387 687,387 687,396 511,396"/>
+<text x="512" y="396" textLength="174" font-family="Helvetica" font-size="12" fill="black">
+signature on reDraw A: 10, B: 10
 </text>
-<line x1="150" y1="392" x2="150" y2="420" stroke="black"/>
-<line x1="450" y1="392" x2="450" y2="420" stroke="black"/>
-<line x1="750" y1="392" x2="750" y2="420" stroke="black"/>
-<line x1="1050" y1="392" x2="1050" y2="420" stroke="black"/>
-<polygon fill="white" points="608,392 892,392 892,414 608,414"/>
-<line x1="608" y1="392" x2="892" y2="392" stroke="black"/>
+<line x1="150" y1="414" x2="150" y2="442" stroke="black"/>
+<line x1="450" y1="414" x2="450" y2="442" stroke="black"/>
+<line x1="750" y1="414" x2="750" y2="442" stroke="black"/>
+<line x1="1050" y1="414" x2="1050" y2="442" stroke="black"/>
+<polygon fill="white" points="608,414 892,414 892,436 608,436"/>
 <line x1="608" y1="414" x2="892" y2="414" stroke="black"/>
-<line x1="608" y1="392" x2="608" y2="414" stroke="black"/>
-<line x1="892" y1="392" x2="892" y2="414" stroke="black"/>
-<polygon fill="white" points="678,399 821,399 821,408 678,408"/>
-<text x="679" y="408" textLength="141" font-family="Helvetica" font-size="12" fill="black">
+<line x1="608" y1="436" x2="892" y2="436" stroke="black"/>
+<line x1="608" y1="414" x2="608" y2="436" stroke="black"/>
+<line x1="892" y1="414" x2="892" y2="436" stroke="black"/>
+<polygon fill="white" points="678,421 821,421 821,430 678,430"/>
+<text x="679" y="430" textLength="141" font-family="Helvetica" font-size="12" fill="black">
 state Creating A: 10, B: 10
 </text>
-<line x1="150" y1="420" x2="150" y2="448" stroke="black"/>
-<line x1="450" y1="420" x2="450" y2="448" stroke="black"/>
-<line x1="750" y1="420" x2="750" y2="448" stroke="black"/>
-<line x1="1050" y1="420" x2="1050" y2="448" stroke="black"/>
-<line x1="750" y1="431" x2="1050" y2="431" stroke="black"/>
-<polygon fill="black" points="1050,431 1040,437 1040,425"/>
-<polygon fill="white" points="813,421 986,421 986,430 813,430"/>
-<text x="814" y="430" textLength="171" font-family="Helvetica" font-size="12" fill="black">
-submit newChannel A: 10, B: 10
+<line x1="150" y1="442" x2="150" y2="470" stroke="black"/>
+<line x1="450" y1="442" x2="450" y2="470" stroke="black"/>
+<line x1="750" y1="442" x2="750" y2="470" stroke="black"/>
+<line x1="1050" y1="442" x2="1050" y2="470" stroke="black"/>
+<line x1="750" y1="453" x2="1050" y2="453" stroke="black"/>
+<polygon fill="black" points="1050,453 1040,459 1040,447"/>
+<polygon fill="white" points="827,443 972,443 972,452 827,452"/>
+<text x="828" y="452" textLength="143" font-family="Helvetica" font-size="12" fill="black">
+submit reDraw A: 10, B: 10
 </text>
-<line x1="150" y1="448" x2="150" y2="465" stroke="black" stroke-dasharray="2,2"/>
-<line x1="450" y1="448" x2="450" y2="465" stroke="black" stroke-dasharray="2,2"/>
-<line x1="750" y1="448" x2="750" y2="465" stroke="black" stroke-dasharray="2,2"/>
-<line x1="1050" y1="448" x2="1050" y2="465" stroke="black" stroke-dasharray="2,2"/>
-<polygon fill="white" points="545,449 653,449 653,458 545,458"/>
-<text x="546" y="458" textLength="106" font-family="Helvetica" font-size="12" fill="black">
+<line x1="150" y1="470" x2="150" y2="487" stroke="black" stroke-dasharray="2,2"/>
+<line x1="450" y1="470" x2="450" y2="487" stroke="black" stroke-dasharray="2,2"/>
+<line x1="750" y1="470" x2="750" y2="487" stroke="black" stroke-dasharray="2,2"/>
+<line x1="1050" y1="470" x2="1050" y2="487" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="white" points="545,471 653,471 653,480 545,480"/>
+<text x="546" y="480" textLength="106" font-family="Helvetica" font-size="12" fill="black">
 After some polling...
 </text>
-<line x1="150" y1="465" x2="150" y2="493" stroke="black"/>
-<line x1="450" y1="465" x2="450" y2="493" stroke="black"/>
-<line x1="750" y1="465" x2="750" y2="493" stroke="black"/>
-<line x1="1050" y1="465" x2="1050" y2="493" stroke="black"/>
-<line x1="1050" y1="476" x2="750" y2="476" stroke="black" stroke-dasharray="2,2"/>
-<polygon fill="black" points="750,476 760,482 760,470"/>
-<polygon fill="white" points="807,466 992,466 992,475 807,475"/>
-<text x="808" y="475" textLength="183" font-family="Helvetica" font-size="12" fill="black">
-channelOpened event A: 10, B: 10
+<line x1="150" y1="487" x2="150" y2="515" stroke="black"/>
+<line x1="450" y1="487" x2="450" y2="515" stroke="black"/>
+<line x1="750" y1="487" x2="750" y2="515" stroke="black"/>
+<line x1="1050" y1="487" x2="1050" y2="515" stroke="black"/>
+<line x1="1050" y1="498" x2="750" y2="498" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="black" points="750,498 760,504 760,492"/>
+<polygon fill="white" points="830,488 969,488 969,497 830,497"/>
+<text x="831" y="497" textLength="137" font-family="Helvetica" font-size="12" fill="black">
+reDraw event A: 10, B: 10
 </text>
-<line x1="150" y1="493" x2="150" y2="521" stroke="black"/>
-<line x1="450" y1="493" x2="450" y2="521" stroke="black"/>
-<line x1="750" y1="493" x2="750" y2="521" stroke="black"/>
-<line x1="1050" y1="493" x2="1050" y2="521" stroke="black"/>
-<line x1="750" y1="504" x2="450" y2="504" stroke="black"/>
-<polygon fill="black" points="450,504 460,510 460,498"/>
-<polygon fill="white" points="526,494 673,494 673,503 526,503"/>
-<text x="527" y="503" textLength="145" font-family="Helvetica" font-size="12" fill="black">
-channelOpened notification
+<line x1="150" y1="515" x2="150" y2="543" stroke="black"/>
+<line x1="450" y1="515" x2="450" y2="543" stroke="black"/>
+<line x1="750" y1="515" x2="750" y2="543" stroke="black"/>
+<line x1="1050" y1="515" x2="1050" y2="543" stroke="black"/>
+<line x1="750" y1="526" x2="450" y2="526" stroke="black"/>
+<polygon fill="black" points="450,526 460,532 460,520"/>
+<polygon fill="white" points="549,516 650,516 650,525 549,525"/>
+<text x="550" y="525" textLength="99" font-family="Helvetica" font-size="12" fill="black">
+reDraw notification
 </text>
-<line x1="150" y1="521" x2="150" y2="549" stroke="black"/>
-<line x1="450" y1="521" x2="450" y2="549" stroke="black"/>
-<line x1="750" y1="521" x2="750" y2="549" stroke="black"/>
-<line x1="1050" y1="521" x2="1050" y2="549" stroke="black"/>
-<line x1="450" y1="532" x2="1050" y2="532" stroke="black"/>
-<polygon fill="black" points="1050,532 1040,538 1040,526"/>
-<polygon fill="white" points="690,522 809,522 809,531 690,531"/>
-<text x="691" y="531" textLength="117" font-family="Helvetica" font-size="12" fill="black">
-verify channelOpened
+<line x1="150" y1="543" x2="150" y2="571" stroke="black"/>
+<line x1="450" y1="543" x2="450" y2="571" stroke="black"/>
+<line x1="750" y1="543" x2="750" y2="571" stroke="black"/>
+<line x1="1050" y1="543" x2="1050" y2="571" stroke="black"/>
+<line x1="450" y1="554" x2="1050" y2="554" stroke="black"/>
+<polygon fill="black" points="1050,554 1040,560 1040,548"/>
+<polygon fill="white" points="711,544 788,544 788,553 711,553"/>
+<text x="712" y="553" textLength="75" font-family="Helvetica" font-size="12" fill="black">
+verify ReDraw
 </text>
-<line x1="150" y1="549" x2="150" y2="577" stroke="black"/>
-<line x1="450" y1="549" x2="450" y2="577" stroke="black"/>
-<line x1="750" y1="549" x2="750" y2="577" stroke="black"/>
-<line x1="1050" y1="549" x2="1050" y2="577" stroke="black"/>
-<line x1="1050" y1="560" x2="450" y2="560" stroke="black" stroke-dasharray="2,2"/>
-<polygon fill="black" points="450,560 460,566 460,554"/>
-<polygon fill="white" points="683,550 816,550 816,559 683,559"/>
-<text x="684" y="559" textLength="131" font-family="Helvetica" font-size="12" fill="black">
-channelOpened success
+<line x1="150" y1="571" x2="150" y2="599" stroke="black"/>
+<line x1="450" y1="571" x2="450" y2="599" stroke="black"/>
+<line x1="750" y1="571" x2="750" y2="599" stroke="black"/>
+<line x1="1050" y1="571" x2="1050" y2="599" stroke="black"/>
+<line x1="1050" y1="582" x2="450" y2="582" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="black" points="450,582 460,588 460,576"/>
+<polygon fill="white" points="706,572 793,572 793,581 706,581"/>
+<text x="707" y="581" textLength="85" font-family="Helvetica" font-size="12" fill="black">
+reDraw success
 </text>
-<line x1="150" y1="577" x2="150" y2="605" stroke="black"/>
-<line x1="450" y1="577" x2="450" y2="605" stroke="black"/>
-<line x1="750" y1="577" x2="750" y2="605" stroke="black"/>
-<line x1="1050" y1="577" x2="1050" y2="605" stroke="black"/>
-<polygon fill="white" points="308,577 592,577 592,599 308,599"/>
-<line x1="308" y1="577" x2="592" y2="577" stroke="black"/>
+<line x1="150" y1="599" x2="150" y2="627" stroke="black"/>
+<line x1="450" y1="599" x2="450" y2="627" stroke="black"/>
+<line x1="750" y1="599" x2="750" y2="627" stroke="black"/>
+<line x1="1050" y1="599" x2="1050" y2="627" stroke="black"/>
+<polygon fill="white" points="308,599 592,599 592,621 308,621"/>
 <line x1="308" y1="599" x2="592" y2="599" stroke="black"/>
-<line x1="308" y1="577" x2="308" y2="599" stroke="black"/>
-<line x1="592" y1="577" x2="592" y2="599" stroke="black"/>
-<polygon fill="white" points="419,584 480,584 480,593 419,593"/>
-<text x="420" y="593" textLength="59" font-family="Helvetica" font-size="12" fill="black">
+<line x1="308" y1="621" x2="592" y2="621" stroke="black"/>
+<line x1="308" y1="599" x2="308" y2="621" stroke="black"/>
+<line x1="592" y1="599" x2="592" y2="621" stroke="black"/>
+<polygon fill="white" points="419,606 480,606 480,615 419,615"/>
+<text x="420" y="615" textLength="59" font-family="Helvetica" font-size="12" fill="black">
 state Open
 </text>
-<line x1="150" y1="605" x2="150" y2="633" stroke="black"/>
-<line x1="450" y1="605" x2="450" y2="633" stroke="black"/>
-<line x1="750" y1="605" x2="750" y2="633" stroke="black"/>
-<line x1="1050" y1="605" x2="1050" y2="633" stroke="black"/>
-<line x1="450" y1="616" x2="750" y2="616" stroke="black" stroke-dasharray="2,2"/>
-<polygon fill="black" points="750,616 740,622 740,610"/>
-<polygon fill="white" points="533,606 666,606 666,615 533,615"/>
-<text x="534" y="615" textLength="131" font-family="Helvetica" font-size="12" fill="black">
-channelOpened success
+<line x1="150" y1="627" x2="150" y2="655" stroke="black"/>
+<line x1="450" y1="627" x2="450" y2="655" stroke="black"/>
+<line x1="750" y1="627" x2="750" y2="655" stroke="black"/>
+<line x1="1050" y1="627" x2="1050" y2="655" stroke="black"/>
+<line x1="450" y1="638" x2="750" y2="638" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="black" points="750,638 740,644 740,632"/>
+<polygon fill="white" points="556,628 643,628 643,637 556,637"/>
+<text x="557" y="637" textLength="85" font-family="Helvetica" font-size="12" fill="black">
+reDraw success
 </text>
-<line x1="150" y1="633" x2="150" y2="661" stroke="black"/>
-<line x1="450" y1="633" x2="450" y2="661" stroke="black"/>
-<line x1="750" y1="633" x2="750" y2="661" stroke="black"/>
-<line x1="1050" y1="633" x2="1050" y2="661" stroke="black"/>
-<polygon fill="white" points="608,633 892,633 892,655 608,655"/>
-<line x1="608" y1="633" x2="892" y2="633" stroke="black"/>
+<line x1="150" y1="655" x2="150" y2="683" stroke="black"/>
+<line x1="450" y1="655" x2="450" y2="683" stroke="black"/>
+<line x1="750" y1="655" x2="750" y2="683" stroke="black"/>
+<line x1="1050" y1="655" x2="1050" y2="683" stroke="black"/>
+<polygon fill="white" points="608,655 892,655 892,677 608,677"/>
 <line x1="608" y1="655" x2="892" y2="655" stroke="black"/>
-<line x1="608" y1="633" x2="608" y2="655" stroke="black"/>
-<line x1="892" y1="633" x2="892" y2="655" stroke="black"/>
-<polygon fill="white" points="719,640 780,640 780,649 719,649"/>
-<text x="720" y="649" textLength="59" font-family="Helvetica" font-size="12" fill="black">
+<line x1="608" y1="677" x2="892" y2="677" stroke="black"/>
+<line x1="608" y1="655" x2="608" y2="677" stroke="black"/>
+<line x1="892" y1="655" x2="892" y2="677" stroke="black"/>
+<polygon fill="white" points="719,662 780,662 780,671 719,671"/>
+<text x="720" y="671" textLength="59" font-family="Helvetica" font-size="12" fill="black">
 state Open
 </text>
-<line x1="150" y1="661" x2="150" y2="678" stroke="black"/>
-<line x1="450" y1="661" x2="450" y2="678" stroke="black"/>
-<line x1="750" y1="661" x2="750" y2="678" stroke="black"/>
-<line x1="1050" y1="661" x2="1050" y2="678" stroke="black"/>
-<line x1="75" y1="666" x2="1125" y2="666" stroke="black" stroke-dasharray="2,2"/>
-<polygon fill="white" points="535,662 663,662 663,671 535,671"/>
-<text x="536" y="671" textLength="126" font-family="Helvetica" font-size="12" fill="black">
+<line x1="150" y1="683" x2="150" y2="700" stroke="black"/>
+<line x1="450" y1="683" x2="450" y2="700" stroke="black"/>
+<line x1="750" y1="683" x2="750" y2="700" stroke="black"/>
+<line x1="1050" y1="683" x2="1050" y2="700" stroke="black"/>
+<line x1="75" y1="688" x2="1125" y2="688" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="white" points="535,684 663,684 663,693 535,693"/>
+<text x="536" y="693" textLength="126" font-family="Helvetica" font-size="12" fill="black">
 Channel is ready to use
 </text>
-<line x1="150" y1="672" x2="150" y2="678" stroke="black"/>
-<line x1="450" y1="672" x2="450" y2="678" stroke="black"/>
-<line x1="750" y1="672" x2="750" y2="678" stroke="black"/>
-<line x1="1050" y1="672" x2="1050" y2="678" stroke="black"/>
+<line x1="150" y1="694" x2="150" y2="700" stroke="black"/>
+<line x1="450" y1="694" x2="450" y2="700" stroke="black"/>
+<line x1="750" y1="694" x2="750" y2="700" stroke="black"/>
+<line x1="1050" y1="694" x2="1050" y2="700" stroke="black"/>
 </svg>
