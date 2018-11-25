@@ -2,15 +2,22 @@
 digraph G {
     pad=0.2
 
-    New -> Proposing [ label="from user:\nfillChannel\nout: proposeChannel" ];
-    New -> OtherProposing [ label="from counterparty:\nproposeChannel" ];
-    Proposing -> OtherCreating [ label="from user:\nfillChannel" ];
-    OtherProposing -> OtherCreating [ label="internal:\nproposeTimer" ];
-    OtherProposing -> Creating [ label="from user:\nfillChannel\nout: " ];
-    Creating -> Open [ label="from counterparty:\nok response to\nchannelOpened notification" ];
-    OtherCreating -> Open [ label="from chain:\nchannelOpened" ];
-    OtherCreating -> New [ label="internal:\nnewChannel expiration" ];
-    Creating -> New [ label="internal:\nnewChannel expiration" ];
-    Open -> OtherCreating [ label="from counterparty:\nproposeChannel" ];
-    Open -> Creating [ label="from counterparty:\nnewChannel\n(as response to proposal)" ];
+    New -> OtherCreating [ label="from counterparty:\nproposeChannel\nout: sig on newChannel" ];
+    New -> Creating [ label="from counterparty:\nsig on newChannel\nout: submit newChannel" ];
+    Creating -> Open [ label="from counterparty:\nok response to channelOpened notification" ];
+    OtherCreating -> Open [ label="from blockchain:\nverfied channelOpened notification" ];
+
+    Open -> OtherReDrawing [ label="from counterparty:\nproposeRedraw\nout: sig on reDraw" ];
+    Open -> ReDrawing [ label="from counterparty:\nsig on reDraw\nout: submit reDraw" ];
+    ReDrawing -> Open [ label="from counterparty:\nok response to reDraw notification" ];
+    OtherReDrawing -> Open [ label="from blockchain:\nverfied reDraw notification" ];
+
+    // New -> OtherProposing [ label="from counterparty:\nproposeChannel" ];
+    // Proposing -> OtherCreating [ label="from user:\nfillChannel" ];
+    // OtherProposing -> OtherCreating [ label="internal:\nproposeTimer" ];
+    // OtherProposing -> Creating [ label="from user:\nfillChannel\nout: " ];
+    // OtherCreating -> Open [ label="from chain:\nchannelOpened" ];
+    // OtherCreating -> New [ label="internal:\nnewChannel expiration" ];
+    // Creating -> New [ label="internal:\nnewChannel expiration" ];
+    // Open -> Creating [ label="from counterparty:\nnewChannel\n(as response to proposal)" ];
 }
