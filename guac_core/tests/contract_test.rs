@@ -14,8 +14,8 @@ use failure::Error;
 use guac_core::crypto::Config;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
+use guac_core::eth_client::create_signature_data;
 use guac_core::eth_client::EthClient;
-use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
 use guac_core::network::Web3Handle;
 use guac_core::payment_contract::{ChannelId, PaymentContract};
 use num256::Uint256;
@@ -206,6 +206,41 @@ fn create_newchannel_fingerprint(
     (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
 }
 
+fn create_update_fingerprint(
+    secret0: &PrivateKey,
+    secret1: &PrivateKey,
+    channel_id: ChannelId,
+    sequence_number: Uint256,
+    balance0: Uint256,
+    balance1: Uint256,
+) -> (Signature, Signature) {
+    // Reorder secret keys as it matters who signs the fingerprint
+    let (secret0, secret1) = if secret0.to_public_key().unwrap() > secret1.to_public_key().unwrap()
+    {
+        (secret1, secret0)
+    } else {
+        (secret0, secret1)
+    };
+
+    let mut msg = "updateState".as_bytes().to_vec();
+    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
+    msg.extend(channel_id.to_vec());
+    msg.extend(&{
+        let data: [u8; 32] = sequence_number.into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance0.into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance1.into();
+        data
+    });
+
+    (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
+}
+
 #[test]
 #[ignore]
 fn contract() {
@@ -241,7 +276,7 @@ fn contract() {
     if alice_pk > bob_pk {
         println!("ALICE_PK > BOB_PK (CASE 1 UNORDERED)");
     } else {
-        println!("ALICE_PK > BOB_PK (CASE 1 ORDERED)");
+        println!("ALICE_PK < BOB_PK (CASE 1 ORDERED)");
     }
 
     // Call openChannel
@@ -253,8 +288,11 @@ fn contract() {
     // This has to be updated on every state update
     let mut channel_nonce = 0u32;
 
-    let alice_balance: Uint256 = "1000000000000000000".parse().unwrap();
-    let bob_balance: Uint256 = "0".parse().unwrap();
+    let mut alice_balance: Uint256 = "1000000000000000000".parse().unwrap();
+    let mut bob_balance: Uint256 = "0".parse().unwrap();
+    let total_balance = alice_balance.clone() + bob_balance.clone();
+    println!("total balance {}", total_balance);
+
     let expiration: Uint256 = (BLOCK_NUMBER.clone() + 100u64).into();
     let settling: Uint256 = 200u64.into();
 
@@ -286,7 +324,49 @@ fn contract() {
     );
 
     let channel_id = fut.wait().unwrap();
-    assert!(channel_id != 0.into());
+    assert!(channel_id != [0u8; 32]);
+    println!("channel id {:x?}", channel_id);
+
+    // Progress nonce
+    channel_nonce += 1;
+
+    let op: Uint256 = "100000000000000000".parse().unwrap();
+    // let op : Uint256 = "0".parse().unwrap();
+    assert!(op <= alice_balance);
+    assert!(op > bob_balance);
+
+    alice_balance -= op.clone();
+    bob_balance += op.clone();
+    assert_eq!(alice_balance.clone() + bob_balance.clone(), total_balance);
+
+    // Reorder balances based on private key (can't do it inside the method)
+    let (balance0, balance1) = if alice.to_public_key().unwrap() > bob.to_public_key().unwrap() {
+        (bob_balance.clone(), alice_balance.clone())
+    } else {
+        (alice_balance.clone(), bob_balance.clone())
+    };
+
+    // let alice_balance : Uint256 = "900000000000000000".parse().unwrap();
+    // let bob_balance : Uint256 = "100000000000000000".parse().unwrap();
+    let (sig_a, sig_b) = create_update_fingerprint(
+        &alice,
+        &bob,
+        channel_id.clone(),
+        channel_nonce.clone().into(),
+        balance0.clone(),
+        balance1.clone(),
+    );
+
+    let fut = contract.update_state(
+        channel_id,
+        channel_nonce.clone().into(),
+        balance0,
+        balance1,
+        sig_a,
+        sig_b,
+    );
+
+    fut.wait().unwrap();
 }
 
 #[test]

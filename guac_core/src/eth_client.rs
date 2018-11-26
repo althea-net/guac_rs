@@ -90,33 +90,6 @@ pub fn create_signature_data(
     ])
 }
 
-pub fn create_update_channel_payload(
-    channel_id: ChannelId,
-    nonce: Uint256,
-    balance_a: Uint256,
-    balance_b: Uint256,
-    sig_a: Signature,
-    sig_b: Signature,
-) -> Vec<u8> {
-    encode_call(
-        "updateState(bytes32,uint256,uint256,uint256,string,string)",
-        &[
-            // channelId
-            Token::Bytes(channel_id.to_vec()),
-            // nonce
-            nonce.into(),
-            // balanceA
-            balance_a.into(),
-            // balanceB
-            balance_b.into(),
-            // sigA
-            sig_a.to_string().as_str().into(),
-            // sigB
-            sig_b.to_string().as_str().into(),
-        ],
-    )
-}
-
 pub fn create_start_challenge_payload(channel_id: ChannelId) -> Vec<u8> {
     encode_call(
         "startChallenge(bytes32)",
@@ -175,7 +148,7 @@ impl PaymentContract for EthClient {
         signature1: Signature,
         expiration: Uint256,
         settling_period: Uint256,
-    ) -> Box<Future<Item = Uint256, Error = Error>> {
+    ) -> Box<Future<Item = ChannelId, Error = Error>> {
         // Broadcast a transaction on the network with data
         assert!(address0 != address1, "Unable to open channel to yourself");
 
@@ -240,12 +213,12 @@ impl PaymentContract for EthClient {
                         "Invalid data length in ChannelOpened event"
                     );
                     data.copy_from_slice(&response.data.0);
-                    Ok(data.into())
+                    Ok(data)
                 }).into_future(),
         )
     }
 
-    fn update_channel(
+    fn update_state(
         &self,
         channel_id: ChannelId,
         channel_nonce: Uint256,
@@ -254,24 +227,21 @@ impl PaymentContract for EthClient {
         sig_a: Signature,
         sig_b: Signature,
     ) -> Box<Future<Item = (), Error = Error>> {
-        let event = CRYPTO.wait_for_event(
-            "ChannelUpdateState(bytes32,uint256,uint256,uint256)",
-            Some(vec![channel_id.into()]),
-            None,
+        let data = encode_call(
+            "updateState(bytes32,uint256,uint256,uint256,bytes,bytes)",
+            &[
+                Token::Bytes(channel_id.to_vec()),
+                channel_nonce.into(),
+                balance_a.into(),
+                balance_b.into(),
+                sig_a.into_bytes().to_vec().into(),
+                sig_b.into_bytes().to_vec().into(),
+            ],
         );
-
-        let data = create_update_channel_payload(
-            channel_id,
-            channel_nonce.into(),
-            balance_a.clone(),
-            balance_b.clone(),
-            sig_a,
-            sig_b,
-        );
-        let call = CRYPTO.broadcast_transaction(Action::Call(data), Uint256::from(0u64));
         Box::new(
-            call.join(event)
-                .and_then(|(_tx, _response)| ok(()))
+            CRYPTO
+                .broadcast_transaction(Action::Call(data), Uint256::from(0u64))
+                .and_then(|_tx| Ok(()))
                 .into_future(),
         )
     }

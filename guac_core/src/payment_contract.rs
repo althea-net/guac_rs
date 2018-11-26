@@ -20,8 +20,8 @@ pub trait PaymentContract {
         signature1: Signature,
         expiration: Uint256,
         settling_period: Uint256,
-    ) -> Box<Future<Item = Uint256, Error = Error>>;
-    fn update_channel(
+    ) -> Box<Future<Item = ChannelId, Error = Error>>;
+    fn update_state(
         &self,
         channel_id: ChannelId,
         channel_nonce: Uint256,
