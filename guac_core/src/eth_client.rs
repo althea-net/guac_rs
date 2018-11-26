@@ -100,17 +100,6 @@ pub fn create_start_challenge_payload(channel_id: ChannelId) -> Vec<u8> {
     )
 }
 
-pub fn create_close_channel_payload(channel_id: ChannelId) -> Vec<u8> {
-    encode_call(
-        // function closeChannel(bytes32 channelId) public {
-        "closeChannel(bytes32)",
-        &[
-            // channel id
-            Token::Bytes(channel_id.to_vec().into()),
-        ],
-    )
-}
-
 pub struct EthClient;
 
 impl EthClient {
@@ -298,20 +287,18 @@ impl PaymentContract for EthClient {
 
     fn close_channel(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>> {
         // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
-
-        let event =
-            CRYPTO.wait_for_event("ChannelClose(bytes32)", Some(vec![channel_id.into()]), None);
-
-        // Broadcast a transaction on the network with data
-        let call = CRYPTO.broadcast_transaction(
-            Action::Call(create_close_channel_payload(channel_id)),
-            Uint256::from(0),
+        let data = encode_call(
+            "closeChannel(bytes32)",
+            &[
+                // channel id
+                Token::Bytes(channel_id.to_vec().into()),
+            ],
         );
-
+        // Broadcast a transaction on the network with data
         Box::new(
-            call.join(event)
-                .and_then(|(_tx, _response)| ok(()))
-                .into_future(),
+            CRYPTO
+                .broadcast_transaction(Action::Call(data), Uint256::from(0))
+                .and_then(|_tx| Ok(())),
         )
     }
 }

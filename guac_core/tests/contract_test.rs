@@ -425,6 +425,8 @@ fn contract() {
         sig_b,
     );
     fut.wait().unwrap();
+
+    // contract.close_channel(channel_id).wait().unwrap();
 }
 
 #[test]

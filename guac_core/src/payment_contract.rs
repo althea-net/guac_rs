@@ -39,8 +39,8 @@ pub trait PaymentContract {
         sig_a: Signature,
         sig_b: Signature,
     ) -> Box<Future<Item = (), Error = Error>>;
-    fn start_challenge(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>>;
     fn close_channel(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>>;
+    fn start_challenge(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>>;
 
     fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
 }
