@@ -21,11 +21,6 @@ pub trait PaymentContract {
         expiration: Uint256,
         settling_period: Uint256,
     ) -> Box<Future<Item = Uint256, Error = Error>>;
-    fn join_channel(
-        &self,
-        channel_id: ChannelId,
-        value: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>>;
     fn update_channel(
         &self,
         channel_id: ChannelId,

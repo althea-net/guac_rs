@@ -245,35 +245,6 @@ impl PaymentContract for EthClient {
         )
     }
 
-    /// Calls JoinChannel on the contract and waits for event.
-    ///
-    /// * `to` - Other party
-    /// * `challenge` - Challenge
-    /// * `value` - Initial deposit
-    fn join_channel(
-        &self,
-        channel_id: ChannelId,
-        value: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>> {
-        // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
-
-        let event = CRYPTO.wait_for_event(
-            "ChannelJoin(bytes32,address,address,uint256,uint256)",
-            Some(vec![channel_id.into()]),
-            None,
-        );
-
-        // Broadcast a transaction on the network with data
-        let call = CRYPTO
-            .broadcast_transaction(Action::Call(create_join_channel_payload(channel_id)), value);
-
-        Box::new(
-            call.join(event)
-                .and_then(|(_tx, response)| ok(()))
-                .into_future(),
-        )
-    }
-
     fn update_channel(
         &self,
         channel_id: ChannelId,
