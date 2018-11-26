@@ -30,6 +30,15 @@ pub trait PaymentContract {
         sig_a: Signature,
         sig_b: Signature,
     ) -> Box<Future<Item = (), Error = Error>>;
+    fn close_channel_fast(
+        &self,
+        channel_id: ChannelId,
+        channel_nonce: Uint256,
+        balance_a: Uint256,
+        balance_b: Uint256,
+        sig_a: Signature,
+        sig_b: Signature,
+    ) -> Box<Future<Item = (), Error = Error>>;
     fn start_challenge(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>>;
     fn close_channel(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>>;
 

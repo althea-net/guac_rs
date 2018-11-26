@@ -241,6 +241,41 @@ fn create_update_fingerprint(
     (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
 }
 
+fn create_close_fingerprint(
+    secret0: &PrivateKey,
+    secret1: &PrivateKey,
+    channel_id: ChannelId,
+    sequence_number: Uint256,
+    balance0: Uint256,
+    balance1: Uint256,
+) -> (Signature, Signature) {
+    // Reorder secret keys as it matters who signs the fingerprint
+    let (secret0, secret1) = if secret0.to_public_key().unwrap() > secret1.to_public_key().unwrap()
+    {
+        (secret1, secret0)
+    } else {
+        (secret0, secret1)
+    };
+
+    let mut msg = "closeChannelFast".as_bytes().to_vec();
+    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
+    msg.extend(channel_id.to_vec());
+    msg.extend(&{
+        let data: [u8; 32] = sequence_number.into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance0.into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance1.into();
+        data
+    });
+
+    (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
+}
+
 #[test]
 #[ignore]
 fn contract() {
@@ -360,12 +395,35 @@ fn contract() {
     let fut = contract.update_state(
         channel_id,
         channel_nonce.clone().into(),
-        balance0,
-        balance1,
+        balance0.clone(),
+        balance1.clone(),
         sig_a,
         sig_b,
     );
 
+    fut.wait().unwrap();
+
+    channel_nonce += 1;
+
+    // let alice_balance : Uint256 = "900000000000000000".parse().unwrap();
+    // let bob_balance : Uint256 = "100000000000000000".parse().unwrap();
+    let (sig_a, sig_b) = create_close_fingerprint(
+        &alice,
+        &bob,
+        channel_id.clone(),
+        channel_nonce.clone().into(),
+        balance0.clone(),
+        balance1.clone(),
+    );
+
+    let fut = contract.close_channel_fast(
+        channel_id,
+        channel_nonce.clone().into(),
+        balance0.clone(),
+        balance1.clone(),
+        sig_a,
+        sig_b,
+    );
     fut.wait().unwrap();
 }
 
