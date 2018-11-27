@@ -1,4 +1,5 @@
 pub mod channel_manager;
+pub mod channel_manager_new;
 pub mod combined_state;
 pub mod types;
 
