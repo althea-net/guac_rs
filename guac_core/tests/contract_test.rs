@@ -276,6 +276,13 @@ fn create_close_fingerprint(
     (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
 }
 
+fn create_settling_fingerprint(key: &PrivateKey, channel_id: ChannelId) -> Signature {
+    let mut msg = "startSettlingPeriod".as_bytes().to_vec();
+    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
+    msg.extend(channel_id.to_vec());
+    key.sign_msg(&msg)
+}
+
 #[test]
 #[ignore]
 fn contract() {
@@ -405,8 +412,12 @@ fn contract() {
 
     channel_nonce += 1;
 
-    // let alice_balance : Uint256 = "900000000000000000".parse().unwrap();
-    // let bob_balance : Uint256 = "100000000000000000".parse().unwrap();
+    let sig = create_settling_fingerprint(&alice, channel_id);
+    contract
+        .start_settling_period(channel_id, sig)
+        .wait()
+        .unwrap();
+
     let (sig_a, sig_b) = create_close_fingerprint(
         &alice,
         &bob,

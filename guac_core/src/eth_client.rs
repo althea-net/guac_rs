@@ -263,28 +263,6 @@ impl PaymentContract for EthClient {
         )
     }
 
-    fn start_challenge(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>> {
-        // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
-
-        let event = CRYPTO.wait_for_event(
-            "ChannelChallenge(bytes32,uint256,address)",
-            Some(vec![channel_id.into()]),
-            None,
-        );
-
-        // Broadcast a transaction on the network with data
-        let call = CRYPTO.broadcast_transaction(
-            Action::Call(create_start_challenge_payload(channel_id)),
-            Uint256::from(0),
-        );
-
-        Box::new(
-            call.join(event)
-                .and_then(|(_tx, response)| ok(()))
-                .into_future(),
-        )
-    }
-
     fn close_channel(&self, channel_id: ChannelId) -> Box<Future<Item = (), Error = Error>> {
         // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
         let data = encode_call(
@@ -292,6 +270,27 @@ impl PaymentContract for EthClient {
             &[
                 // channel id
                 Token::Bytes(channel_id.to_vec().into()),
+            ],
+        );
+        // Broadcast a transaction on the network with data
+        Box::new(
+            CRYPTO
+                .broadcast_transaction(Action::Call(data), Uint256::from(0))
+                .and_then(|_tx| Ok(())),
+        )
+    }
+    fn start_settling_period(
+        &self,
+        channel_id: ChannelId,
+        signature: Signature,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        // This is the event we'll wait for that would mean our contract call got executed with at least one confirmation
+        let data = encode_call(
+            "startSettlingPeriod(bytes32,bytes)",
+            &[
+                // channel id
+                Token::Bytes(channel_id.to_vec().into()),
+                signature.into_bytes().to_vec().into(),
             ],
         );
         // Broadcast a transaction on the network with data
