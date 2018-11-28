@@ -241,6 +241,37 @@ impl PaymentContract for EthClient {
                 .into_future(),
         )
     }
+    fn update_state_with_bounty(
+        &self,
+        channel_id: ChannelId,
+        channel_nonce: Uint256,
+        balance_a: Uint256,
+        balance_b: Uint256,
+        sig_a: Signature,
+        sig_b: Signature,
+        bounty_amount: Uint256,
+        bounty_signature: Signature,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        let data = encode_call(
+            "updateStateWithBounty(bytes32,uint256,uint256,uint256,bytes,bytes,uint256,bytes)",
+            &[
+                Token::Bytes(channel_id.to_vec()),
+                channel_nonce.into(),
+                balance_a.into(),
+                balance_b.into(),
+                sig_a.into_bytes().to_vec().into(),
+                sig_b.into_bytes().to_vec().into(),
+                bounty_amount.into(),
+                bounty_signature.into_bytes().to_vec().into(),
+            ],
+        );
+        Box::new(
+            CRYPTO
+                .broadcast_transaction(Action::Call(data), Uint256::from(0u64))
+                .and_then(|_tx| Ok(()))
+                .into_future(),
+        )
+    }
 
     fn close_channel_fast(
         &self,

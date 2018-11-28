@@ -30,6 +30,17 @@ pub trait PaymentContract {
         sig_a: Signature,
         sig_b: Signature,
     ) -> Box<Future<Item = (), Error = Error>>;
+    fn update_state_with_bounty(
+        &self,
+        channel_id: ChannelId,
+        channel_nonce: Uint256,
+        balance_a: Uint256,
+        balance_b: Uint256,
+        sig_a: Signature,
+        sig_b: Signature,
+        bounty_amount: Uint256,
+        bounty_signature: Signature,
+    ) -> Box<Future<Item = (), Error = Error>>;
     fn close_channel_fast(
         &self,
         channel_id: ChannelId,
