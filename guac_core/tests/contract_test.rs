@@ -283,6 +283,69 @@ fn create_settling_fingerprint(key: &PrivateKey, channel_id: ChannelId) -> Signa
     key.sign_msg(&msg)
 }
 
+fn create_redraw_fingerprint(
+    secret0: &PrivateKey,
+    secret1: &PrivateKey,
+    channel_id: ChannelId,
+    nonce: Uint256,
+    old_balance_a: Uint256,
+    old_balance_b: Uint256,
+    new_balance_a: Uint256,
+    new_balance_b: Uint256,
+    expiration: Uint256,
+) -> (Signature, Signature) {
+
+    let (secret0, secret1, old_balance_a, old_balance_b, new_balance_a, new_balance_b) =
+        if secret0.to_public_key().unwrap() > secret1.to_public_key().unwrap() {
+            (
+                secret0,
+                secret1,
+                old_balance_a,
+                old_balance_b,
+                new_balance_a,
+                new_balance_b,
+            )
+        } else {
+            (
+                secret0,
+                secret1,
+                old_balance_a,
+                old_balance_b,
+                new_balance_a,
+                new_balance_b,
+            )
+        };
+    
+    let mut msg = "reDraw".as_bytes().to_vec();
+    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
+    msg.extend(channel_id.to_vec());
+    msg.extend(&{
+        let data: [u8; 32] = nonce.into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = old_balance_a.into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = old_balance_b.into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = new_balance_a.into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = new_balance_b.into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = expiration.into();
+        data
+    });
+    (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
+}
+
 #[test]
 #[ignore]
 fn contract() {
@@ -332,12 +395,13 @@ fn contract() {
 
     let mut alice_balance: Uint256 = "1000000000000000000".parse().unwrap();
     let mut bob_balance: Uint256 = "0".parse().unwrap();
-    let total_balance = alice_balance.clone() + bob_balance.clone();
+    let mut total_balance = alice_balance.clone() + bob_balance.clone();
     println!("total balance {}", total_balance);
 
     let expiration: Uint256 = (BLOCK_NUMBER.clone() + 100u64).into();
     let settling: Uint256 = 200u64.into();
 
+    println!("Calling quickDeposit");
     contract
         .quick_deposit(alice_balance.clone())
         .wait()
@@ -354,6 +418,7 @@ fn contract() {
         settling.clone(),
     );
 
+    println!("Calling newChannel");
     let fut = contract.new_channel(
         alice.to_public_key().unwrap(),
         bob.to_public_key().unwrap(),
@@ -399,6 +464,7 @@ fn contract() {
         balance1.clone(),
     );
 
+    println!("Calling updateState");
     let fut = contract.update_state(
         channel_id,
         channel_nonce.clone().into(),
@@ -409,6 +475,82 @@ fn contract() {
     );
 
     fut.wait().unwrap();
+
+    // //
+    // // Redraw
+    // //
+
+    // channel_nonce += 1;
+
+    // let old_balance0 = alice_balance.clone();
+    // let old_balance1 = bob_balance.clone();
+
+    // let op: Uint256 = "100000000000000000".parse().unwrap();
+    // assert!(op <= alice_balance);
+
+    // // alice_balance -= op.clone();
+    // // bob_balance += op.clone();
+
+    // // Alice deposits again
+    // println!("Calling quickDeposit again");
+    // contract.quick_deposit(op.clone()).wait().unwrap();
+
+    // alice_balance += op.clone();
+
+    // assert_eq!(old_balance0.clone() + old_balance1.clone(), total_balance);
+
+    // total_balance += op.clone();
+    // assert_eq!(alice_balance.clone() + bob_balance.clone(), total_balance);
+
+    // let (old_balance0, old_balance1, new_balance0, new_balance1) =
+    //     if alice.to_public_key().unwrap() > bob.to_public_key().unwrap() {
+    //         (
+    //             old_balance1,
+    //             old_balance0,
+    //             bob_balance.clone(),
+    //             alice_balance.clone(),
+    //         )
+    //     } else {
+    //         (
+    //             old_balance0,
+    //             old_balance1,
+    //             bob_balance.clone(),
+    //             alice_balance.clone(),
+    //         )
+    //     };
+
+    // println!(
+    //     "{} {} {} {}",
+    //     old_balance0, old_balance1, new_balance0, new_balance1
+    // );
+
+    // let expiration: Uint256 = (BLOCK_NUMBER.clone() + 100u64).into(); //expiration
+
+    // let (sig_a, sig_b) = create_redraw_fingerprint(
+    //     &alice,
+    //     &bob,
+    //     channel_id,
+    //     channel_nonce.clone().into(),
+    //     old_balance0.clone(),
+    //     old_balance1.clone(),
+    //     new_balance0.clone(),
+    //     new_balance1.clone(),
+    //     expiration.clone(),
+    // );
+
+    // println!("Calling redraw");
+    // let fut = contract.redraw(
+    //     channel_id,
+    //     channel_nonce.clone().into(),
+    //     old_balance0.clone(),
+    //     old_balance1.clone(),
+    //     new_balance0.clone(),
+    //     new_balance1.clone(),
+    //     expiration.clone(),
+    //     sig_a,
+    //     sig_b,
+    // );
+    // fut.wait().unwrap();
 
     channel_nonce += 1;
 
@@ -427,6 +569,8 @@ fn contract() {
         balance1.clone(),
     );
 
+    println!("Calling closeChannelFast");
+
     let fut = contract.close_channel_fast(
         channel_id,
         channel_nonce.clone().into(),
@@ -436,6 +580,8 @@ fn contract() {
         sig_b,
     );
     fut.wait().unwrap();
+
+    println!("Calling withdraw");
 
     contract.withdraw(alice_balance.clone()).wait().unwrap();
     // contract.close_channel(channel_id).wait().unwrap();

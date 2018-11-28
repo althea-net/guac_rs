@@ -48,4 +48,16 @@ pub trait PaymentContract {
 
     fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
     fn withdraw(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
+    fn redraw(
+        &self,
+        channel_id: ChannelId,
+        channel_nonce: Uint256,
+        old_balance_a: Uint256,
+        old_balance_b: Uint256,
+        new_balance_a: Uint256,
+        new_balance_b: Uint256,
+        expiration: Uint256,
+        sig_a: Signature,
+        sig_b: Signature,
+    ) -> Box<Future<Item = (), Error = Error>>;
 }

@@ -307,6 +307,88 @@ impl PaymentContract for EthClient {
                 .and_then(|_tx| Ok(())),
         )
     }
+
+    fn redraw(
+        &self,
+        channel_id: ChannelId,
+        channel_nonce: Uint256,
+        old_balance_a: Uint256,
+        old_balance_b: Uint256,
+        new_balance_a: Uint256,
+        new_balance_b: Uint256,
+        expiration: Uint256,
+        sig_a: Signature,
+        sig_b: Signature,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        println!(
+            "old_balance_a={} old_balance_b={} new_balance_a={} new_balance_b={}",
+            old_balance_a, old_balance_b, new_balance_a, new_balance_b
+        );
+        // Broadcast a transaction on the network with data
+        // assert!(address0 != address1, "Unable to open channel to yourself");
+
+        // // Reorder addresses
+        // let (address0, address1, balance0, balance1, signature0, signature1) =
+        //     if address0 > address1 {
+        //         (
+        //             address1, address0, balance1, balance0, signature1, signature0,
+        //         )
+        //     } else {
+        //         (
+        //             address0, address1, balance0, balance1, signature0, signature1,
+        //         )
+        //     };
+        // assert!(address0 < address1);
+
+        // let addr0_bytes: [u8; 32] = {
+        //     let mut data: [u8; 32] = Default::default();
+        //     data[12..].copy_from_slice(&address0.as_bytes());
+        //     data
+        // };
+        // let addr1_bytes: [u8; 32] = {
+        //     let mut data: [u8; 32] = Default::default();
+        //     data[12..].copy_from_slice(&address1.as_bytes());
+        //     data
+        // };
+        let event = CRYPTO.wait_for_event(
+            "ChannelReDrawn(bytes32)",
+            Some(vec![channel_id.into()]),
+            None,
+        );
+
+        let payload = encode_call(
+            "reDraw(bytes32,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes)",
+            &[
+                // channelId
+                Token::Bytes(channel_id.to_vec().into()),
+                // sequenceNumber
+                channel_nonce.into(),
+                // oldBalance0
+                old_balance_a.into(),
+                // oldBalance1
+                old_balance_b.into(),
+                // newBalance0
+                new_balance_a.into(),
+                // newBalance1
+                new_balance_b.into(),
+                // expiration
+                expiration.into(),
+                // signature0
+                sig_a.into_bytes().to_vec().into(),
+                // signature
+                sig_b.into_bytes().to_vec().into(),
+            ],
+        );
+        let call = CRYPTO.broadcast_transaction(Action::Call(payload), 0u64.into());
+
+        Box::new(
+            call.join(event)
+                .and_then(|(_tx, response)| {
+                    println!("response {:?}", response);
+                    Ok(())
+                }).into_future(),
+        )
+    }
 }
 
 #[test]
