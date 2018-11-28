@@ -100,15 +100,15 @@ pub fn create_start_challenge_payload(channel_id: ChannelId) -> Vec<u8> {
     )
 }
 
-pub struct EthClient;
+pub struct GuacContract;
 
-impl EthClient {
+impl GuacContract {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl PaymentContract for EthClient {
+impl PaymentContract for GuacContract {
     fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
         let payload = encode_call("quickDeposit()", &[]);
         let call = CRYPTO

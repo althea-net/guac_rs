@@ -11,11 +11,11 @@ extern crate sha3;
 use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
 use clarity::{Address, PrivateKey, Signature, Transaction};
 use failure::Error;
+use guac_core::contracts::guac_contract::create_signature_data;
+use guac_core::contracts::guac_contract::GuacContract;
 use guac_core::crypto::Config;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
-use guac_core::eth_client::create_signature_data;
-use guac_core::eth_client::EthClient;
 use guac_core::network::Web3Handle;
 use guac_core::payment_contract::{ChannelId, PaymentContract};
 use num256::Uint256;
@@ -378,7 +378,7 @@ fn contract() {
     };
     CRYPTO.init(&cfg).unwrap();
 
-    let contract: Box<PaymentContract> = Box::new(EthClient::new());
+    let contract: Box<PaymentContract> = Box::new(GuacContract::new());
 
     println!("Address {:?}", &*CHANNEL_ADDRESS);
     println!("Network ID {:?}", &*NETWORK_ID);

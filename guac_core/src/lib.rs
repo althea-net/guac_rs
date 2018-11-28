@@ -36,10 +36,10 @@ pub mod payment_contract;
 // Code
 pub mod api;
 pub mod channel_client;
+pub mod contracts;
 pub mod counterparty;
 pub mod crypto;
 pub mod error;
-pub mod eth_client;
 pub mod network;
 pub mod storage;
 pub mod transport_protocol;
