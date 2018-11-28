@@ -1,2 +1,2 @@
 [workspace]
-members = ["guac_core", "guac_actix"]
+members = ["guac_core"]
