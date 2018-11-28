@@ -11,8 +11,12 @@ extern crate sha3;
 use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
 use clarity::{Address, PrivateKey, Signature, Transaction};
 use failure::Error;
-use guac_core::contracts::guac_contract::create_signature_data;
 use guac_core::contracts::guac_contract::GuacContract;
+use guac_core::contracts::guac_contract::{
+    create_close_channel_fast_fingerprint_data, create_new_channel_fingerprint_data,
+    create_redraw_fingerprint_data, create_update_fingerprint_data,
+    create_update_with_bounty_fingerprint_data,
+};
 use guac_core::crypto::Config;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
@@ -164,7 +168,7 @@ fn poll_for_event(event: &str) -> web3::Result<Log> {
     )
 }
 
-fn create_newchannel_fingerprint(
+fn create_new_channel_fingerprint(
     secret0: &PrivateKey,
     secret1: &PrivateKey,
     address0: Address,
@@ -182,27 +186,15 @@ fn create_newchannel_fingerprint(
 
     assert!(address0 < address1);
 
-    let mut msg = "newChannel".as_bytes().to_vec();
-    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
-    msg.extend(address0.as_bytes());
-    msg.extend(address1.as_bytes());
-    msg.extend(&{
-        let data: [u8; 32] = balance0.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = balance1.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = expiration.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = settling.into();
-        data
-    });
-
+    let msg = create_new_channel_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &address0,
+        &address1,
+        &balance0,
+        &balance1,
+        &expiration,
+        &settling,
+    );
     (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
 }
 
@@ -222,22 +214,13 @@ fn create_update_fingerprint(
         (secret0, secret1)
     };
 
-    let mut msg = "updateState".as_bytes().to_vec();
-    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
-    msg.extend(channel_id.to_vec());
-    msg.extend(&{
-        let data: [u8; 32] = sequence_number.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = balance0.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = balance1.into();
-        data
-    });
-
+    let msg = create_update_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &channel_id,
+        &sequence_number,
+        &balance0,
+        &balance1,
+    );
     (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
 }
 
@@ -257,22 +240,13 @@ fn create_close_fingerprint(
         (secret0, secret1)
     };
 
-    let mut msg = "closeChannelFast".as_bytes().to_vec();
-    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
-    msg.extend(channel_id.to_vec());
-    msg.extend(&{
-        let data: [u8; 32] = sequence_number.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = balance0.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = balance1.into();
-        data
-    });
-
+    let msg = create_close_channel_fast_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &channel_id,
+        &sequence_number,
+        &balance0,
+        &balance1,
+    );
     (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
 }
 
@@ -287,7 +261,7 @@ fn create_redraw_fingerprint(
     secret0: &PrivateKey,
     secret1: &PrivateKey,
     channel_id: ChannelId,
-    nonce: Uint256,
+    sequence_number: Uint256,
     old_balance_a: Uint256,
     old_balance_b: Uint256,
     new_balance_a: Uint256,
@@ -301,33 +275,16 @@ fn create_redraw_fingerprint(
         (secret0, secret1)
     };
 
-    let mut msg = "reDraw".as_bytes().to_vec();
-    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
-    msg.extend(channel_id.to_vec());
-    msg.extend(&{
-        let data: [u8; 32] = nonce.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = old_balance_a.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = old_balance_b.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = new_balance_a.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = new_balance_b.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = expiration.into();
-        data
-    });
+    let mut msg = create_redraw_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &channel_id,
+        &sequence_number,
+        &old_balance_a,
+        &old_balance_b,
+        &new_balance_a,
+        &new_balance_b,
+        &expiration,
+    );
     (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
 }
 
@@ -341,28 +298,16 @@ fn create_update_with_bounty_fingerprint(
     signature1: Signature,
     bounty_amount: Uint256,
 ) -> Signature {
-    // Reorder secret keys as it matters who signs the fingerprint
-    let mut msg = "updateStateWithBounty".as_bytes().to_vec();
-    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
-    msg.extend(channel_id.to_vec());
-    msg.extend(&{
-        let data: [u8; 32] = sequence_number.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = balance0.into();
-        data
-    });
-    msg.extend(&{
-        let data: [u8; 32] = balance1.into();
-        data
-    });
-    msg.extend(signature0.into_bytes().to_vec());
-    msg.extend(signature1.into_bytes().to_vec());
-    msg.extend(&{
-        let data: [u8; 32] = bounty_amount.into();
-        data
-    });
+    let msg = create_update_with_bounty_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &channel_id,
+        &sequence_number,
+        &balance0,
+        &balance1,
+        &signature0,
+        &signature1,
+        &bounty_amount,
+    );
     secret.sign_msg(&msg)
 }
 
@@ -438,7 +383,7 @@ fn contract() {
         .wait()
         .unwrap();
 
-    let (sig0, sig1) = create_newchannel_fingerprint(
+    let (sig0, sig1) = create_new_channel_fingerprint(
         &alice,
         &bob,
         alice.to_public_key().unwrap(),

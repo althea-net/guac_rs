@@ -20,86 +20,161 @@ pub struct Fullnode {
     pub url: String,
 }
 
-pub fn create_update_tx(update: UpdateTx) -> Transaction {
-    let channel_id: [u8; 32] = update.channel_id.into();
-    let nonce: [u8; 32] = update.nonce.into();
-    let balance_a: [u8; 32] = update.balance_a.into();
-    let balance_b: [u8; 32] = update.balance_b.into();
-    let signature_a = update.signature_a.unwrap().to_string();
-    let signature_b = update.signature_b.unwrap().to_string();
-    let data = encode_call(
-        "updateState(bytes32,uint256,uint256,uint256,string,string)",
-        &[
-            // channelId
-            Token::Bytes(channel_id.to_vec()),
-            // nonce
-            Token::Bytes(nonce.to_vec()),
-            // balanceA
-            Token::Bytes(balance_a.to_vec()),
-            // balanceB
-            Token::Bytes(balance_b.to_vec()),
-            // SigA
-            signature_a.as_str().into(),
-            // SigB
-            signature_b.as_str().into(),
-        ],
-    );
-
-    Transaction {
-        to: Address::default(),
-        nonce: Uint256::from(42u32),
-        // TODO: set this semi automatically
-        gas_price: Uint256::from(3000u32),
-        // TODO: find out how much gas this contract acutally takes
-        gas_limit: Uint256::from(50_000u32),
-        value: Uint256::from(0u32),
-        data,
-        signature: None,
-    }.sign(&CRYPTO.secret(), None)
-}
-
-/// Creates a payload for "joinChannel" contract call.
-///
-/// * `channel_id` - A valid channel ID
-pub fn create_join_channel_payload(channel_id: ChannelId) -> Vec<u8> {
-    encode_call(
-        "joinChannel(bytes32,uint256)",
-        &[
-            // id
-            Token::Bytes(channel_id.to_vec().into()),
-            // tokenAmount
-            0u32.into(), // should use `msg.value` ^
-        ],
-    )
-}
-
-/// Create a data that should be signed with a private key
-/// and the signed data should be passed as a Signature to
-/// create_update_channel_payload.
-pub fn create_signature_data(
-    channel_id: ChannelId,
-    nonce: Uint256,
-    balance_a: Uint256,
-    balance_b: Uint256,
+pub fn create_update_fingerprint_data(
+    contract_address: &Address,
+    channel_id: &ChannelId,
+    nonce: &Uint256,
+    balance0: &Uint256,
+    balance1: &Uint256,
 ) -> Vec<u8> {
-    encode_tokens(&[
-        Token::Bytes(channel_id.to_vec()),
-        nonce.into(),
-        balance_a.into(),
-        balance_b.into(),
-    ])
+    let mut msg = "updateState".as_bytes().to_vec();
+    msg.extend(contract_address.as_bytes());
+    msg.extend(channel_id.to_vec());
+    msg.extend(&{
+        let data: [u8; 32] = nonce.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance0.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance1.clone().into();
+        data
+    });
+    msg
 }
 
-pub fn create_start_challenge_payload(channel_id: ChannelId) -> Vec<u8> {
-    encode_call(
-        "startChallenge(bytes32)",
-        &[
-            // channel id
-            Token::Bytes(channel_id.to_vec().into()),
-        ],
-    )
+pub fn create_new_channel_fingerprint_data(
+    contract_address: &Address,
+    address0: &Address,
+    address1: &Address,
+    balance0: &Uint256,
+    balance1: &Uint256,
+    expiration: &Uint256,
+    settling: &Uint256,
+) -> Vec<u8> {
+    let mut msg = "newChannel".as_bytes().to_vec();
+    msg.extend(contract_address.clone().as_bytes());
+    msg.extend(address0.as_bytes());
+    msg.extend(address1.as_bytes());
+    msg.extend(&{
+        let data: [u8; 32] = balance0.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance1.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = expiration.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = settling.clone().into();
+        data
+    });
+    msg
 }
 
+pub fn create_close_channel_fast_fingerprint_data(
+    contract_address: &Address,
+    channel_id: &ChannelId,
+    sequence_number: &Uint256,
+    balance0: &Uint256,
+    balance1: &Uint256,
+) -> Vec<u8> {
+    let mut msg = "closeChannelFast".as_bytes().to_vec();
+    msg.extend(contract_address.as_bytes());
+    msg.extend(channel_id.to_vec());
+    msg.extend(&{
+        let data: [u8; 32] = sequence_number.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance0.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance1.clone().into();
+        data
+    });
+    msg
+}
+
+pub fn create_redraw_fingerprint_data(
+    contract_addres: &Address,
+    channel_id: &ChannelId,
+    sequence_number: &Uint256,
+    old_balance_a: &Uint256,
+    old_balance_b: &Uint256,
+    new_balance_a: &Uint256,
+    new_balance_b: &Uint256,
+    expiration: &Uint256,
+) -> Vec<u8> {
+    let mut msg = "reDraw".as_bytes().to_vec();
+    msg.extend(contract_addres.as_bytes());
+    msg.extend_from_slice(&channel_id[..]);
+    msg.extend(&{
+        let data: [u8; 32] = sequence_number.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = old_balance_a.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = old_balance_b.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = new_balance_a.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = new_balance_b.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = expiration.clone().into();
+        data
+    });
+    msg
+}
+
+pub fn create_update_with_bounty_fingerprint_data(
+    contract_address: &Address,
+    channel_id: &ChannelId,
+    sequence_number: &Uint256,
+    balance0: &Uint256,
+    balance1: &Uint256,
+    signature0: &Signature,
+    signature1: &Signature,
+    bounty_amount: &Uint256,
+) -> Vec<u8> {
+    let mut msg = "updateStateWithBounty".as_bytes().to_vec();
+    msg.extend(contract_address.clone().as_bytes());
+    msg.extend_from_slice(&channel_id[..]);
+    msg.extend(&{
+        let data: [u8; 32] = sequence_number.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance0.clone().into();
+        data
+    });
+    msg.extend(&{
+        let data: [u8; 32] = balance1.clone().into();
+        data
+    });
+    msg.extend(signature0.clone().into_bytes().to_vec());
+    msg.extend(signature1.clone().into_bytes().to_vec());
+    msg.extend(&{
+        let data: [u8; 32] = bounty_amount.clone().into();
+        data
+    });
+    msg
+}
 pub struct GuacContract;
 
 impl GuacContract {
@@ -420,23 +495,4 @@ impl PaymentContract for GuacContract {
                 }).into_future(),
         )
     }
-}
-
-#[test]
-fn test_create_update_tx() {
-    let tx = create_update_tx(UpdateTx {
-        nonce: 0u32.into(),
-        balance_a: 23u32.into(),
-        balance_b: 23u32.into(),
-        channel_id: 11u32.into(),
-        signature_a: Some(Signature::new(1u32.into(), 2u32.into(), 3u32.into())),
-        signature_b: Some(Signature::new(4u32.into(), 5u32.into(), 6u32.into())),
-    });
-    trace!("tx: {:?}", tx);
-}
-
-#[test]
-fn test_join_channel_tx() {
-    let data = create_join_channel_payload([0u8; 32]);
-    assert!(data.len() > 0);
 }
