@@ -437,6 +437,7 @@ fn contract() {
     );
     fut.wait().unwrap();
 
+    contract.withdraw(alice_balance.clone()).wait().unwrap();
     // contract.close_channel(channel_id).wait().unwrap();
 }
 

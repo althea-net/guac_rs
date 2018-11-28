@@ -47,4 +47,5 @@ pub trait PaymentContract {
     ) -> Box<Future<Item = (), Error = Error>>;
 
     fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
+    fn withdraw(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
 }

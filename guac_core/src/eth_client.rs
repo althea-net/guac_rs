@@ -116,6 +116,13 @@ impl PaymentContract for EthClient {
             .map(|_| ());
         Box::new(call)
     }
+    fn withdraw(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
+        let payload = encode_call("withdraw(uint256)", &[value.into()]);
+        let call = CRYPTO
+            .broadcast_transaction(Action::Call(payload), 0u64.into())
+            .map(|_| ());
+        Box::new(call)
+    }
     /// Calls ChannelOpen on the contract and waits for event.
     ///
     /// * `channel_id` - Channel ID
