@@ -1,9 +1,9 @@
 use clarity::abi::derive_signature;
+use clarity::utils::bytes_to_hex_str;
 use clarity::Transaction;
 use clarity::{Address, PrivateKey, Signature};
 use failure::Error;
 use multihash::{encode, Hash};
-use network::Web3Handle;
 
 use owning_ref::{RwLockReadGuardRef, RwLockWriteGuardRefMut};
 use sha3::{Digest, Keccak256};
@@ -16,7 +16,8 @@ use futures::IntoFuture;
 use futures::Stream;
 use num256::Uint256;
 use std::time;
-use web3::types::{Bytes, FilterBuilder, Log, H256};
+use web3::client::{Web3, Web3Client};
+use web3::types::{NewFilter, Log};
 
 /// A global object which is responsible for managing all crypo related things.
 lazy_static! {
@@ -39,7 +40,7 @@ pub struct Crypto {
     pub balance: Uint256,
 
     // Handle to a Web3 instance
-    pub web3: Option<Web3Handle>,
+    pub web3: Option<Web3Client>,
 
     /// Contract address
     pub contract: Address,
@@ -68,10 +69,10 @@ pub trait CryptoService {
     fn eth_sign(&self, data: &[u8]) -> Signature;
     fn hash_bytes(&self, x: &[&[u8]]) -> Uint256;
     fn verify(_fingerprint: &Uint256, _signature: &Signature, _address: Address) -> bool;
-    fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Handle>;
+    fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Client>;
 
     // Async stuff
-    fn get_network_id(&self) -> Box<Future<Item = u64, Error = Error>>;
+    fn get_network_id(&self) -> Box<Future<Item = String, Error = Error>>;
     fn get_nonce(&self) -> Box<Future<Item = Uint256, Error = Error>>;
     fn get_gas_price(&self) -> Box<Future<Item = Uint256, Error = Error>>;
     /// Queries the network for current balance. This is different
@@ -117,10 +118,16 @@ impl Crypto {
     }
 }
 
+fn bytes_to_data(s: &[u8]) -> String {
+    let mut foo = "0x".to_string();
+    foo.push_str(&bytes_to_hex_str(&s));
+    foo
+}
+
 impl CryptoService for Arc<RwLock<Crypto>> {
     fn init(&self, config: &Config) -> Result<(), Error> {
         let mut service = self.write().unwrap();
-        service.web3 = Some(Web3Handle::new(&config.address)?);
+        service.web3 = Some(Web3Client::new(&config.address));
         service.contract = config.contract.clone();
         service.secret = config.secret.clone();
         Ok(())
@@ -160,65 +167,25 @@ impl CryptoService for Arc<RwLock<Crypto>> {
     fn verify(_fingerprint: &Uint256, _signature: &Signature, _address: Address) -> bool {
         unimplemented!("verify")
     }
-    fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Handle> {
+    fn web3<'ret, 'me: 'ret>(&'me self) -> RwLockReadGuardRef<'ret, Crypto, Web3Client> {
         RwLockReadGuardRef::new(self.read().unwrap()).map(|c| {
             // To use web3 you need to call CRYPTO.init first.
             assert!(c.web3.is_some(), "Web3 connection is not initialized.");
             c.web3.as_ref().unwrap()
         })
     }
-    fn get_network_id(&self) -> Box<Future<Item = u64, Error = Error>> {
-        Box::new(
-            self.web3()
-                .net()
-                .version()
-                .into_future()
-                .map_err(GuacError::from)
-                .from_err()
-                .map(|value| {
-                    // According to https://github.com/ethereum/wiki/wiki/JSON-RPC#net_version
-                    // server sends network id as a string.
-                    value
-                        .parse()
-                        .expect("Network was expected to return a valid network ID")
-                }),
-        )
+    fn get_network_id(&self) -> Box<Future<Item = String, Error = Error>> {
+        self.web3().net_version()
     }
     fn get_nonce(&self) -> Box<Future<Item = Uint256, Error = Error>> {
-        Box::new(
-            self.web3()
-                .eth()
-                .transaction_count(self.own_eth_addr().as_bytes().into(), None)
-                .into_future()
-                .map_err(GuacError::from)
-                .from_err()
-                // Ugly conversion routine from ethereum-types -> clarity
-                .map(|value| value.to_string().parse().unwrap()),
-        )
+        self.web3()
+            .eth_get_transaction_count(self.own_eth_addr().clone())
     }
     fn get_gas_price(&self) -> Box<Future<Item = Uint256, Error = Error>> {
-        Box::new(
-            self.web3()
-                .eth()
-                .gas_price()
-                .into_future()
-                .map_err(GuacError::from)
-                .from_err()
-                // Ugly conversion routine from ethereum-types -> clarity
-                .map(|value| value.to_string().parse().unwrap()),
-        )
+        self.web3().eth_gas_price()
     }
     fn get_network_balance(&self) -> Box<Future<Item = Uint256, Error = Error>> {
-        Box::new(
-            self.web3()
-                .eth()
-                .balance(self.own_eth_addr().as_bytes().into(), None)
-                .into_future()
-                .map_err(GuacError::from)
-                .from_err()
-                // Ugly conversion routine from ethereum-types -> clarity
-                .map(|value| value.to_string().parse().unwrap()),
-        )
+        self.web3().eth_get_balance(self.own_eth_addr().clone())
     }
 
     fn wait_for_event(
@@ -228,38 +195,62 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         topic2: Option<Vec<[u8; 32]>>,
     ) -> Box<Future<Item = Log, Error = Error>> {
         // Build a filter with specified topics
-        let filter = FilterBuilder::default()
-            .address(
-                // Convert contract address into eth-types
-                vec![self.read().unwrap().contract.as_bytes().into()],
-            ).topics(
-                Some(vec![derive_signature(event).into()]),
-                // This is a first, optional topic to filter. If specified it will be converted
-                // into a vector of values, otherwise a None.
-                topic1.map(|v| v.iter().map(|&val| val.into()).collect()),
-                topic2.map(|v| v.iter().map(|&val| val.into()).collect()),
-                None,
-            ).build();
+        let mut new_filter = NewFilter::default();
+        new_filter.address = vec![self.read().unwrap().contract.clone()];
+        new_filter.topics = Some(vec![
+            Some(vec![Some(bytes_to_data(&derive_signature(event)))]),
+            topic1.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
+            topic2.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
+        ]);
 
+        // let filter = FilterBuilder::default()
+        //     .address(
+        //         // Convert contract address into eth-types
+        //         vec![self.read().unwrap().contract.as_bytes().into()],
+        //     ).topics(
+        //         Some(vec![derive_signature(event).into()]),
+        //         // This is a first, optional topic to filter. If specified it will be converted
+        //         // into a vector of values, otherwise a None.
+        //         topic1.map(|v| v.iter().map(|&val| val.into()).collect()),
+        //         topic2.map(|v| v.iter().map(|&val| val.into()).collect()),
+        //         None,
+        //     ).build();
         Box::new(
-            self.web3()
-                .eth_filter()
-                .create_logs_filter(filter)
-                .then(|filter| {
-                    filter
-                        .unwrap()
-                        .stream(time::Duration::from_secs(0))
-                        .into_future()
-                        .map(|(head, _tail)| {
-                            // Throw away rest of the stream
-                            head
-                        })
-                }).map_err(|(e, _)| e)
-                .map_err(GuacError::from)
+            CRYPTO
+                .web3()
+                .eth_new_filter(vec![new_filter])
                 .from_err()
-                .map(|maybe_log| maybe_log.expect("Expected log data but None found"))
+                .and_then(move |filter_id| {
+                    CRYPTO
+                        .web3()
+                        .eth_get_filter_changes(filter_id)
+                        .into_future()
+                        .map(|(head, _tail)| head)
+                        .map_err(|(e, _)| e)
+                }).from_err()
+                .map(move |maybe_log| maybe_log.expect("Expected log data but None found"))
                 .into_future(),
         )
+
+        // Box::new(
+        //     self.web3()
+        //         .eth_filter()
+        //         .create_logs_filter(filter)
+        //         .then(|filter| {
+        //             filter
+        //                 .unwrap()
+        //                 .stream(time::Duration::from_secs(0))
+        //                 .into_future()
+        //                 .map(|(head, _tail)| {
+        //                     // Throw away rest of the stream
+        //                     head
+        //                 })
+        //         }).map_err(|(e, _)| e)
+        //         .map_err(GuacError::from)
+        //         .from_err()
+        //         .map(|maybe_log| maybe_log.expect("Expected log data but None found"))
+        //         .into_future(),
+        // )
     }
 
     fn broadcast_transaction(
@@ -274,7 +265,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         // let instance = self.read().unwrap();
         let contract = self.read().unwrap().contract.clone();
         let secret = self.read().unwrap().secret.clone();
-        let web3 = self.web3().clone();
+        // let web3 = self.web3().clone();
 
         Box::new(
             props
@@ -300,14 +291,15 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                         },
                     };
 
-                    let transaction = transaction.sign(&secret, Some(network_id));
+                    let transaction = transaction.sign(&secret, Some(network_id.parse().unwrap()));
 
-                    web3.eth()
-                        .send_raw_transaction(Bytes::from(transaction.to_bytes().unwrap()))
-                        .into_future()
-                        .map_err(GuacError::from)
-                        .and_then(|tx| ok(format!("0x{:x}", tx).parse().unwrap()))
-                        .from_err()
+                    CRYPTO
+                        .web3()
+                        .eth_send_raw_transaction(transaction.to_bytes().unwrap())
+                    // .into_future()
+                    // .map_err(GuacError::from)
+                    // .and_then(|tx| ok(format!("0x{:x}", tx).parse().unwrap()))
+                    // .from_err()
                 }).into_future(),
         )
     }
