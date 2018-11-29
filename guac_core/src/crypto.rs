@@ -89,7 +89,8 @@ pub trait CryptoService {
     fn wait_for_event(
         &self,
         event: &str,
-        topic: Option<[u8; 32]>,
+        topic1: Option<Vec<[u8; 32]>>,
+        topic2: Option<Vec<[u8; 32]>>,
     ) -> Box<Future<Item = Log, Error = Error>>;
     /// Broadcast a transaction on the network.
     ///
@@ -187,7 +188,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         Box::new(
             self.web3()
                 .eth()
-                .transaction_count(self.own_eth_addr().to_string().parse().unwrap(), None)
+                .transaction_count(self.own_eth_addr().as_bytes().into(), None)
                 .into_future()
                 .map_err(GuacError::from)
                 .from_err()
@@ -211,7 +212,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         Box::new(
             self.web3()
                 .eth()
-                .balance(self.own_eth_addr().to_string().parse().unwrap(), None)
+                .balance(self.own_eth_addr().as_bytes().into(), None)
                 .into_future()
                 .map_err(GuacError::from)
                 .from_err()
@@ -223,19 +224,20 @@ impl CryptoService for Arc<RwLock<Crypto>> {
     fn wait_for_event(
         &self,
         event: &str,
-        topic: Option<[u8; 32]>,
+        topic1: Option<Vec<[u8; 32]>>,
+        topic2: Option<Vec<[u8; 32]>>,
     ) -> Box<Future<Item = Log, Error = Error>> {
         // Build a filter with specified topics
         let filter = FilterBuilder::default()
             .address(
                 // Convert contract address into eth-types
-                vec![self.read().unwrap().contract.to_string().parse().unwrap()],
+                vec![self.read().unwrap().contract.as_bytes().into()],
             ).topics(
                 Some(vec![derive_signature(event).into()]),
                 // This is a first, optional topic to filter. If specified it will be converted
                 // into a vector of values, otherwise a None.
-                topic.map(|v| vec![v.into()]),
-                None,
+                topic1.map(|v| v.iter().map(|&val| val.into()).collect()),
+                topic2.map(|v| v.iter().map(|&val| val.into()).collect()),
                 None,
             ).build();
 

@@ -7,20 +7,25 @@ extern crate rand;
 #[macro_use]
 extern crate failure;
 extern crate num256;
-
+extern crate sha3;
 use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
-use clarity::{Address, PrivateKey, Transaction};
+use clarity::{Address, PrivateKey, Signature, Transaction};
 use failure::Error;
-use guac_core::channel_client::channel_manager::ChannelManager;
+use guac_core::contracts::guac_contract::GuacContract;
+use guac_core::contracts::guac_contract::{
+    create_close_channel_fast_fingerprint_data, create_new_channel_fingerprint_data,
+    create_redraw_fingerprint_data, create_update_fingerprint_data,
+    create_update_with_bounty_fingerprint_data,
+};
 use guac_core::crypto::Config;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
-use guac_core::eth_client::EthClient;
-use guac_core::eth_client::{create_signature_data, create_update_channel_payload};
 use guac_core::network::Web3Handle;
-use guac_core::payment_contract::PaymentContract;
+use guac_core::payment_contract::{ChannelId, PaymentContract};
 use num256::Uint256;
 use rand::{OsRng, Rng};
+use sha3::Digest;
+use sha3::{Keccak256, Sha3_256};
 use std::env;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -91,6 +96,15 @@ lazy_static! {
          .into_iter()
          .nth(0)
          .expect("Unable to obtain first address from the test network");
+
+    static ref BLOCK_NUMBER : Uint256 = WEB3
+        .eth()
+        .block_number()
+        .wait()
+        .expect("Unable to retrieve block number")
+        .to_string()
+        .parse()
+        .expect("Unable to convert block number");
 }
 
 /// Creates a random private key
@@ -154,6 +168,149 @@ fn poll_for_event(event: &str) -> web3::Result<Log> {
     )
 }
 
+fn create_new_channel_fingerprint(
+    secret0: &PrivateKey,
+    secret1: &PrivateKey,
+    address0: Address,
+    address1: Address,
+    balance0: Uint256,
+    balance1: Uint256,
+    expiration: Uint256,
+    settling: Uint256,
+) -> (Signature, Signature) {
+    let (address0, address1, balance0, balance1) = if address0 > address1 {
+        (address1, address0, balance1, balance0)
+    } else {
+        (address0, address1, balance0, balance1)
+    };
+
+    assert!(address0 < address1);
+
+    let msg = create_new_channel_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &address0,
+        &address1,
+        &balance0,
+        &balance1,
+        &expiration,
+        &settling,
+    );
+    (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
+}
+
+fn create_update_fingerprint(
+    secret0: &PrivateKey,
+    secret1: &PrivateKey,
+    channel_id: ChannelId,
+    sequence_number: Uint256,
+    balance0: Uint256,
+    balance1: Uint256,
+) -> (Signature, Signature) {
+    // Reorder secret keys as it matters who signs the fingerprint
+    let (secret0, secret1) = if secret0.to_public_key().unwrap() > secret1.to_public_key().unwrap()
+    {
+        (secret1, secret0)
+    } else {
+        (secret0, secret1)
+    };
+
+    let msg = create_update_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &channel_id,
+        &sequence_number,
+        &balance0,
+        &balance1,
+    );
+    (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
+}
+
+fn create_close_fingerprint(
+    secret0: &PrivateKey,
+    secret1: &PrivateKey,
+    channel_id: ChannelId,
+    sequence_number: Uint256,
+    balance0: Uint256,
+    balance1: Uint256,
+) -> (Signature, Signature) {
+    // Reorder secret keys as it matters who signs the fingerprint
+    let (secret0, secret1) = if secret0.to_public_key().unwrap() > secret1.to_public_key().unwrap()
+    {
+        (secret1, secret0)
+    } else {
+        (secret0, secret1)
+    };
+
+    let msg = create_close_channel_fast_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &channel_id,
+        &sequence_number,
+        &balance0,
+        &balance1,
+    );
+    (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
+}
+
+fn create_settling_fingerprint(key: &PrivateKey, channel_id: ChannelId) -> Signature {
+    let mut msg = "startSettlingPeriod".as_bytes().to_vec();
+    msg.extend(CHANNEL_ADDRESS.clone().as_bytes());
+    msg.extend(channel_id.to_vec());
+    key.sign_msg(&msg)
+}
+
+fn create_redraw_fingerprint(
+    secret0: &PrivateKey,
+    secret1: &PrivateKey,
+    channel_id: ChannelId,
+    sequence_number: Uint256,
+    old_balance_a: Uint256,
+    old_balance_b: Uint256,
+    new_balance_a: Uint256,
+    new_balance_b: Uint256,
+    expiration: Uint256,
+) -> (Signature, Signature) {
+    let (secret0, secret1) = if secret0.to_public_key().unwrap() > secret1.to_public_key().unwrap()
+    {
+        (secret1, secret0)
+    } else {
+        (secret0, secret1)
+    };
+
+    let mut msg = create_redraw_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &channel_id,
+        &sequence_number,
+        &old_balance_a,
+        &old_balance_b,
+        &new_balance_a,
+        &new_balance_b,
+        &expiration,
+    );
+    (secret0.sign_msg(&msg), secret1.sign_msg(&msg))
+}
+
+fn create_update_with_bounty_fingerprint(
+    secret: &PrivateKey,
+    channel_id: ChannelId,
+    sequence_number: Uint256,
+    balance0: Uint256,
+    balance1: Uint256,
+    signature0: Signature,
+    signature1: Signature,
+    bounty_amount: Uint256,
+) -> Signature {
+    let msg = create_update_with_bounty_fingerprint_data(
+        &*CHANNEL_ADDRESS,
+        &channel_id,
+        &sequence_number,
+        &balance0,
+        &balance1,
+        &signature0,
+        &signature1,
+        &bounty_amount,
+    );
+    secret.sign_msg(&msg)
+}
+
 #[test]
 #[ignore]
 fn contract() {
@@ -166,10 +323,21 @@ fn contract() {
     };
     CRYPTO.init(&cfg).unwrap();
 
-    let contract: Box<PaymentContract> = Box::new(EthClient::new());
+    let contract: Box<PaymentContract> = Box::new(GuacContract::new());
 
     println!("Address {:?}", &*CHANNEL_ADDRESS);
     println!("Network ID {:?}", &*NETWORK_ID);
+
+    // Bounty Hunter
+    let bounty_hunter_balance: Uint256 = "1000000000000000000".parse().unwrap(); // 1ETH
+    let bounty_hunter = make_seeded_key();
+    *CRYPTO.secret_mut() = bounty_hunter.clone();
+    let bounty_hunter_pk = bounty_hunter.to_public_key().unwrap();
+    contract
+        .quick_deposit(bounty_hunter_balance.clone())
+        .wait()
+        .unwrap();
+
     // Set up both parties (alice and bob)
     // they will be used to exchange ETH through channels contract.
     let alice = make_seeded_key();
@@ -185,15 +353,12 @@ fn contract() {
     println!("Alice PK {:?}", alice_pk.to_string());
     let bob_pk = bob.to_public_key().expect("Unable to get Bob's public key");
     println!("Bob PK {:?}", bob_pk.to_string());
-    // let alice_cm = ChannelManager::New;
-    // let bob_cm = ChannelManager::New;
-    let mut cm = ChannelManager::New;
 
-    let action = cm.tick(alice_pk, bob_pk).expect("Doesn't work");
-    println!("action {:?}", action);
-    println!("cm {:?}", cm);
-
-    let challenge = Uint256::from(42u32);
+    if alice_pk > bob_pk {
+        println!("ALICE_PK > BOB_PK (CASE 1 UNORDERED)");
+    } else {
+        println!("ALICE_PK < BOB_PK (CASE 1 ORDERED)");
+    }
 
     // Call openChannel
 
@@ -201,94 +366,251 @@ fn contract() {
     let gas_price = WEB3.eth().gas_price().wait().unwrap();
     let gas_price: Uint256 = gas_price.to_string().parse().unwrap();
 
-    let channel_id = contract
-        .open_channel(
-            bob.to_public_key().unwrap(),
-            challenge,
-            "1000000000000000000".parse().unwrap(),
-        ).wait()
-        .unwrap();
-
-    // Switch to bob
-    *CRYPTO.secret_mut() = bob.clone();
-    assert_eq!(CRYPTO.secret(), bob);
-    println!("bob {:?}", CRYPTO.secret());
-
-    // Bob joins Alice's channel
-    contract
-        .join_channel(channel_id, "1000000000000000000".parse().unwrap())
-        .wait()
-        .unwrap();
-
     // This has to be updated on every state update
     let mut channel_nonce = 0u32;
 
-    //
-    // Alice calls updateState
-    //
-    channel_nonce += 1;
-    let balance_a: Uint256 = "500000000000000000".parse().unwrap();
-    let balance_b: Uint256 = "1500000000000000000".parse().unwrap();
+    let mut alice_balance: Uint256 = "1000000000000000000".parse().unwrap();
+    let mut bob_balance: Uint256 = "0".parse().unwrap();
+    let mut total_balance = alice_balance.clone() + bob_balance.clone();
+    println!("total balance {}", total_balance);
 
-    // Proof is the same for both parties
-    let proof = create_signature_data(
-        channel_id,
-        channel_nonce.into(),
-        balance_a.clone(),
-        balance_b.clone(),
+    let expiration: Uint256 = (BLOCK_NUMBER.clone() + 100u64).into();
+    let settling: Uint256 = 200u64.into();
+
+    println!("Calling quickDeposit");
+    contract
+        .quick_deposit(alice_balance.clone())
+        .wait()
+        .unwrap();
+
+    let (sig0, sig1) = create_new_channel_fingerprint(
+        &alice,
+        &bob,
+        alice.to_public_key().unwrap(),
+        bob.to_public_key().unwrap(),
+        alice_balance.clone(),
+        bob_balance.clone(),
+        expiration.clone(),
+        settling.clone(),
     );
 
-    *CRYPTO.secret_mut() = alice.clone();
-    assert_eq!(CRYPTO.secret(), alice);
+    println!("Calling newChannel");
+    let fut = contract.new_channel(
+        alice.to_public_key().unwrap(),
+        bob.to_public_key().unwrap(),
+        alice_balance.clone().into(),
+        bob_balance.clone().into(),
+        sig0,
+        sig1,
+        expiration.clone().into(),
+        settling.clone().into(),
+    );
+
+    let channel_id = fut.wait().unwrap();
+    assert!(channel_id != [0u8; 32]);
+    println!("channel id {:x?}", channel_id);
+
+    // Progress nonce
+    channel_nonce += 1;
+
+    let op: Uint256 = "100000000000000000".parse().unwrap();
+    // let op : Uint256 = "0".parse().unwrap();
+    assert!(op <= alice_balance);
+    assert!(op > bob_balance);
+
+    alice_balance -= op.clone();
+    bob_balance += op.clone();
+    assert_eq!(alice_balance.clone() + bob_balance.clone(), total_balance);
+
+    // Reorder balances based on private key (can't do it inside the method)
+    let (balance0, balance1) = if alice.to_public_key().unwrap() > bob.to_public_key().unwrap() {
+        (bob_balance.clone(), alice_balance.clone())
+    } else {
+        (alice_balance.clone(), bob_balance.clone())
+    };
+
+    // let alice_balance : Uint256 = "900000000000000000".parse().unwrap();
+    // let bob_balance : Uint256 = "100000000000000000".parse().unwrap();
+    let (sig_a, sig_b) = create_update_fingerprint(
+        &alice,
+        &bob,
+        channel_id.clone(),
+        channel_nonce.clone().into(),
+        balance0.clone(),
+        balance1.clone(),
+    );
+
+    println!("Calling updateState");
+    let fut = contract.update_state(
+        channel_id,
+        channel_nonce.clone().into(),
+        balance0.clone(),
+        balance1.clone(),
+        sig_a.clone(),
+        sig_b.clone(),
+    );
+
+    fut.wait().unwrap();
+
+    //
+    // Redraw
+    //
+
+    channel_nonce += 1;
+
+    let old_balance0 = alice_balance.clone();
+    let old_balance1 = bob_balance.clone();
+
+    let op: Uint256 = "100000000000000000".parse().unwrap();
+    assert!(op <= alice_balance);
+
+    // alice_balance -= op.clone();
+    // bob_balance += op.clone();
+
+    // Alice deposits again
+    println!("Calling quickDeposit again");
+    contract.quick_deposit(op.clone()).wait().unwrap();
+
+    alice_balance += op.clone();
+
+    assert_eq!(old_balance0.clone() + old_balance1.clone(), total_balance);
+
+    total_balance += op.clone();
+    assert_eq!(alice_balance.clone() + bob_balance.clone(), total_balance);
+
+    let (old_balance0, old_balance1, new_balance0, new_balance1) =
+        if alice.to_public_key().unwrap() > bob.to_public_key().unwrap() {
+            (
+                old_balance1,
+                old_balance0,
+                bob_balance.clone(),
+                alice_balance.clone(),
+            )
+        } else {
+            (
+                old_balance0,
+                old_balance1,
+                alice_balance.clone(),
+                bob_balance.clone(),
+            )
+        };
+
+    println!(
+        "{} {} {} {}",
+        old_balance0, old_balance1, new_balance0, new_balance1
+    );
+
+    let expiration: Uint256 = (BLOCK_NUMBER.clone() + 100u64).into(); //expiration
+
+    let (sig_a, sig_b) = create_redraw_fingerprint(
+        &alice,
+        &bob,
+        channel_id,
+        channel_nonce.clone().into(),
+        old_balance0.clone(),
+        old_balance1.clone(),
+        new_balance0.clone(),
+        new_balance1.clone(),
+        expiration.clone(),
+    );
+
+    println!("Calling redraw");
+    let fut = contract.redraw(
+        channel_id,
+        channel_nonce.clone().into(),
+        old_balance0.clone(),
+        old_balance1.clone(),
+        new_balance0.clone(),
+        new_balance1.clone(),
+        expiration.clone(),
+        sig_a,
+        sig_b,
+    );
+    fut.wait().unwrap();
+
+    channel_nonce += 1;
+
+    let sig = create_settling_fingerprint(&alice, channel_id);
+    println!("Calling start settling period");
     contract
-        .update_channel(
+        .start_settling_period(channel_id, sig)
+        .wait()
+        .unwrap();
+
+    channel_nonce += 1;
+    println!("Calling updateStateWithBounty");
+
+    let (balance0, balance1) = if alice.to_public_key().unwrap() > bob.to_public_key().unwrap() {
+        (bob_balance.clone(), alice_balance.clone())
+    } else {
+        (alice_balance.clone(), bob_balance.clone())
+    };
+    let (sig_a, sig_b) = create_update_fingerprint(
+        &alice,
+        &bob,
+        channel_id.clone(),
+        channel_nonce.clone().into(),
+        balance0.clone(),
+        balance1.clone(),
+    );
+    let bounty: Uint256 = "1234".parse().unwrap();
+
+    *CRYPTO.secret_mut() = bounty_hunter.clone();
+
+    let fut = contract.update_state_with_bounty(
+        channel_id,
+        channel_nonce.clone().into(),
+        balance0.clone(),
+        balance1.clone(),
+        sig_a.clone(),
+        sig_b.clone(),
+        bounty.clone(), // bounty
+        create_update_with_bounty_fingerprint(
+            &bounty_hunter,
             channel_id,
-            Uint256::from(channel_nonce),
-            balance_a.clone(),
-            balance_b.clone(),
-            alice.sign_msg(&proof),
-            bob.sign_msg(&proof),
-        ).wait()
-        .unwrap();
+            channel_nonce.clone().into(),
+            balance0.clone(),
+            balance1.clone(),
+            sig_a.clone(),
+            sig_b.clone(),
+            bounty.clone(),
+        ),
+    );
 
-    // Switch to bob
-    *CRYPTO.secret_mut() = bob.clone();
-    assert_eq!(CRYPTO.secret(), bob);
+    fut.wait().unwrap();
 
-    // Bob starts challenge on channel
-    contract.start_challenge(channel_id).wait().unwrap();
-
-    //
-    // Switch to alice (keep in mind that Bob started the closing challenge)
-    //
     *CRYPTO.secret_mut() = alice.clone();
-    assert_eq!(CRYPTO.secret(), alice);
+    channel_nonce += 1;
 
-    contract.close_channel(channel_id).wait().unwrap();
+    let (balance0, balance1) = if alice.to_public_key().unwrap() > bob.to_public_key().unwrap() {
+        (bob_balance.clone(), alice_balance.clone())
+    } else {
+        (alice_balance.clone(), bob_balance.clone())
+    };
+    let (sig_a, sig_b) = create_close_fingerprint(
+        &alice,
+        &bob,
+        channel_id.clone(),
+        channel_nonce.clone().into(),
+        balance0.clone(),
+        balance1.clone(),
+    );
 
-    let alice_balance: Uint256 = WEB3
-        .eth()
-        .balance(alice.to_public_key().unwrap().as_bytes().into(), None)
-        .wait()
-        .unwrap()
-        // Convert U256 to Uint256
-        .to_string()
-        .parse()
-        .unwrap();
-    println!("Alice {:?}", alice_balance);
-    let bob_balance: Uint256 = WEB3
-        .eth()
-        .balance(bob.to_public_key().unwrap().as_bytes().into(), None)
-        .wait()
-        .unwrap()
-        // Convert U256 to Uint256
-        .to_string()
-        .parse()
-        .unwrap();
-    println!("Bob {:?}", bob_balance);
+    println!("Calling closeChannelFast");
+    let fut = contract.close_channel_fast(
+        channel_id,
+        channel_nonce.clone().into(),
+        balance0.clone(),
+        balance1.clone(),
+        sig_a,
+        sig_b,
+    );
+    fut.wait().unwrap();
 
-    assert!(alice_balance < Uint256::from_str("9500000000000000000").unwrap());
-    assert!(bob_balance >= Uint256::from_str("10490000000000000000").unwrap());
+    println!("Calling withdraw");
+
+    contract.withdraw(alice_balance.clone()).wait().unwrap();
+    // contract.close_channel(channel_id).wait().unwrap();
 }
 
 #[test]
