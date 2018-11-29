@@ -16,8 +16,14 @@ msc {
 
 
 
-  b=>b [label="fillChannel A, 10"];
+  b-xb [label="fillChannel in OtherCreating state fails"];
+  ...  [ label = "After some polling..." ];
 
+  a<<c [label="channelOpened event"];
+  a=>b [label="channelOpened notification"],
+  b=>c [label="verify channelOpened"];
+  b<<c [label="channelOpened success"];
+  b box b [label="state Open"];
   a<=b [label="propose reDraw A: 10, B: 10"];
   a box a [label="state OtherCreating A: 10, B: 10"];
 
