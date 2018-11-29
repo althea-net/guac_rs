@@ -188,7 +188,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         Box::new(
             self.web3()
                 .eth()
-                .transaction_count(self.own_eth_addr().to_string().parse().unwrap(), None)
+                .transaction_count(self.own_eth_addr().as_bytes().into(), None)
                 .into_future()
                 .map_err(GuacError::from)
                 .from_err()
@@ -212,7 +212,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         Box::new(
             self.web3()
                 .eth()
-                .balance(self.own_eth_addr().to_string().parse().unwrap(), None)
+                .balance(self.own_eth_addr().as_bytes().into(), None)
                 .into_future()
                 .map_err(GuacError::from)
                 .from_err()
@@ -231,7 +231,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         let filter = FilterBuilder::default()
             .address(
                 // Convert contract address into eth-types
-                vec![self.read().unwrap().contract.to_string().parse().unwrap()],
+                vec![self.read().unwrap().contract.as_bytes().into()],
             ).topics(
                 Some(vec![derive_signature(event).into()]),
                 // This is a first, optional topic to filter. If specified it will be converted
