@@ -1,7 +1,7 @@
 use clarity::{Address, Signature};
 use crypto::CryptoService;
 use failure::Error;
-use futures::{empty, Future};
+use futures::{future, Future};
 use num256::Uint256;
 use qutex::Guard;
 use std::sync::Arc;
@@ -12,7 +12,15 @@ use {CRYPTO, STORAGE};
 pub struct Guac {
     blockchain_client: Arc<Box<BlockchainClient>>,
     counterparty_client: Arc<Box<CounterpartyClient>>,
-    storage: Arc<Box<ChannelStorage>>,
+    storage: Arc<Box<Storage>>,
+}
+
+#[derive(Debug, Fail)]
+pub enum GuacError {
+    #[fail(
+        display = "Guac is currently waiting on another operation to complete. Try again later."
+    )]
+    TryAgainLater(),
 }
 
 #[derive(Clone, Debug)]
@@ -42,10 +50,10 @@ pub struct Counterparty {
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChannelState {
     New,
-    // Creating,
-    // OtherCreating,
-    // ReDrawing,
-    // OtherReDrawing,
+    Creating,
+    OtherCreating,
+    ReDrawing,
+    OtherReDrawing,
     Open,
 }
 
@@ -113,21 +121,21 @@ pub trait BlockchainClient {
     fn re_draw(&self, new_channel: &ReDrawTx) -> Box<Future<Item = Uint256, Error = Error>>;
 }
 
-pub trait ChannelStorage {
+pub trait Storage {
     /// Creates a new channel for given parameters of a counterparty.
     // fn register_channel(&self, channel: Channel) -> Box<Future<Item = Channel, Error = Error>>;
     /// Get channel struct for a given channel ID.
     ///
     /// - `channel_id` - A valid channel ID
-    fn get_channel(
-        &self,
-        counterparty_address: Address,
-    ) -> Box<Future<Item = Counterparty, Error = Error>>;
+    fn get_counterparty(&self, address: Address)
+        -> Box<Future<Item = Counterparty, Error = Error>>;
     /// Update a channel by its ID
-    fn update_channel(&self, channel: Counterparty) -> Box<Future<Item = (), Error = Error>>;
+    fn update_counterparty(
+        &self,
+        counterparty: Counterparty,
+    ) -> Box<Future<Item = (), Error = Error>>;
 }
 
-// Note: Due to the fact that we are using qutex::Guard,
 impl Guac {
     fn fillChannel(
         mut self,
@@ -139,7 +147,7 @@ impl Guac {
         let blockchain_client = self.blockchain_client.clone();
         Box::new(
             storage
-                .get_channel(their_address.clone())
+                .get_counterparty(their_address.clone())
                 .and_then(move |counterparty| {
                     match counterparty.state {
                         ChannelState::New => {
@@ -174,37 +182,41 @@ impl Guac {
 
                             let my_signature = new_channel.sign();
 
-                            counterparty_client
-                                .propose_channel(&new_channel)
-                                .and_then(move |their_signature| {
-                                    let (signature0, signature1) = if (i_am_0) {
-                                        (my_signature, their_signature)
-                                    } else {
-                                        (their_signature, my_signature)
-                                    };
+                            Box::new(
+                                counterparty_client
+                                    .propose_channel(&new_channel)
+                                    .and_then(move |their_signature| {
+                                        let (signature0, signature1) = if (i_am_0) {
+                                            (my_signature, their_signature)
+                                        } else {
+                                            (their_signature, my_signature)
+                                        };
 
-                                    blockchain_client.new_channel(&NewChannelTx {
-                                        signature0: Some(signature0),
-                                        signature1: Some(signature1),
-                                        ..new_channel
-                                    })
-                                }).and_then(|channel_id| {
-                                    counterparty_client.notify_channel_opened(&channel_id)
-                                }).and_then(move |()| {
-                                    // counterparty.state = ChannelState::Open;
-                                    Ok(())
-                                });
+                                        counterparty.state = ChannelState::Creating;
 
-                            Ok(())
+                                        blockchain_client.new_channel(&NewChannelTx {
+                                            signature0: Some(signature0),
+                                            signature1: Some(signature1),
+                                            ..new_channel
+                                        })
+                                    }).and_then(move |channel_id| {
+                                        counterparty_client.notify_channel_opened(&channel_id)
+                                    }).and_then(move |()| {
+                                        counterparty.state = ChannelState::Open;
+                                        Ok(())
+                                    }),
+                            ) as Box<Future<Item = (), Error = Error>>
                         }
-                        // ChannelState::Creating
-                // | ChannelState::OtherCreating
-                // | ChannelState::ReDrawTxing
-                // | ChannelState::OtherReDrawTxing => {
-                //     // Do refill
-
-                // }
+                        ChannelState::Creating
+                        | ChannelState::OtherCreating
+                        | ChannelState::ReDrawing
+                        | ChannelState::OtherReDrawing => {
+                            // Make user wait
+                            return Box::new(future::err(GuacError::TryAgainLater().into()))
+                                as Box<Future<Item = (), Error = Error>>;
+                        }
                         ChannelState::Open => {
+                            // Do redraw
                             let channel = counterparty.channel.clone();
 
                             let balance0 = channel.balance0.clone();
@@ -216,7 +228,6 @@ impl Guac {
                                 (balance0, balance1 + amount)
                             };
 
-                            // Do refill
                             let re_draw = ReDrawTx {
                                 channel_id: channel.channel_id,
                                 sequence_number: channel.sequence_number,
@@ -231,28 +242,33 @@ impl Guac {
 
                             let my_signature = re_draw.sign();
 
-                            counterparty_client
-                                .propose_re_draw(&re_draw)
-                                .and_then(move |their_signature| {
-                                    let (signature0, signature1) = if (counterparty.i_am_0) {
-                                        (my_signature, their_signature)
-                                    } else {
-                                        (their_signature, my_signature)
-                                    };
-
-                                    blockchain_client.re_draw(&ReDrawTx {
-                                        signature0: Some(signature0),
-                                        signature1: Some(signature1),
-                                        ..re_draw
-                                    })
-                                }).and_then(|channel_id| {
-                                    counterparty_client.notify_re_draw(&CRYPTO.own_eth_addr())
-                                }).and_then(move |()| {
-                                    // self.state = ChannelState::Open;
-                                    Ok(())
-                                });
-
-                            Ok(())
+                            Box::new(
+                                counterparty_client
+                                    .propose_re_draw(&re_draw)
+                                    .and_then(move |their_signature| {
+                                        counterparty.state = ChannelState::ReDrawing;
+                                        storage.update_counterparty(counterparty);
+                                        their_signature
+                                    }).and_then(move |their_signature| {
+                                        let (signature0, signature1) = if (counterparty.i_am_0) {
+                                            (my_signature, their_signature)
+                                        } else {
+                                            (their_signature, my_signature)
+                                        };
+                                    }).and_then(move |(their_signature, my_signature)| {
+                                        blockchain_client.re_draw(&ReDrawTx {
+                                            signature0: Some(signature0),
+                                            signature1: Some(signature1),
+                                            ..re_draw
+                                        })
+                                    }).and_then(move |channel_id| {
+                                        counterparty_client.notify_re_draw(&CRYPTO.own_eth_addr())
+                                    }).and_then(move |()| {
+                                        counterparty.state = ChannelState::Open;
+                                        storage.update_counterparty(counterparty);
+                                        Ok(())
+                                    }),
+                            ) as Box<Future<Item = (), Error = Error>>
                         }
                     }
                 }),
