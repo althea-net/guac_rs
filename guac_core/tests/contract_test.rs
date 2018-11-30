@@ -587,7 +587,7 @@ fn contract() {
 #[ignore]
 fn init_and_query() {
     let cfg = Config {
-        address: "http://127.0.0.1:8545".to_string(),
+        address: env::var("GANACHE_HOST").unwrap_or("http://localhost:8545".to_owned()),
         contract: CHANNEL_ADDRESS.clone(),
         secret: "fafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafa"
             .parse()
