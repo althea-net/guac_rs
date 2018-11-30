@@ -202,55 +202,29 @@ impl CryptoService for Arc<RwLock<Crypto>> {
             topic1.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
             topic2.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
         ]);
-
-        // let filter = FilterBuilder::default()
-        //     .address(
-        //         // Convert contract address into eth-types
-        //         vec![self.read().unwrap().contract.as_bytes().into()],
-        //     ).topics(
-        //         Some(vec![derive_signature(event).into()]),
-        //         // This is a first, optional topic to filter. If specified it will be converted
-        //         // into a vector of values, otherwise a None.
-        //         topic1.map(|v| v.iter().map(|&val| val.into()).collect()),
-        //         topic2.map(|v| v.iter().map(|&val| val.into()).collect()),
-        //         None,
-        //     ).build();
         Box::new(
             CRYPTO
                 .web3()
-                .eth_new_filter(vec![new_filter])
-                .from_err()
+                .eth_new_filter(new_filter)
                 .and_then(move |filter_id| {
                     CRYPTO
                         .web3()
-                        .eth_get_filter_changes(filter_id)
+                        .eth_get_filter_changes(filter_id.clone())
                         .into_future()
-                        .map(|(head, _tail)| head)
+                        .map(move |(head, _tail)| (filter_id, head))
                         .map_err(|(e, _)| e)
-                }).from_err()
-                .map(move |maybe_log| maybe_log.expect("Expected log data but None found"))
+                }).and_then(|(filter_id, head)| {
+                    CRYPTO
+                        .web3()
+                        .eth_uninstall_filter(filter_id)
+                        .and_then(move |r| {
+                            ensure!(r, "Unable to properly uninstall filter");
+                            Ok(head)
+                        })
+                }).map(move |maybe_log| maybe_log.expect("Expected log data but None found"))
+                .from_err()
                 .into_future(),
         )
-
-        // Box::new(
-        //     self.web3()
-        //         .eth_filter()
-        //         .create_logs_filter(filter)
-        //         .then(|filter| {
-        //             filter
-        //                 .unwrap()
-        //                 .stream(time::Duration::from_secs(0))
-        //                 .into_future()
-        //                 .map(|(head, _tail)| {
-        //                     // Throw away rest of the stream
-        //                     head
-        //                 })
-        //         }).map_err(|(e, _)| e)
-        //         .map_err(GuacError::from)
-        //         .from_err()
-        //         .map(|maybe_log| maybe_log.expect("Expected log data but None found"))
-        //         .into_future(),
-        // )
     }
 
     fn broadcast_transaction(

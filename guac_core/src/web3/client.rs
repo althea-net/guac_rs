@@ -23,10 +23,8 @@ pub trait Web3 {
     /// Returns a list of addresses owned by client
     fn eth_accounts(&self) -> Box<Future<Item = Vec<Address>, Error = Error>>;
     fn net_version(&self) -> Box<Future<Item = String, Error = Error>>;
-    fn eth_new_filter(
-        &self,
-        new_filter: Vec<NewFilter>,
-    ) -> Box<Future<Item = Uint256, Error = Error>>;
+    fn eth_new_filter(&self, new_filter: NewFilter) -> Box<Future<Item = Uint256, Error = Error>>;
+    fn eth_uninstall_filter(&self, filter: Uint256) -> Box<Future<Item = bool, Error = Error>>;
     fn eth_get_filter_changes(&self, filters: Uint256) -> Box<Stream<Item = Log, Error = Error>>;
     fn eth_get_transaction_count(
         &self,
@@ -65,12 +63,13 @@ impl Web3 for Web3Client {
         self.jsonrpc_client
             .request_method("net_version", Vec::<String>::new())
     }
-    fn eth_new_filter(
-        &self,
-        new_filter: Vec<NewFilter>,
-    ) -> Box<Future<Item = Uint256, Error = Error>> {
+    fn eth_new_filter(&self, new_filter: NewFilter) -> Box<Future<Item = Uint256, Error = Error>> {
         self.jsonrpc_client
-            .request_method("eth_newFilter", new_filter)
+            .request_method("eth_newFilter", vec![new_filter])
+    }
+    fn eth_uninstall_filter(&self, filter: Uint256) -> Box<Future<Item = bool, Error = Error>> {
+        self.jsonrpc_client
+            .request_method("eth_uninstallFilter", vec![filter])
     }
     fn eth_get_filter_changes(&self, filter: Uint256) -> Box<Stream<Item = Log, Error = Error>> {
         let jsonrpc_client = self.jsonrpc_client.clone();
