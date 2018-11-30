@@ -125,7 +125,9 @@ impl Web3 for Web3Client {
         &self,
         data: Vec<u8>,
     ) -> Box<Future<Item = Uint256, Error = Error>> {
-        self.jsonrpc_client
-            .request_method("eth_sendRawTransaction", vec![bytes_to_hex_str(&data)])
+        self.jsonrpc_client.request_method(
+            "eth_sendRawTransaction",
+            vec![format!("0x{}", bytes_to_hex_str(&data))],
+        )
     }
 }
