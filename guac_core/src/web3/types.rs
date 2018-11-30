@@ -28,7 +28,6 @@ pub struct Log {
     pub type_: Option<String>,
 }
 
-
 #[derive(Serialize, Default, Debug)]
 pub struct NewFilter {
     #[serde(

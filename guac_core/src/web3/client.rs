@@ -17,7 +17,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
 use web3::jsonrpc::client::{Client, HTTPClient};
-use web3::types::{TransactionRequest, NewFilter, Log};
+use web3::types::{Log, NewFilter, TransactionRequest};
 
 pub trait Web3 {
     /// Returns a list of addresses owned by client

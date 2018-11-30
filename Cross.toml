@@ -1,0 +1,7 @@
+# Those env variables are passed to `cross` processes
+# and are required by `cross test`.
+[build.env]
+passthrough = [
+  "CHANNEL_ADDRESS",
+  "GANACHE_HOST",
+]

@@ -73,10 +73,7 @@ fn block_on<R: 'static, E: 'static, F: 'static + Future<Item = R, Error = E>>(
     let (tx, rx) = mpsc::unbounded();
     Arbiter::spawn(
         f.then(move |result| {
-            tx
-                .send(result)
-                .wait()
-                .expect("Unable to send R");
+            tx.send(result).wait().expect("Unable to send R");
             System::current().stop();
             Ok(())
         }).into_future(),

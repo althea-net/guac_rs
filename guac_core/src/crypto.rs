@@ -17,7 +17,7 @@ use futures::Stream;
 use num256::Uint256;
 use std::time;
 use web3::client::{Web3, Web3Client};
-use web3::types::{NewFilter, Log};
+use web3::types::{Log, NewFilter};
 
 /// A global object which is responsible for managing all crypo related things.
 lazy_static! {
