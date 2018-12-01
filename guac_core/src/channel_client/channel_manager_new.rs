@@ -21,6 +21,8 @@ pub enum GuacError {
         display = "Guac is currently waiting on another operation to complete. Try again later."
     )]
     TryAgainLater(),
+    #[fail(display = "Cannot call this method in the current state.")]
+    WrongState(),
 }
 
 #[derive(Clone, Debug)]
@@ -66,7 +68,7 @@ pub struct NewChannelTx {
     pub balance1: Uint256,
 
     pub expiration: Uint256,
-    pub settlingPeriodLength: Uint256,
+    pub settling_period_length: Uint256,
 
     pub signature0: Option<Signature>,
     pub signature1: Option<Signature>,
@@ -137,7 +139,7 @@ pub trait Storage {
 }
 
 impl Guac {
-    fn fillChannel(
+    fn fill_channel(
         mut self,
         their_address: Address,
         amount: Uint256,
@@ -175,7 +177,7 @@ impl Guac {
                                 balance0,
                                 balance1,
                                 expiration: 9999999999.into(), //TODO: get current block plus some
-                                settlingPeriodLength: 5000.into(), //TODO: figure out default value
+                                settling_period_length: 5000.into(), //TODO: figure out default value
                                 signature0: None,
                                 signature1: None,
                             };
@@ -207,10 +209,7 @@ impl Guac {
                                     }),
                             ) as Box<Future<Item = (), Error = Error>>
                         }
-                        ChannelState::Creating
-                        | ChannelState::OtherCreating
-                        | ChannelState::ReDrawing
-                        | ChannelState::OtherReDrawing => {
+                        _ => {
                             // Make user wait
                             return Box::new(future::err(GuacError::TryAgainLater().into()))
                                 as Box<Future<Item = (), Error = Error>>;
@@ -270,6 +269,144 @@ impl Guac {
                                     }),
                             ) as Box<Future<Item = (), Error = Error>>
                         }
+                    }
+                }),
+        )
+    }
+
+    fn propose_channel(
+        mut self,
+        their_address: Address,
+        new_channel_tx: &NewChannelTx,
+    ) -> Box<Future<Item = Signature, Error = Error>> {
+        let storage = self.storage.clone();
+        let counterparty_client = self.counterparty_client.clone();
+        let blockchain_client = self.blockchain_client.clone();
+        Box::new(
+            storage
+                .get_counterparty(their_address.clone())
+                .and_then(move |counterparty| match counterparty.state {
+                    ChannelState::New => {
+                        let NewChannelTx {
+                            address0,
+                            address1,
+                            balance0,
+                            balance1,
+                            expiration,
+                            settling_period_length,
+                            signature0,
+                            signature1,
+                        } = new_channel_tx;
+
+                        ensure!(address0 < address1, "Addresses must be sorted.");
+
+                        let (my_balance, i_am_0) = if (address0 == CRYPTO.own_eth_addr()) {
+                            (balance0, true)
+                        } else if (address1 == CRYPTO.own_eth_addr()) {
+                            (balance1, false)
+                        } else {
+                            bail!("This is NewChannelTx is not meant for me.")
+                        };
+
+                        ensure!(
+                            my_balance == 0,
+                            "My balance in proposed channel must be zero."
+                        );
+
+                        ensure!(
+                            settling_period_length == 5000.into(),
+                            "I only accept settling periods of 5000 blocks"
+                        );
+
+                        storage
+                            .update_counterparty(Counterparty {
+                                // Save the current state of the counterparty
+                                channel: Channel {
+                                    address0,
+                                    address1,
+                                    total_balance: balance0 + balance1,
+                                    balance0,
+                                    balance1,
+                                    sequence_number: 0.into(),
+                                    settling_period_length: 5000.into(),
+                                    settling_period_started: false,
+                                    settling_period_end: 0.into(),
+                                },
+                                state: ChannelState::OtherCreating,
+                                i_am_0,
+                                ..counterparty
+                            }).and_then(|| {
+                                // Return our signature
+                                new_channel_tx.sign()
+                            })
+                    }
+                    _ => {
+                        // Can't do that in this state
+                        return Box::new(future::err(GuacError::WrongState().into()))
+                            as Box<Future<Item = (), Error = Error>>;
+                    }
+                }),
+        )
+    }
+
+    fn propose_re_draw(
+        mut self,
+        their_address: Address,
+        re_draw_tx: &ReDrawTx,
+    ) -> Box<Future<Item = Signature, Error = Error>> {
+        let storage = self.storage.clone();
+        let counterparty_client = self.counterparty_client.clone();
+        let blockchain_client = self.blockchain_client.clone();
+        Box::new(
+            storage
+                .get_counterparty(their_address.clone())
+                .and_then(move |counterparty| match counterparty.state {
+                    ChannelState::Open => {
+                        let channel = counterparty.channel;
+                        let ReDrawTx {
+                            channel_id,
+
+                            sequence_number,
+                            old_balance0,
+                            old_balance1,
+
+                            new_balance0,
+                            new_balance1,
+
+                            expiration,
+
+                            signature0,
+                            signature1,
+                        } = re_draw_tx;
+
+                        ensure!(channel_id == channel.channel_id, "Incorrect channel ID.");
+                        ensure!(
+                            sequence_number == channel.sequence_number,
+                            "Incorrect sequence number."
+                        );
+                        ensure!(old_balance0 == channel.balance0, "Incorrect old balance0");
+                        ensure!(old_balance1 == channel.balance1, "Incorrect old balance1");
+
+                        if (i_am_0) {
+                            ensure!(new_balance0 == channel.balance0, "Incorrect new balance0");
+                        } else {
+                            ensure!(new_balance1 == channel.balance1, "Incorrect new balance1");
+                        }
+
+                        storage
+                            .update_counterparty(Counterparty {
+                                // Save the current state of the counterparty
+                                state: ChannelState::OtherReDrawing,
+                                ..counterparty
+                            }).and_then(|| {
+                                // Return our signature
+                                re_draw_tx.sign()
+                            })
+                    }
+                    _ => {
+                        // Can't do that in this state
+                        return Box::new(future::err(GuacError::WrongState().into()))
+                            as Box<Future<Item = (), Error = Error>>;
                     }
                 }),
         )
