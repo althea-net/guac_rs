@@ -1,16 +1,24 @@
 extern crate clarity;
 extern crate guac_core;
-extern crate web3;
 #[macro_use]
 extern crate lazy_static;
 extern crate rand;
 #[macro_use]
 extern crate failure;
+extern crate actix;
+extern crate futures;
+extern crate futures_executor;
 extern crate num256;
 extern crate sha3;
+
+use actix::prelude::*;
+use actix::SystemRunner;
 use clarity::abi::{derive_signature, encode_call, encode_tokens, Token};
 use clarity::{Address, PrivateKey, Signature, Transaction};
-use failure::Error;
+// use failure::Error;
+use futures::future::ok;
+use futures::Async;
+use futures::{Future, IntoFuture, Stream};
 use guac_core::contracts::guac_contract::GuacContract;
 use guac_core::contracts::guac_contract::{
     create_close_channel_fast_fingerprint_data, create_new_channel_fingerprint_data,
@@ -20,8 +28,9 @@ use guac_core::contracts::guac_contract::{
 use guac_core::crypto::Config;
 use guac_core::crypto::CryptoService;
 use guac_core::crypto::CRYPTO;
-use guac_core::network::Web3Handle;
 use guac_core::payment_contract::{ChannelId, PaymentContract};
+use guac_core::web3::client::{Web3, Web3Client};
+use guac_core::web3::types::TransactionRequest;
 use num256::Uint256;
 use rand::{OsRng, Rng};
 use sha3::Digest;
@@ -32,35 +41,19 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use std::time;
-use web3::futures::future::ok;
-use web3::futures::Async;
-use web3::futures::{Future, IntoFuture, Stream};
-use web3::transports::{EventLoopHandle, Http};
-use web3::types::{Bytes, FilterBuilder, Log, TransactionRequest, H160, U256};
-use web3::Web3;
 
-fn make_web3() -> Option<Web3Handle> {
+fn make_web3() -> Option<Web3Client> {
     let address = env::var("GANACHE_HOST").unwrap_or("http://localhost:8545".to_owned());
     eprintln!("Trying to create a Web3 connection to {:?}", address);
     for counter in 0..30 {
-        match Web3Handle::new(&address) {
-            Ok(web3) => {
-                // Request a list of accounts on the node to verify that connection to the
-                // specified network is stable.
-                match web3.eth().accounts().wait() {
-                    Ok(accounts) => {
-                        println!("Got accounts {:?}", accounts);
-                        return Some(web3);
-                    }
-                    Err(e) => {
-                        eprintln!("Unable to retrieve accounts ({}): {}", counter, e);
-                        thread::sleep(time::Duration::from_secs(1));
-                        continue;
-                    }
-                }
+        let web3 = Web3Client::new(&address);
+        match block_on(web3.eth_accounts()) {
+            Ok(accounts) => {
+                println!("Got accounts {:?}", accounts);
+                return Some(web3);
             }
             Err(e) => {
-                eprintln!("Unable to create transport ({}): {}", counter, e);
+                eprintln!("Unable to retrieve accounts ({}): {}", counter, e);
                 thread::sleep(time::Duration::from_secs(1));
                 continue;
             }
@@ -68,43 +61,56 @@ fn make_web3() -> Option<Web3Handle> {
     }
     None
 }
+use futures::{sync::mpsc, Sink};
+use std::cell::RefCell;
+
+/// Executes a future on a temporary System and converts
+/// a Future into a Result.
+fn block_on<R: 'static, E: 'static, F: 'static + Future<Item = R, Error = E>>(
+    f: F,
+) -> Result<R, E> {
+    let sys = System::new("test");
+    let (tx, rx) = mpsc::unbounded();
+    Arbiter::spawn(
+        f.then(move |result| {
+            tx.send(result).wait().expect("Unable to send R");
+            System::current().stop();
+            Ok(())
+        }).into_future(),
+    );
+    sys.run();
+
+    // Wait for either value comes first (error or ok)
+    let res = rx.wait().nth(0);
+    // Unwrap deeply nested value
+    res.unwrap().unwrap()
+}
 
 lazy_static! {
     static ref CHANNEL_ADDRESS: Address = env::var("CHANNEL_ADDRESS")
         .expect("Unable to obtain channel manager contract address. Is $CHANNEL_ADDRESS set properly?")
         .parse()
         .expect("Unable to parse address passed in $CHANNEL_ADDRESS");
-    static ref WEB3: Web3Handle =
+    static ref WEB3: Web3Client =
         make_web3().expect("Unable to create a valid transport for Web3 protocol");
 
-    // WEB3.
-    static ref NETWORK_ID : u64 = WEB3.net()
-            .version()
-            .wait()
-            .expect("Unable to obtain network ID")
-            .parse()
-            .expect("Unable to parse network ID");
+    // // WEB3.
+    static ref NETWORK_ID : u64 = block_on(WEB3.net_version())
+    .unwrap().parse()
+            .expect("Unable to obtain network ID");
 
-    static ref ONE_ETH: U256 = "de0b6b3a7640000".parse().unwrap();
+    static ref ONE_ETH: Uint256 = "0xde0b6b3a7640000".parse().unwrap();
 
-    // Choose a seed key which is the first key returned by the network
-    static ref SEED_ADDRESS : H160 = WEB3
-         .eth()
-         .accounts()
-         .wait()
+    // // Choose a seed key which is the first key returned by the network
+    static ref SEED_ADDRESS : Address = block_on(WEB3
+         .eth_accounts()
+    )
          .expect("Unable to retrieve accounts")
          .into_iter()
          .nth(0)
          .expect("Unable to obtain first address from the test network");
 
-    static ref BLOCK_NUMBER : Uint256 = WEB3
-        .eth()
-        .block_number()
-        .wait()
-        .expect("Unable to retrieve block number")
-        .to_string()
-        .parse()
-        .expect("Unable to convert block number");
+    static ref BLOCK_NUMBER : Uint256 = block_on(WEB3.eth_block_number()).expect("Unable to convert block number");
 }
 
 /// Creates a random private key
@@ -126,46 +132,17 @@ fn make_seeded_key() -> PrivateKey {
     let key = make_random_key();
     let tx_req = TransactionRequest {
         from: *SEED_ADDRESS,
-        to: Some(key.to_public_key().unwrap().as_bytes().into()),
+        to: Some(key.to_public_key().unwrap()),
         gas: None,
-        gas_price: Some(0x1.into()),
-        value: Some(&*ONE_ETH * 10u32),
+        gas_price: Some(Uint256::from(0x1u64)),
+        value: Some(ONE_ETH.clone() * Uint256::from(10u64)),
         data: None,
         nonce: None,
-        condition: None,
     };
-    let _res = WEB3.eth().send_transaction(tx_req).wait().unwrap();
-    let res = WEB3
-        .eth()
-        .balance(key.to_public_key().unwrap().as_bytes().into(), None)
-        .wait();
+    let _res = block_on(WEB3.eth_send_transaction(vec![tx_req])).unwrap();
+    let res = block_on(WEB3.eth_get_balance(key.to_public_key().unwrap())).unwrap();
     println!("Balance {:?}", res);
     key
-}
-
-/// Waits for a single occurence of an event call and returns the log data
-fn poll_for_event(event: &str) -> web3::Result<Log> {
-    let filter = FilterBuilder::default()
-        .address(vec![CHANNEL_ADDRESS.to_string().parse().unwrap()])
-        .topics(Some(vec![derive_signature(event).into()]), None, None, None)
-        .build();
-
-    Box::new(
-        WEB3.eth_filter()
-            .create_logs_filter(filter)
-            .then(|filter| {
-                filter
-                    .unwrap()
-                    .stream(time::Duration::from_secs(0))
-                    .into_future()
-                    .map(|(head, _tail)| {
-                        // Throw away rest of the stream
-                        head
-                    })
-            }).map_err(|(e, _)| e)
-            .map(|maybe_log| maybe_log.expect("Expected log data but None found"))
-            .into_future(),
-    )
 }
 
 fn create_new_channel_fingerprint(
@@ -333,10 +310,7 @@ fn contract() {
     let bounty_hunter = make_seeded_key();
     *CRYPTO.secret_mut() = bounty_hunter.clone();
     let bounty_hunter_pk = bounty_hunter.to_public_key().unwrap();
-    contract
-        .quick_deposit(bounty_hunter_balance.clone())
-        .wait()
-        .unwrap();
+    block_on(contract.quick_deposit(bounty_hunter_balance.clone())).unwrap();
 
     // Set up both parties (alice and bob)
     // they will be used to exchange ETH through channels contract.
@@ -363,8 +337,7 @@ fn contract() {
     // Call openChannel
 
     // Get gas price
-    let gas_price = WEB3.eth().gas_price().wait().unwrap();
-    let gas_price: Uint256 = gas_price.to_string().parse().unwrap();
+    let gas_price = block_on(WEB3.eth_gas_price()).unwrap();
 
     // This has to be updated on every state update
     let mut channel_nonce = 0u32;
@@ -378,10 +351,7 @@ fn contract() {
     let settling: Uint256 = 200u64.into();
 
     println!("Calling quickDeposit");
-    contract
-        .quick_deposit(alice_balance.clone())
-        .wait()
-        .unwrap();
+    block_on(contract.quick_deposit(alice_balance.clone())).unwrap();
 
     let (sig0, sig1) = create_new_channel_fingerprint(
         &alice,
@@ -395,7 +365,7 @@ fn contract() {
     );
 
     println!("Calling newChannel");
-    let fut = contract.new_channel(
+    let fut = block_on(contract.new_channel(
         alice.to_public_key().unwrap(),
         bob.to_public_key().unwrap(),
         alice_balance.clone().into(),
@@ -404,9 +374,9 @@ fn contract() {
         sig1,
         expiration.clone().into(),
         settling.clone().into(),
-    );
+    ));
 
-    let channel_id = fut.wait().unwrap();
+    let channel_id = fut.unwrap();
     assert!(channel_id != [0u8; 32]);
     println!("channel id {:x?}", channel_id);
 
@@ -441,16 +411,16 @@ fn contract() {
     );
 
     println!("Calling updateState");
-    let fut = contract.update_state(
+    let fut = block_on(contract.update_state(
         channel_id,
         channel_nonce.clone().into(),
         balance0.clone(),
         balance1.clone(),
         sig_a.clone(),
         sig_b.clone(),
-    );
+    ));
 
-    fut.wait().unwrap();
+    fut.unwrap();
 
     //
     // Redraw
@@ -469,7 +439,7 @@ fn contract() {
 
     // Alice deposits again
     println!("Calling quickDeposit again");
-    contract.quick_deposit(op.clone()).wait().unwrap();
+    block_on(contract.quick_deposit(op.clone())).unwrap();
 
     alice_balance += op.clone();
 
@@ -515,7 +485,7 @@ fn contract() {
     );
 
     println!("Calling redraw");
-    let fut = contract.redraw(
+    let fut = block_on(contract.redraw(
         channel_id,
         channel_nonce.clone().into(),
         old_balance0.clone(),
@@ -525,17 +495,14 @@ fn contract() {
         expiration.clone(),
         sig_a,
         sig_b,
-    );
-    fut.wait().unwrap();
+    ));
+    fut.unwrap();
 
     channel_nonce += 1;
 
     let sig = create_settling_fingerprint(&alice, channel_id);
     println!("Calling start settling period");
-    contract
-        .start_settling_period(channel_id, sig)
-        .wait()
-        .unwrap();
+    block_on(contract.start_settling_period(channel_id, sig)).unwrap();
 
     channel_nonce += 1;
     println!("Calling updateStateWithBounty");
@@ -557,7 +524,7 @@ fn contract() {
 
     *CRYPTO.secret_mut() = bounty_hunter.clone();
 
-    let fut = contract.update_state_with_bounty(
+    let fut = block_on(contract.update_state_with_bounty(
         channel_id,
         channel_nonce.clone().into(),
         balance0.clone(),
@@ -575,9 +542,9 @@ fn contract() {
             sig_b.clone(),
             bounty.clone(),
         ),
-    );
+    ));
 
-    fut.wait().unwrap();
+    fut.unwrap();
 
     *CRYPTO.secret_mut() = alice.clone();
     channel_nonce += 1;
@@ -597,19 +564,19 @@ fn contract() {
     );
 
     println!("Calling closeChannelFast");
-    let fut = contract.close_channel_fast(
+    let fut = block_on(contract.close_channel_fast(
         channel_id,
         channel_nonce.clone().into(),
         balance0.clone(),
         balance1.clone(),
         sig_a,
         sig_b,
-    );
-    fut.wait().unwrap();
+    ));
+    fut.unwrap();
 
     println!("Calling withdraw");
 
-    contract.withdraw(alice_balance.clone()).wait().unwrap();
+    block_on(contract.withdraw(alice_balance.clone())).unwrap();
     // contract.close_channel(channel_id).wait().unwrap();
 }
 
@@ -617,20 +584,22 @@ fn contract() {
 #[ignore]
 fn init_and_query() {
     let cfg = Config {
-        address: "http://127.0.0.1:8545".to_string(),
+        address: env::var("GANACHE_HOST").unwrap_or("http://localhost:8545".to_owned()),
         contract: CHANNEL_ADDRESS.clone(),
         secret: "fafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafa"
             .parse()
             .unwrap(),
     };
     CRYPTO.init(&cfg).unwrap();
-    assert_ne!(CRYPTO.web3().eth().accounts().wait().unwrap().len(), 0);
 
-    assert_eq!(CRYPTO.get_network_id().wait().unwrap(), *NETWORK_ID);
-    assert_eq!(CRYPTO.get_nonce().wait().unwrap(), Uint256::from(0u64));
-    assert_ne!(CRYPTO.get_gas_price().wait().unwrap(), Uint256::from(0u64));
+    assert!(block_on(CRYPTO.get_network_id()).unwrap().len() != 0);
+    assert_eq!(block_on(CRYPTO.get_nonce()).unwrap(), Uint256::from(0u64));
+    assert_ne!(
+        block_on(CRYPTO.get_gas_price()).unwrap(),
+        Uint256::from(0u64)
+    );
     assert_eq!(
-        CRYPTO.get_network_balance().wait().unwrap(),
+        block_on(CRYPTO.get_network_balance()).unwrap(),
         Uint256::from(0u64)
     );
 }

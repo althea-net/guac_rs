@@ -1,6 +1,7 @@
 use channel_client::types::UpdateTx;
 use clarity::abi::encode_tokens;
 use clarity::abi::{encode_call, Token};
+use clarity::utils::hex_str_to_bytes;
 use clarity::Transaction;
 use clarity::{Address, Signature};
 use error::GuacError;
@@ -278,12 +279,13 @@ impl PaymentContract for GuacContract {
         Box::new(
             call.join(event)
                 .and_then(|(_tx, response)| {
+                    // let response = response.get(0).unwrap();
                     let mut data: [u8; 32] = Default::default();
                     ensure!(
-                        response.data.0.len() == 32,
+                        response.data.len() == 32,
                         "Invalid data length in ChannelOpened event"
                     );
-                    data.copy_from_slice(&response.data.0);
+                    data.copy_from_slice(&response.data);
                     Ok(data)
                 }).into_future(),
         )
