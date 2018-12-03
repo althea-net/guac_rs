@@ -1,24 +1,62 @@
+use clarity::utils::{bytes_to_hex_str, hex_str_to_bytes};
 use clarity::Address;
 use num256::Uint256;
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::Serialize;
+use serde::Serializer;
+use std::ops::Deref;
+
+/// Serializes slice of data as "UNFORMATTED DATA" format required
+/// by Ethereum JSONRPC API.
+///
+/// See more https://github.com/ethereum/wiki/wiki/JSON-RPC#hex-value-encoding
+pub fn data_serialize<S>(x: &[u8], s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(&format!("0x{}", bytes_to_hex_str(x)))
+}
+
+/// Deserializes slice of data as "UNFORMATTED DATA" format required
+/// by Ethereum JSONRPC API.
+///
+/// See more https://github.com/ethereum/wiki/wiki/JSON-RPC#hex-value-encoding
+pub fn data_deserialize<'de, D>(d: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(d)?;
+    hex_str_to_bytes(&s).map_err(serde::de::Error::custom)
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Log {
     /// true when the log was removed, due to a chain reorganization. false if its a valid log.
     pub removed: Option<bool>,
     /// integer of the log index position in the block. null when its pending log.
-    pub logIndex: Option<Uint256>,
+    #[serde(rename = "logIndex")]
+    pub log_index: Option<Uint256>,
     /// integer of the transactions index position log was created from. null when its pending log.
-    pub transactionIndex: Option<Uint256>,
+    #[serde(rename = "transactionIndex")]
+    pub transaction_index: Option<Uint256>,
     /// hash of the transactions this log was created from. null when its pending log.
-    pub transactionHash: Option<String>,
+    #[serde(rename = "transactionHash")]
+    pub transaction_hash: Option<String>,
     /// hash of the block where this log was in. null when its pending. null when its pending log.
-    pub blockHash: Option<String>,
+    #[serde(rename = "blockHash")]
+    pub block_hash: Option<String>,
     /// the block number where this log was in. null when its pending. null when its pending log.
-    pub blockNumber: Option<Uint256>,
+    #[serde(rename = "blockNumber")]
+    pub block_number: Option<Uint256>,
     /// 20 Bytes - address from which this log originated.
     pub address: Address,
     /// contains the non-indexed arguments of the log.
-    pub data: String, //
+    #[serde(
+        serialize_with = "data_serialize",
+        deserialize_with = "data_deserialize"
+    )]
+    pub data: Vec<u8>, //
     /// Array of 0 to 4 32 Bytes DATA of indexed log arguments. (In solidity:
     /// The first topic is the hash of the signature of the
     /// event (e.g. Deposit(address,bytes32,uint256)), except you declared

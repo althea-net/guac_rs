@@ -281,12 +281,11 @@ impl PaymentContract for GuacContract {
                 .and_then(|(_tx, response)| {
                     // let response = response.get(0).unwrap();
                     let mut data: [u8; 32] = Default::default();
-                    let body = hex_str_to_bytes(&response.data)?;
                     ensure!(
-                        body.len() == 32,
+                        response.data.len() == 32,
                         "Invalid data length in ChannelOpened event"
                     );
-                    data.copy_from_slice(&body);
+                    data.copy_from_slice(&response.data);
                     Ok(data)
                 }).into_future(),
         )

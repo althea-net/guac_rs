@@ -19,6 +19,7 @@ use std::time::Duration;
 use web3::jsonrpc::client::{Client, HTTPClient};
 use web3::types::{Log, NewFilter, TransactionRequest};
 
+/// Trait that exposes common Web3 JSONRPC APIs in an asynchronous way
 pub trait Web3 {
     /// Returns a list of addresses owned by client
     fn eth_accounts(&self) -> Box<Future<Item = Vec<Address>, Error = Error>>;
@@ -42,6 +43,7 @@ pub trait Web3 {
         -> Box<Future<Item = Uint256, Error = Error>>;
 }
 
+/// An instance of Web3Client.
 pub struct Web3Client {
     jsonrpc_client: Arc<Box<HTTPClient>>,
 }
