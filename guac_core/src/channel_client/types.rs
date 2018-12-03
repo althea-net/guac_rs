@@ -6,6 +6,50 @@ use crypto::CryptoService;
 use std::ops::Add;
 use CRYPTO;
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+pub struct Channel {
+    pub channel_id: Uint256,
+    pub address_0: Address,
+    pub address_1: Address,
+
+    pub total_balance: Uint256,
+    pub balance_0: Uint256,
+    pub balance_1: Uint256,
+    pub sequence_number: Uint256,
+
+    pub settling_period_length: Uint256,
+    pub settling_period_started: bool,
+    pub settling_period_end: Uint256,
+    pub i_am_0: bool,
+}
+
+impl Channel {
+    pub fn my_balance(&self) -> &Uint256 {
+        match self.i_am_0 {
+            true => &self.balance_0,
+            false => &self.balance_1,
+        }
+    }
+    pub fn their_balance(&self) -> &Uint256 {
+        match self.i_am_0 {
+            true => &self.balance_1,
+            false => &self.balance_0,
+        }
+    }
+    pub fn my_balance_mut(&mut self) -> &mut Uint256 {
+        match self.i_am_0 {
+            true => &mut self.balance_0,
+            false => &mut self.balance_1,
+        }
+    }
+    pub fn their_balance_mut(&mut self) -> &mut Uint256 {
+        match self.i_am_0 {
+            true => &mut self.balance_1,
+            false => &mut self.balance_0,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum ChannelStatus {
     Open,
@@ -15,7 +59,7 @@ pub enum ChannelStatus {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Channel {
+pub struct OldChannel {
     pub channel_id: Option<Uint256>,
     pub address_a: Address,
     pub address_b: Address,
@@ -30,13 +74,13 @@ pub struct Channel {
     pub is_a: bool,
 }
 
-impl Channel {
+impl OldChannel {
     pub fn new_pair(
         channel_id: Uint256,
         deposit_a: Uint256,
         deposit_b: Uint256,
-    ) -> (Channel, Channel) {
-        let channel_a = Channel {
+    ) -> (OldChannel, OldChannel) {
+        let channel_a = OldChannel {
             channel_id: Some(channel_id.clone()),
             address_a: "0x0000000000000000000000000000000000000001"
                 .parse()
@@ -55,7 +99,7 @@ impl Channel {
             is_a: true,
         };
 
-        let channel_b = Channel {
+        let channel_b = OldChannel {
             is_a: false,
             ..channel_a.clone()
         };
@@ -68,14 +112,14 @@ impl Channel {
     }
 
     pub fn swap(&self) -> Self {
-        Channel {
+        OldChannel {
             is_a: !self.is_a,
             ..self.clone()
         }
     }
 }
 
-impl Channel {
+impl OldChannel {
     pub fn get_my_address(&self) -> &Address {
         match self.is_a {
             true => &self.address_a,
