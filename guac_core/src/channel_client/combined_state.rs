@@ -16,13 +16,13 @@ use std::ops::{Add, Sub};
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct CombinedState {
     /// This represents our current state
-    their_state: Channel,
+    pub their_state: Channel,
     /// This represents the last confirmed state we have from them
-    my_state: Channel,
+    pub my_state: Channel,
 
     /// This represents the amount of money we have confirmed we will recieve from them, but have
     /// not been `withdraw`n yet
-    pending_receive: Uint256,
+    pub pending_receive: Uint256,
 }
 
 impl CombinedState {
