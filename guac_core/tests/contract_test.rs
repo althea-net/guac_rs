@@ -120,7 +120,7 @@ fn make_random_key() -> PrivateKey {
     rng.fill_bytes(&mut data);
 
     let res = PrivateKey::from(data);
-    debug_assert_ne!(res, PrivateKey::new());
+    debug_assert_ne!(res, PrivateKey::default());
     res
 }
 
@@ -139,7 +139,11 @@ fn make_seeded_key() -> PrivateKey {
         data: None,
         nonce: None,
     };
-    let _res = block_on(WEB3.eth_send_transaction(vec![tx_req])).unwrap();
+    let tx = block_on(WEB3.eth_send_transaction(vec![tx_req])).unwrap();
+    let transaction_response = block_on(WEB3.eth_get_transaction_by_hash(tx))
+        .unwrap()
+        .unwrap();
+    println!("Transaction {:?}", transaction_response);
     let res = block_on(WEB3.eth_get_balance(key.to_public_key().unwrap())).unwrap();
     println!("Balance {:?}", res);
     key
