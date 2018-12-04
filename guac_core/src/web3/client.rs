@@ -17,7 +17,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
 use web3::jsonrpc::client::{Client, HTTPClient};
-use web3::types::{Log, NewFilter, TransactionRequest};
+use web3::types::{Log, NewFilter, TransactionRequest, TransactionResponse};
 
 /// Trait that exposes common Web3 JSONRPC APIs in an asynchronous way
 pub trait Web3 {
@@ -41,6 +41,10 @@ pub trait Web3 {
     fn eth_block_number(&self) -> Box<Future<Item = Uint256, Error = Error>>;
     fn eth_send_raw_transaction(&self, data: Vec<u8>)
         -> Box<Future<Item = Uint256, Error = Error>>;
+    fn eth_get_transaction_by_hash(
+        &self,
+        hash: Uint256,
+    ) -> Box<Future<Item = Option<TransactionResponse>, Error = Error>>;
 }
 
 /// An instance of Web3Client.
@@ -130,6 +134,17 @@ impl Web3 for Web3Client {
         self.jsonrpc_client.request_method(
             "eth_sendRawTransaction",
             vec![format!("0x{}", bytes_to_hex_str(&data))],
+        )
+    }
+    fn eth_get_transaction_by_hash(
+        &self,
+        hash: Uint256,
+    ) -> Box<Future<Item = Option<TransactionResponse>, Error = Error>> {
+        self.jsonrpc_client.request_method(
+            "eth_getTransactionByHash",
+            /// XXX: Technically it doesn't need to be Uint256, but since send_raw_transaction is
+            /// returning it we'll keep it consistent.
+            vec![hash],
         )
     }
 }
