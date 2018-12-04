@@ -67,12 +67,12 @@ pub struct Log {
 }
 
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]
-struct Data(
+pub struct Data(
     #[serde(
         serialize_with = "data_serialize",
         deserialize_with = "data_deserialize"
     )]
-    Vec<u8>,
+    pub Vec<u8>,
 );
 
 impl Deref for Data {
@@ -89,36 +89,36 @@ impl Deref for Data {
 pub struct TransactionResponse {
     /// hash of the block where this transaction was in. null when its pending.
     #[serde(rename = "blockHash")]
-    block_hash: Option<Data>,
+    pub block_hash: Option<Data>,
     /// block number where this transaction was in. null when its pending.
     #[serde(rename = "blockNumber")]
-    block_number: Option<Uint256>,
+    pub block_number: Option<Uint256>,
     /// address of the sender.
-    from: Address,
+    pub from: Address,
     /// gas provided by the sender.
-    gas: Uint256,
+    pub gas: Uint256,
     /// gas price provided by the sender in Wei.
     #[serde(rename = "gasPrice")]
-    gas_price: Uint256,
+    pub gas_price: Uint256,
     /// hash of the transaction
-    hash: Data,
+    pub hash: Data,
     /// the data send along with the transaction.
-    input: Data,
+    pub input: Data,
     /// the number of transactions made by the sender prior to this one.
-    nonce: Uint256,
+    pub nonce: Uint256,
     /// address of the receiver. null when its a contract creation transaction.
-    to: Address,
+    pub to: Address,
     /// integer of the transaction's index position in the block. null when its pending.
     #[serde(rename = "transactionIndex")]
-    transaction_index: Uint256,
+    pub transaction_index: Uint256,
     /// value transferred in Wei.
-    value: Uint256,
+    pub value: Uint256,
     /// ECDSA recovery id
-    v: Uint256,
+    pub v: Uint256,
     /// ECDSA signature r
-    r: Uint256,
+    pub r: Uint256,
     /// ECDSA signature s
-    s: Uint256,
+    pub s: Uint256,
 }
 
 #[derive(Serialize, Default, Debug)]
