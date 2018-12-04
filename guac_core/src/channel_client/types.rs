@@ -50,6 +50,18 @@ impl Channel {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct UpdateTx {
+    pub channel_id: Uint256,
+    pub sequence_number: Uint256,
+
+    pub balance_0: Uint256,
+    pub balance_1: Uint256,
+
+    pub signature_0: Option<Signature>,
+    pub signature_1: Option<Signature>,
+}
+
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum ChannelStatus {
     Open,
@@ -180,12 +192,12 @@ impl OldChannel {
             false => &mut self.deposit_a,
         }
     }
-    pub fn create_update(&self) -> Result<UpdateTx, Error> {
+    pub fn create_update(&self) -> Result<OldUpdateTx, Error> {
         let channel_id = self.channel_id.as_ref().ok_or(err_msg(
             "Unable to create update before channel is open on the network",
         ))?;
 
-        let mut update_tx = UpdateTx {
+        let mut update_tx = OldUpdateTx {
             channel_id: channel_id.clone(),
             nonce: self.nonce.clone(),
             balance_a: self.balance_a.clone(),
@@ -197,7 +209,11 @@ impl OldChannel {
         update_tx.sign(self.is_a, channel_id.clone());
         Ok(update_tx)
     }
-    pub fn apply_update(&mut self, update: &UpdateTx, validate_balance: bool) -> Result<(), Error> {
+    pub fn apply_update(
+        &mut self,
+        update: &OldUpdateTx,
+        validate_balance: bool,
+    ) -> Result<(), Error> {
         trace!(
             "Apply update for channel {:?} with {:?}",
             self.channel_id,
@@ -244,7 +260,7 @@ impl OldChannel {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTx {
+pub struct OldUpdateTx {
     pub channel_id: Uint256,
     pub nonce: Uint256,
 
@@ -255,7 +271,7 @@ pub struct UpdateTx {
     pub signature_b: Option<Signature>,
 }
 
-impl UpdateTx {
+impl OldUpdateTx {
     pub fn set_my_signature(&mut self, is_a: bool, signature: &Signature) {
         match is_a {
             true => self.signature_a = Some(signature.clone()),
@@ -300,8 +316,8 @@ impl UpdateTx {
         self.set_my_signature(is_a, &my_sig.into());
     }
 
-    pub fn strip_sigs(&self) -> UpdateTx {
-        UpdateTx {
+    pub fn strip_sigs(&self) -> OldUpdateTx {
+        OldUpdateTx {
             signature_a: None,
             signature_b: None,
             ..self.clone()
