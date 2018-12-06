@@ -2,6 +2,7 @@ use clarity::Address;
 use clarity::Signature;
 use failure::Error;
 use futures::Future;
+use num256::Uint256;
 
 /// An alias for a channel ID in a raw bytes form
 pub type ChannelId = [u8; 32];
