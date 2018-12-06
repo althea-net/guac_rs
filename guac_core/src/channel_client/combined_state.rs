@@ -1,4 +1,4 @@
-use failure::{err_msg, Error};
+use failure::Error;
 
 use num256::Uint256;
 
@@ -100,7 +100,7 @@ impl CombinedState {
 
         state.sequence_number += 1u8.into();
 
-        Ok(state.create_update()?)
+        Ok(state.create_update())
     }
 
     /// This is what processes the `UpdateTx` created by the `create_update` on the counterparty.
@@ -208,8 +208,32 @@ impl CombinedState {
 mod tests {
     use super::*;
 
-    fn new_pair(deposit_a: Uint256, deposit_b: Uint256) -> (CombinedState, CombinedState) {
-        let (channel_a, channel_b) = Channel::new_pair(42u64.into(), deposit_a, deposit_b);
+    fn new_pair(balance_0: Uint256, balance_1: Uint256) -> (CombinedState, CombinedState) {
+        // let (channel_a, channel_b) = Channel::new_pair(42u64.into(), deposit_a, deposit_b);
+
+        let channel_a = Channel {
+            channel_id: 42.into(),
+            address_0: "0x0000000000000000000000000000000000000001"
+                .parse()
+                .unwrap(),
+            address_1: "0x0000000000000000000000000000000000000002"
+                .parse()
+                .unwrap(),
+            settling_period_length: 0.into(),
+            settling_period_end: 0.into(),
+            settling_period_started: false,
+            sequence_number: 0.into(),
+            balance_0,
+            balance_1,
+            total_balance: balance_0.add(balance_1),
+            i_am_0: true,
+        };
+
+        let channel_b = Channel {
+            i_am_0: false,
+            ..channel_a.clone()
+        };
+
         (
             CombinedState::new(&channel_a),
             CombinedState::new(&channel_b),
