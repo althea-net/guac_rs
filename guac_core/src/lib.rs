@@ -32,7 +32,7 @@ extern crate tokio;
 pub mod payment_contract;
 
 // Code
-pub mod api;
+// pub mod api;
 pub mod channel_client;
 pub mod contracts;
 pub mod counterparty;
@@ -40,7 +40,6 @@ pub mod crypto;
 pub mod error;
 pub mod storage;
 pub mod transport_protocol;
-pub mod transports;
 pub mod web3;
 
 pub use crypto::CRYPTO;
