@@ -490,26 +490,26 @@ impl ChannelManager {
 mod tests {
     use super::*;
     /*
-    #[test]
-    fn serialize() {
-        // Some data structure.
-        let update_tx = UpdateTx {
-            balance_a: 23.into(),
-            balance_b: 23.into(),
-            channel_id: Bytes32([11; 32]),
-            nonce: 45.into(),
-            signature_a: None,
-            signature_b: None,
-        };
+        #[test]
+        fn serialize() {
+            // Some data structure.
+            let update_tx = UpdateTx {
+                balance_a: 23.into(),
+                balance_b: 23.into(),
+                channel_id: Bytes32([11; 32]),
+                nonce: 45.into(),
+                signature_a: None,
+                signature_b: None,
+            };
 
-        // Serialize it to a JSON string.
-        let j = serde_json::to_string(&update_tx).unwrap();
+            // Serialize it to a JSON string.
+            let j = serde_json::to_string(&update_tx).unwrap();
 
-        // Print, write to a file, or send to an HTTP server.
-        assert_eq!("{\"channel_id\":\"0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b\",\"nonce\":\"0x2d\",\"balance_a\":\"0x17\",\"balance_b\":\"0x17\",\"signature_a\":null,\"signature_b\":null}", j);
-    }
+            // Print, write to a file, or send to an HTTP server.
+            assert_eq!("{\"channel_id\":\"0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b\",\"nonce\":\"0x2d\",\"balance_a\":\"0x17\",\"balance_b\":\"0x17\",\"signature_a\":null,\"signature_b\":null}", j);
+        }
 
-*/
+    */
 
     #[test]
     fn test_channel_opening() {
@@ -527,7 +527,8 @@ mod tests {
                 "0x0000000000000000000000000000000000000064"
                     .parse()
                     .unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
 
         let mut channel_prop = match proposal {
             ChannelManagerAction::SendChannelProposal(channel) => channel,
@@ -575,7 +576,8 @@ mod tests {
                 "0x0000000000000000000000000000000000000064"
                     .parse()
                     .unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
 
         let channel_prop_a = match proposal_a {
             ChannelManagerAction::SendChannelProposal(channel) => channel,
@@ -593,7 +595,8 @@ mod tests {
                 "0x0000000000000000000000000000000000000064"
                     .parse()
                     .unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
 
         let channel_prop_b = match proposal_b {
             ChannelManagerAction::SendChannelProposal(channel) => channel,
@@ -619,14 +622,16 @@ mod tests {
                 "0x0000000000000000000000000000000000000001"
                     .parse()
                     .unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
         manager_b
             .channel_created(
                 &channel_prop_a,
                 "0x0000000000000000000000000000000000000002"
                     .parse()
                     .unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
 
         assert_eq!(
             manager_a,

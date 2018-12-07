@@ -98,7 +98,7 @@ impl CombinedState {
     pub fn create_update(&mut self) -> Result<UpdateTx, Error> {
         let mut state = self.my_state.clone();
 
-        state.nonce = state.nonce.add(1u8);
+        state.nonce += 1u8.into();
 
         Ok(state.create_update()?)
     }

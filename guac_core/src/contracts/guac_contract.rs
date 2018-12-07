@@ -287,7 +287,8 @@ impl PaymentContract for GuacContract {
                     );
                     data.copy_from_slice(&response.data);
                     Ok(data)
-                }).into_future(),
+                })
+                .into_future(),
         )
     }
 
@@ -390,7 +391,7 @@ impl PaymentContract for GuacContract {
         // Broadcast a transaction on the network with data
         Box::new(
             CRYPTO
-                .broadcast_transaction(Action::Call(data), Uint256::from(0))
+                .broadcast_transaction(Action::Call(data), 0u32.into())
                 .and_then(|_tx| Ok(())),
         )
     }
@@ -411,7 +412,7 @@ impl PaymentContract for GuacContract {
         // Broadcast a transaction on the network with data
         Box::new(
             CRYPTO
-                .broadcast_transaction(Action::Call(data), Uint256::from(0))
+                .broadcast_transaction(Action::Call(data), 0u32.into())
                 .and_then(|_tx| Ok(())),
         )
     }
@@ -494,7 +495,8 @@ impl PaymentContract for GuacContract {
                 .and_then(|(_tx, response)| {
                     println!("response {:?}", response);
                     Ok(())
-                }).into_future(),
+                })
+                .into_future(),
         )
     }
 }

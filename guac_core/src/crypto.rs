@@ -213,7 +213,8 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                         .into_future()
                         .map(move |(head, _tail)| (filter_id, head))
                         .map_err(|(e, _)| e)
-                }).and_then(|(filter_id, head)| {
+                })
+                .and_then(|(filter_id, head)| {
                     CRYPTO
                         .web3()
                         .eth_uninstall_filter(filter_id)
@@ -221,7 +222,8 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                             ensure!(r, "Unable to properly uninstall filter");
                             Ok(head)
                         })
-                }).map(move |maybe_log| maybe_log.expect("Expected log data but None found"))
+                })
+                .map(move |maybe_log| maybe_log.expect("Expected log data but None found"))
                 .from_err()
                 .into_future(),
         )
@@ -274,7 +276,8 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                     // .map_err(GuacError::from)
                     // .and_then(|tx| ok(format!("0x{:x}", tx).parse().unwrap()))
                     // .from_err()
-                }).into_future(),
+                })
+                .into_future(),
         )
     }
 }

@@ -76,7 +76,8 @@ fn block_on<R: 'static, E: 'static, F: 'static + Future<Item = R, Error = E>>(
             tx.send(result).wait().expect("Unable to send R");
             System::current().stop();
             Ok(())
-        }).into_future(),
+        })
+        .into_future(),
     );
     sys.run();
 
@@ -351,7 +352,7 @@ fn contract() {
     let mut total_balance = alice_balance.clone() + bob_balance.clone();
     println!("total balance {}", total_balance);
 
-    let expiration: Uint256 = (BLOCK_NUMBER.clone() + 100u64).into();
+    let expiration: Uint256 = BLOCK_NUMBER.clone() + 100u64.into();
     let settling: Uint256 = 200u64.into();
 
     println!("Calling quickDeposit");
@@ -474,7 +475,7 @@ fn contract() {
         old_balance0, old_balance1, new_balance0, new_balance1
     );
 
-    let expiration: Uint256 = (BLOCK_NUMBER.clone() + 100u64).into(); //expiration
+    let expiration: Uint256 = BLOCK_NUMBER.clone() + 100u64.into(); //expiration
 
     let (sig_a, sig_b) = create_redraw_fingerprint(
         &alice,

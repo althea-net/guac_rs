@@ -142,7 +142,8 @@ impl TransportProtocol for HTTPTransportClient {
                         ));
                     }
                     Ok(response)
-                }).and_then(move |response| {
+                })
+                .and_then(move |response| {
                     response
                         .json()
                         .from_err()
@@ -185,7 +186,8 @@ impl TransportProtocol for HTTPTransportClient {
                                 ));
                             }
                             Ok(response)
-                        }).and_then(move |response| response.body().from_err().and_then(|_| Ok(())))
+                        })
+                        .and_then(move |response| response.body().from_err().and_then(|_| Ok(())))
                 }),
         )
     }
