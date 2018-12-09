@@ -7,6 +7,7 @@ use crypto::CryptoService;
 use failure::Error;
 use futures::{future, Future};
 use num256::Uint256;
+
 use std::sync::Arc;
 use storage::{Data, Storage};
 use CRYPTO;
@@ -612,6 +613,9 @@ impl CounterpartyApi for Guac {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use qutex::{FutureGuard, Guard, QrwLock, Qutex};
+    use std::collections::HashMap;
+    use std::sync::Mutex;
 
     struct CC {}
 
@@ -679,40 +683,28 @@ mod tests {
         }
     }
 
-    struct ST {}
-
-    impl Storage for ST {
-        fn get_counterparty(
-            &self,
-            address: Address,
-        ) -> Box<Future<Item = Counterparty, Error = Error>> {
-            unimplemented!();
-        }
-
-        fn set_counterparty(
-            &self,
-            address: Address,
-            counterparty: Counterparty,
-        ) -> Box<Future<Item = (), Error = Error>> {
-            unimplemented!();
-        }
-
-        fn update_counterparty(
-            &self,
-            counterparty: Counterparty,
-        ) -> Box<Future<Item = (), Error = Error>> {
-            unimplemented!();
-        }
-    }
-
     #[test]
     fn test_register_counterparty() {
-        let G = Guac {
-            storage: Arc::new(Box::new(ST {})),
+        let g = Guac {
+            storage: Arc::new(Box::new(Data::new())),
             counterparty_client: Arc::new(Box::new(CC {})),
             blockchain_client: Arc::new(Box::new(BC {})),
         };
 
-        G.register_counterparty([0; 20].into(), "example.com".to_string());
+        g.register_counterparty([2; 20].into(), "example.com".to_string())
+            .wait()
+            .unwrap();
+
+        assert_eq!(
+            g.storage
+                .get_counterparty([2; 20].into())
+                .wait()
+                .unwrap()
+                .clone(),
+            Counterparty::New {
+                i_am_0: false,
+                url: "example.com".to_string()
+            }
+        )
     }
 }

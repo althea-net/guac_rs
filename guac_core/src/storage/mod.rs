@@ -26,6 +26,14 @@ pub struct Data {
     inner: QrwLock<HashMap<Address, Qutex<Counterparty>>>,
 }
 
+impl Data {
+    pub fn new() -> Data {
+        Data {
+            inner: QrwLock::new(HashMap::new()),
+        }
+    }
+}
+
 // #[derive(Default)]
 // struct Data {
 //     /// This stores a mapping from eth address to channel managers which manage the eth address
