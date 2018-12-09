@@ -1,7 +1,7 @@
 use channel_client::combined_state::CombinedState;
 use clarity::{Address, Signature};
 use crypto::CryptoService;
-use failure::{err_msg, Error};
+use failure::Error;
 use num256::Uint256;
 use CRYPTO;
 

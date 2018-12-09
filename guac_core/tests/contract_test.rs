@@ -36,9 +36,9 @@ use rand::{OsRng, Rng};
 use sha3::Digest;
 use sha3::{Keccak256, Sha3_256};
 use std::env;
-use std::ops::Deref;
+// use std::ops::Deref;
 use std::str::FromStr;
-use std::sync::Arc;
+// use std::sync::Arc;
 use std::thread;
 use std::time;
 
