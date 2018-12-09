@@ -1,5 +1,5 @@
+use channel_client::types::Counterparty;
 use clarity::Address;
-use counterparty::Counterparty;
 use failure::Error;
 
 use futures;
@@ -12,105 +12,84 @@ use CRYPTO;
 use qutex::{FutureGuard, Guard, QrwLock, Qutex};
 use std::collections::HashMap;
 
-use channel_client::ChannelManager;
+// use channel_client::ChannelManager;
 
-lazy_static! {
-    pub static ref STORAGE: Storage = Storage {
-        inner: QrwLock::new(Data::default())
-    };
-}
+// lazy_static! {
+//     pub static ref STORAGE: Storage = Storage {
+//         inner: QrwLock::new(Data::default())
+//     };
+// }
 
 /// Storage contains a futures aware RwLock (QrwLock) which controls access to the inner data
 /// This outer Rwlock should only be mutated very rarely, only to insert and remove counterparties
-pub struct Storage {
-    inner: QrwLock<Data>,
+pub struct Data {
+    inner: QrwLock<HashMap<Address, Qutex<Counterparty>>>,
 }
 
-#[derive(Default)]
-struct Data {
-    /// This stores a mapping from eth address to channel managers which manage the eth address
-    /// The ChannelManagers are wrapped in a futures aware Mutex (a Qutex) to achieve inner
-    /// mutability (the outer Data struct and this the outer RwLock does not have to be locked for
-    /// writing to mutate a single ChannelManager)
-    addr_to_channel: HashMap<Address, Qutex<ChannelManager>>,
-    /// This stores a mapping from eth address to counterparty, with no fancy interior mutability
-    /// for the counterparty, as the the frequency of mutations to the counterparty will be
-    /// very low (comparable to the addition and deletions of channels, in which case the outer
-    /// RwLock needs to be locked for writing anyways)
-    addr_to_counterparty: HashMap<Address, Counterparty>,
-}
+// #[derive(Default)]
+// struct Data {
+//     /// This stores a mapping from eth address to channel managers which manage the eth address
+//     /// The ChannelManagers are wrapped in a futures aware Mutex (a Qutex) to achieve inner
+//     /// mutability (the outer Data struct and this the outer RwLock does not have to be locked for
+//     /// writing to mutate a single ChannelManager)
+//     addr_to_counterparty: HashMap<Address, Qutex<ChannelManager>>,
+//     // This stores a mapping from eth address to counterparty, with no fancy interior mutability
+//     // for the counterparty, as the the frequency of mutations to the counterparty will be
+//     // very low (comparable to the addition and deletions of channels, in which case the outer
+//     // RwLock needs to be locked for writing anyways)
+//     // addr_to_counterparty: HashMap<Address, Counterparty>,
+// }
 
-impl Storage {
-    pub fn get_all_counterparties(&self) -> impl Future<Item = Vec<Counterparty>, Error = Error> {
-        self.inner
-            .clone()
-            .read()
-            .and_then(|data| {
-                let mut keys = Vec::new();
-                for i in data.addr_to_counterparty.values() {
-                    keys.push(i.clone());
-                }
-                Ok(keys)
-            })
-            .from_err()
-    }
-
-    pub fn get_all_channel_managers_mut(
-        &self,
-    ) -> impl Future<Item = Vec<Guard<ChannelManager>>, Error = Error> {
-        self.inner
-            .clone()
-            .read()
-            .and_then(|data| {
-                let mut keys = Vec::new();
-                for i in data.addr_to_channel.values() {
-                    keys.push(i.clone().lock());
-                }
-                join_all(keys)
-            })
-            .from_err()
-    }
-
-    pub fn get_channel(
+pub trait Storage {
+    fn get_counterparty(
         &self,
         k: Address,
-    ) -> impl Future<Item = Guard<ChannelManager>, Error = Error> {
-        self.inner
-            .clone()
-            .read()
-            .from_err()
-            .and_then(move |data| match data.addr_to_channel.get(&k) {
-                Some(v) => futures::future::ok(v.clone().lock()),
-                None => futures::future::err(format_err!("node not found")),
-            })
-            .and_then(|v: FutureGuard<ChannelManager>| v.from_err().and_then(|v| Ok(v)))
-    }
-
-    pub fn init_data(
+    ) -> Box<Future<Item = Guard<Counterparty>, Error = Error>>;
+    fn new_counterparty(
         &self,
-        k: Counterparty,
-        v: ChannelManager,
-    ) -> impl Future<Item = (), Error = Error> {
-        assert!(k.address != CRYPTO.own_eth_addr());
-        self.inner
-            .clone()
-            .write()
-            .from_err()
-            .and_then(move |mut data| {
-                if !data.addr_to_counterparty.contains_key(&k.address) {
-                    data.addr_to_counterparty
-                        .insert(k.address.clone(), k.clone());
-                    data.addr_to_channel
-                        .insert(k.address.clone(), Qutex::new(v));
-                } else {
-                    bail!("Already exists");
-                }
-                Ok(())
-            })
+        k: Address,
+        v: Counterparty,
+    ) -> Box<Future<Item = (), Error = Error>>;
+}
+
+impl Storage for Data {
+    fn get_counterparty(
+        &self,
+        k: Address,
+    ) -> Box<Future<Item = Guard<Counterparty>, Error = Error>> {
+        Box::new(
+            self.inner
+                .clone()
+                .read()
+                .from_err()
+                .and_then(move |data| match data.get(&k) {
+                    Some(v) => futures::future::ok(v.clone().lock()),
+                    None => futures::future::err(format_err!("Counterparty not found")),
+                })
+                .and_then(|v: FutureGuard<Counterparty>| v.from_err().and_then(|v| Ok(v))),
+        )
     }
 
-    pub fn reset(&self) {
-        *self.inner.clone().write().wait().unwrap() = Data::default()
+    fn new_counterparty(
+        &self,
+        k: Address,
+        v: Counterparty,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        assert!(k != CRYPTO.own_eth_addr());
+        Box::new(
+            self.inner
+                .clone()
+                .write()
+                .from_err()
+                .and_then(move |mut data| {
+                    if !data.contains_key(&k) {
+                        data.insert(k.clone(), Qutex::new(v.clone()));
+                    } else {
+                        bail!("Counterparty already exists");
+                    }
+                    Ok(())
+                }),
+        )
     }
 }
 
