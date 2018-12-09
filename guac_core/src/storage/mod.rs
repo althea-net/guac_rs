@@ -3,7 +3,7 @@ use clarity::Address;
 use failure::Error;
 
 use futures;
-use futures::future::join_all;
+// use futures::future::join_all;
 use futures::Future;
 
 use crypto::CryptoService;

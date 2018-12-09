@@ -9,7 +9,7 @@ use futures::{future, Future};
 use num256::Uint256;
 
 use std::sync::Arc;
-use storage::{Data, Storage};
+use storage::Storage;
 use CRYPTO;
 
 #[macro_export]
@@ -613,41 +613,42 @@ impl CounterpartyApi for Guac {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use qutex::{FutureGuard, Guard, QrwLock, Qutex};
-    use std::collections::HashMap;
-    use std::sync::Mutex;
+    // use qutex::{FutureGuard, Guard, QrwLock, Qutex};
+    // use std::collections::HashMap;
+    // use std::sync::Mutex;
+    use storage::Data;
 
     struct CC {}
 
     impl CounterpartyClient for CC {
         fn propose_channel(
             &self,
-            new_channel: &NewChannelTx,
+            _new_channel: &NewChannelTx,
         ) -> Box<Future<Item = Signature, Error = Error>> {
             unimplemented!();
         }
 
         fn propose_re_draw(
             &self,
-            re_draw: &ReDrawTx,
+            _re_draw: &ReDrawTx,
         ) -> Box<Future<Item = Signature, Error = Error>> {
             unimplemented!();
         }
 
         fn notify_channel_opened(
             &self,
-            channel_id: &Uint256,
+            _channel_id: &Uint256,
         ) -> Box<Future<Item = (), Error = Error>> {
             unimplemented!();
         }
 
-        fn notify_re_draw(&self, my_address: &Address) -> Box<Future<Item = (), Error = Error>> {
+        fn notify_re_draw(&self, _my_address: &Address) -> Box<Future<Item = (), Error = Error>> {
             unimplemented!();
         }
 
         fn receive_payment(
             &self,
-            update_tx: &UpdateTx,
+            _update_tx: &UpdateTx,
         ) -> Box<Future<Item = UpdateTx, Error = Error>> {
             unimplemented!();
         }
@@ -658,26 +659,26 @@ mod tests {
     impl BlockchainClient for BC {
         fn new_channel(
             &self,
-            new_channel: &NewChannelTx,
+            _new_channel: &NewChannelTx,
         ) -> Box<Future<Item = Uint256, Error = Error>> {
             unimplemented!();
         }
 
-        fn re_draw(&self, new_channel: &ReDrawTx) -> Box<Future<Item = Uint256, Error = Error>> {
+        fn re_draw(&self, _new_channel: &ReDrawTx) -> Box<Future<Item = Uint256, Error = Error>> {
             unimplemented!();
         }
 
         fn check_for_open(
             &self,
-            address_0: &Address,
-            address_1: &Address,
+            _address_0: &Address,
+            _address_1: &Address,
         ) -> Box<Future<Item = Uint256, Error = Error>> {
             unimplemented!();
         }
 
         fn check_for_re_draw(
             &self,
-            channel_id: &Uint256,
+            _channel_id: &Uint256,
         ) -> Box<Future<Item = Uint256, Error = Error>> {
             unimplemented!();
         }
