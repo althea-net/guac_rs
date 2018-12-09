@@ -9,7 +9,6 @@ use futures::{future, Future};
 use num256::Uint256;
 use std::sync::Arc;
 use storage::{Data, Storage};
-// use try_future;
 use CRYPTO;
 
 #[macro_export]
@@ -70,22 +69,6 @@ pub trait BlockchainClient {
     fn check_for_re_draw(&self, channel_id: &Uint256)
         -> Box<Future<Item = Uint256, Error = Error>>;
 }
-
-// pub trait Storage {
-//     fn get_counterparty(&self, address: Address)
-//         -> Box<Future<Item = Counterparty, Error = Error>>;
-
-//     fn set_counterparty(
-//         &self,
-//         address: Address,
-//         counterparty: Counterparty,
-//     ) -> Box<Future<Item = (), Error = Error>>;
-
-//     fn update_counterparty(
-//         &self,
-//         counterparty: Counterparty,
-//     ) -> Box<Future<Item = (), Error = Error>>;
-// }
 
 pub trait UserApi {
     fn register_counterparty(
@@ -274,7 +257,6 @@ impl UserApi for Guac {
                                         re_draw_tx: re_draw_tx.clone(),
                                         url: url.clone(),
                                     };
-                                    // .and_then(move |_| {
                                     let (signature0, signature1) =
                                         if channel.clone().my_state.i_am_0 {
                                             (my_signature, their_signature)
@@ -294,9 +276,7 @@ impl UserApi for Guac {
                                         })
                                         .and_then(move |_| {
                                             // Save the new open state of the channel
-                                            // storage.clone().update_counterparty(
                                             counterparty = Counterparty::Open {
-                                                // i_am_0,
                                                 url: url.clone(),
                                                 channel: CombinedState::new(&Channel {
                                                     // TODO: what else changes here?
@@ -306,9 +286,7 @@ impl UserApi for Guac {
                                                 }),
                                             };
                                             Ok(())
-                                            // )
                                         })
-                                    // })
                                 },
                             )) as Box<Future<Item = (), Error = Error>>
                         }
@@ -369,7 +347,6 @@ impl CounterpartyApi for Guac {
 
         Box::new(storage.get_counterparty(their_address.clone()).and_then(
             move |mut counterparty| {
-                // let mut counterparty = c.clone();
                 match counterparty.clone() {
                     Counterparty::New { url, i_am_0 } => {
                         Box::new(
@@ -414,11 +391,8 @@ impl CounterpartyApi for Guac {
                                         new_channel_tx: new_channel_tx_clone_2.clone(),
                                         url,
                                     };
-                                    // )
-                                    // .and_then(move |_| {
-                                    // Return our signature
+
                                     Ok(new_channel_tx_clone_2.sign())
-                                    // })
                                 }),
                         ) as Box<Future<Item = Signature, Error = Error>>
                     }
@@ -440,7 +414,6 @@ impl CounterpartyApi for Guac {
         let storage = self.storage.clone();
         Box::new(storage.get_counterparty(their_address.clone()).and_then(
             move |mut counterparty| {
-                // let mut counterparty = c.clone();
                 match counterparty.clone() {
                     Counterparty::Open { url, channel } => {
                         let channel_clone_1 = channel.clone();
@@ -492,20 +465,14 @@ impl CounterpartyApi for Guac {
                                         "Incorrect new balance_1"
                                     );
                                 }
-                                //     Ok(())
-                                // })
-                                // .and_then(move |_| {
-                                // storage
+
                                 *counterparty = Counterparty::OtherReDrawing {
                                     channel: channel_clone_1,
                                     re_draw_tx: re_draw_tx_clone_1.clone(),
                                     url,
                                 };
-                                // )
-                                // .and_then(move |_| {
-                                // Return our signature
+
                                 Ok(re_draw_tx_clone_1.sign())
-                                // })
                             }),
                         ) as Box<Future<Item = Signature, Error = Error>>
                     }
@@ -527,7 +494,6 @@ impl CounterpartyApi for Guac {
         let blockchain_client = self.blockchain_client.clone();
         Box::new(storage.get_counterparty(their_address.clone()).and_then(
             move |mut counterparty| {
-                // let mut counterparty = c.clone();
                 match counterparty.clone() {
                     Counterparty::OtherCreating {
                         i_am_0,
@@ -544,7 +510,6 @@ impl CounterpartyApi for Guac {
                             blockchain_client
                                 .check_for_open(&address_0, &address_1)
                                 .and_then(move |channel_id| {
-                                    // storage.update_counterparty(
                                     *counterparty = Counterparty::Open {
                                         channel: CombinedState::new(&Channel {
                                             channel_id,
@@ -564,7 +529,6 @@ impl CounterpartyApi for Guac {
                                         url,
                                     };
                                     Ok(())
-                                    // )
                                 }),
                         ) as Box<Future<Item = (), Error = Error>>
                     }
@@ -583,7 +547,6 @@ impl CounterpartyApi for Guac {
         let blockchain_client = self.blockchain_client.clone();
         Box::new(storage.get_counterparty(their_address.clone()).and_then(
             move |mut counterparty| {
-                // let mut counterparty = c.clone();
                 match counterparty.clone() {
                     Counterparty::OtherReDrawing {
                         url,
@@ -593,7 +556,6 @@ impl CounterpartyApi for Guac {
                         blockchain_client
                             .check_for_re_draw(&channel.my_state.channel_id)
                             .and_then(move |_| {
-                                // storage.update_counterparty(
                                 *counterparty = Counterparty::Open {
                                     channel: CombinedState::new(&Channel {
                                         total_balance: re_draw_tx.new_balance_0.clone()
@@ -626,19 +588,14 @@ impl CounterpartyApi for Guac {
         let storage = self.storage.clone();
         Box::new(storage.get_counterparty(their_address.clone()).and_then(
             move |mut counterparty| {
-                // let mut counterparty = c.clone();
                 match counterparty.clone() {
                     Counterparty::Open { url, mut channel } => {
-                        // let mut channel_mut = channel.clone();
                         Box::new(future::ok(()).and_then(move |_| {
                             let my_update_tx = channel.receive_payment(&update_tx);
-                            // storage
-                            // .update_counterparty(
+
                             *counterparty = Counterparty::Open { channel, url };
-                            // )
-                            // .and_then(move |_|
+
                             my_update_tx
-                            // )
                         })) as Box<Future<Item = UpdateTx, Error = Error>>
                     }
                     _ => {
@@ -652,110 +609,110 @@ impl CounterpartyApi for Guac {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     struct CC {}
+    struct CC {}
 
-//     impl CounterpartyClient for CC {
-//         fn propose_channel(
-//             &self,
-//             new_channel: &NewChannelTx,
-//         ) -> Box<Future<Item = Signature, Error = Error>> {
-//             unimplemented!();
-//         }
+    impl CounterpartyClient for CC {
+        fn propose_channel(
+            &self,
+            new_channel: &NewChannelTx,
+        ) -> Box<Future<Item = Signature, Error = Error>> {
+            unimplemented!();
+        }
 
-//         fn propose_re_draw(
-//             &self,
-//             re_draw: &ReDrawTx,
-//         ) -> Box<Future<Item = Signature, Error = Error>> {
-//             unimplemented!();
-//         }
+        fn propose_re_draw(
+            &self,
+            re_draw: &ReDrawTx,
+        ) -> Box<Future<Item = Signature, Error = Error>> {
+            unimplemented!();
+        }
 
-//         fn notify_channel_opened(
-//             &self,
-//             channel_id: &Uint256,
-//         ) -> Box<Future<Item = (), Error = Error>> {
-//             unimplemented!();
-//         }
+        fn notify_channel_opened(
+            &self,
+            channel_id: &Uint256,
+        ) -> Box<Future<Item = (), Error = Error>> {
+            unimplemented!();
+        }
 
-//         fn notify_re_draw(&self, my_address: &Address) -> Box<Future<Item = (), Error = Error>> {
-//             unimplemented!();
-//         }
+        fn notify_re_draw(&self, my_address: &Address) -> Box<Future<Item = (), Error = Error>> {
+            unimplemented!();
+        }
 
-//         fn receive_payment(
-//             &self,
-//             update_tx: &UpdateTx,
-//         ) -> Box<Future<Item = UpdateTx, Error = Error>> {
-//             unimplemented!();
-//         }
-//     }
+        fn receive_payment(
+            &self,
+            update_tx: &UpdateTx,
+        ) -> Box<Future<Item = UpdateTx, Error = Error>> {
+            unimplemented!();
+        }
+    }
 
-//     struct BC {}
+    struct BC {}
 
-//     impl BlockchainClient for BC {
-//         fn new_channel(
-//             &self,
-//             new_channel: &NewChannelTx,
-//         ) -> Box<Future<Item = Uint256, Error = Error>> {
-//             unimplemented!();
-//         }
+    impl BlockchainClient for BC {
+        fn new_channel(
+            &self,
+            new_channel: &NewChannelTx,
+        ) -> Box<Future<Item = Uint256, Error = Error>> {
+            unimplemented!();
+        }
 
-//         fn re_draw(&self, new_channel: &ReDrawTx) -> Box<Future<Item = Uint256, Error = Error>> {
-//             unimplemented!();
-//         }
+        fn re_draw(&self, new_channel: &ReDrawTx) -> Box<Future<Item = Uint256, Error = Error>> {
+            unimplemented!();
+        }
 
-//         fn check_for_open(
-//             &self,
-//             address_0: &Address,
-//             address_1: &Address,
-//         ) -> Box<Future<Item = Uint256, Error = Error>> {
-//             unimplemented!();
-//         }
+        fn check_for_open(
+            &self,
+            address_0: &Address,
+            address_1: &Address,
+        ) -> Box<Future<Item = Uint256, Error = Error>> {
+            unimplemented!();
+        }
 
-//         fn check_for_re_draw(
-//             &self,
-//             channel_id: &Uint256,
-//         ) -> Box<Future<Item = Uint256, Error = Error>> {
-//             unimplemented!();
-//         }
-//     }
+        fn check_for_re_draw(
+            &self,
+            channel_id: &Uint256,
+        ) -> Box<Future<Item = Uint256, Error = Error>> {
+            unimplemented!();
+        }
+    }
 
-//     struct ST {}
+    struct ST {}
 
-//     impl Storage for ST {
-//         fn get_counterparty(
-//             &self,
-//             address: Address,
-//         ) -> Box<Future<Item = Counterparty, Error = Error>> {
-//             unimplemented!();
-//         }
+    impl Storage for ST {
+        fn get_counterparty(
+            &self,
+            address: Address,
+        ) -> Box<Future<Item = Counterparty, Error = Error>> {
+            unimplemented!();
+        }
 
-//         fn set_counterparty(
-//             &self,
-//             address: Address,
-//             counterparty: Counterparty,
-//         ) -> Box<Future<Item = (), Error = Error>> {
-//             unimplemented!();
-//         }
+        fn set_counterparty(
+            &self,
+            address: Address,
+            counterparty: Counterparty,
+        ) -> Box<Future<Item = (), Error = Error>> {
+            unimplemented!();
+        }
 
-//         fn update_counterparty(
-//             &self,
-//             counterparty: Counterparty,
-//         ) -> Box<Future<Item = (), Error = Error>> {
-//             unimplemented!();
-//         }
-//     }
+        fn update_counterparty(
+            &self,
+            counterparty: Counterparty,
+        ) -> Box<Future<Item = (), Error = Error>> {
+            unimplemented!();
+        }
+    }
 
-//     #[test]
-//     fn test_register_counterparty() {
-//         let G = Guac {
-//             storage: Arc::new(Box::new(ST {})),
-//             counterparty_client: Arc::new(Box::new(CC {})),
-//             blockchain_client: Arc::new(Box::new(BC {})),
-//         };
+    #[test]
+    fn test_register_counterparty() {
+        let G = Guac {
+            storage: Arc::new(Box::new(ST {})),
+            counterparty_client: Arc::new(Box::new(CC {})),
+            blockchain_client: Arc::new(Box::new(BC {})),
+        };
 
-//         G.register_counterparty([0; 20].into(), "example.com".to_string());
-//     }
-// }
+        G.register_counterparty([0; 20].into(), "example.com".to_string());
+    }
+}
