@@ -32,8 +32,6 @@ extern crate tokio;
 pub mod payment_contract;
 
 pub mod channel_client;
-pub mod contracts;
-pub mod counterparty;
 pub mod crypto;
 pub mod error;
 pub mod storage;
