@@ -223,8 +223,8 @@ mod tests {
             settling_period_end: 0.into(),
             settling_period_started: false,
             sequence_number: 0.into(),
-            balance_0,
-            balance_1,
+            balance_0: balance_0.clone(),
+            balance_1: balance_1.clone(),
             total_balance: balance_0.add(balance_1),
             i_am_0: true,
         };
