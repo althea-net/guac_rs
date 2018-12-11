@@ -190,9 +190,9 @@ impl UserApi for Guac {
                         };
 
                         let (balance_0, balance_1) = if i_am_0 {
-                            (amount, 0.into())
+                            (amount, 0u64.into())
                         } else {
-                            (0.into(), amount)
+                            (0u64.into(), amount)
                         };
 
                         let new_channel_tx = NewChannelTx {
@@ -201,7 +201,7 @@ impl UserApi for Guac {
                             balance_0: balance_0.clone(),
                             balance_1: balance_1.clone(),
                             expiration: 9999999999u64.into(), //TODO: get current block plus some
-                            settling_period_length: 5000.into(), //TODO: figure out default value
+                            settling_period_length: 5000u64.into(), //TODO: figure out default value
                             signature0: None,
                             signature1: None,
                         };
@@ -210,7 +210,7 @@ impl UserApi for Guac {
 
                         Box::new(
                             counterparty_client
-                                .propose_channel(&new_channel_tx)
+                                .propose_channel(my_address, url.clone(), new_channel_tx.clone())
                                 .and_then(move |their_signature| {
                                     let (signature0, signature1) = if i_am_0 {
                                         (my_signature, their_signature)
@@ -231,7 +231,7 @@ impl UserApi for Guac {
                                         })
                                         .and_then(move |channel_id| {
                                             counterparty_client
-                                                .notify_channel_opened(&channel_id)
+                                                .notify_channel_opened(my_address, url.clone())
                                                 .and_then(move |()| {
                                                     *counterparty = Counterparty::Open {
                                                         channel: CombinedState::new(&Channel {
@@ -242,13 +242,13 @@ impl UserApi for Guac {
                                                                 + balance_1.clone(),
                                                             balance_0,
                                                             balance_1,
-                                                            sequence_number: 0.into(),
-                                                            settling_period_length: 5000.into(),
+                                                            sequence_number: 0u64.into(),
+                                                            settling_period_length: 5000u64.into(),
                                                             settling_period_started: false,
-                                                            settling_period_end: 0.into(),
+                                                            settling_period_end: 0u64.into(),
                                                             i_am_0,
                                                         }),
-                                                        url: url,
+                                                        url: url.clone(),
                                                     };
                                                     Ok(())
                                                 })
@@ -282,43 +282,51 @@ impl UserApi for Guac {
 
                         let my_signature = re_draw_tx.sign();
 
-                        Box::new(counterparty_client.propose_re_draw(&re_draw_tx).and_then(
-                            move |their_signature| {
-                                *counterparty = Counterparty::ReDrawing {
-                                    channel: channel.clone(),
-                                    re_draw_tx: re_draw_tx.clone(),
-                                    url: url.clone(),
-                                };
-                                let (signature0, signature1) = if channel.clone().my_state.i_am_0 {
-                                    (my_signature, their_signature)
-                                } else {
-                                    (their_signature, my_signature)
-                                };
-
-                                blockchain_client
-                                    .re_draw(&ReDrawTx {
-                                        signature0: Some(signature0),
-                                        signature1: Some(signature1),
-                                        ..re_draw_tx
-                                    })
-                                    .and_then(move |_| {
-                                        counterparty_client.notify_re_draw(&CRYPTO.own_eth_addr())
-                                    })
-                                    .and_then(move |_| {
-                                        // Save the new open state of the channel
-                                        *counterparty = Counterparty::Open {
-                                            url: url.clone(),
-                                            channel: CombinedState::new(&Channel {
-                                                // TODO: what else changes here?
-                                                balance_0: new_balance_0.clone(),
-                                                balance_1: new_balance_1.clone(),
-                                                ..channel.my_state
-                                            }),
+                        Box::new(
+                            counterparty_client
+                                .propose_re_draw(
+                                    CRYPTO.own_eth_addr(),
+                                    url.clone(),
+                                    re_draw_tx.clone(),
+                                )
+                                .and_then(move |their_signature| {
+                                    *counterparty = Counterparty::ReDrawing {
+                                        channel: channel.clone(),
+                                        re_draw_tx: re_draw_tx.clone(),
+                                        url: url.clone(),
+                                    };
+                                    let (signature0, signature1) =
+                                        if channel.clone().my_state.i_am_0 {
+                                            (my_signature, their_signature)
+                                        } else {
+                                            (their_signature, my_signature)
                                         };
-                                        Ok(())
-                                    })
-                            },
-                        )) as Box<Future<Item = (), Error = Error>>
+
+                                    blockchain_client
+                                        .re_draw(&ReDrawTx {
+                                            signature0: Some(signature0),
+                                            signature1: Some(signature1),
+                                            ..re_draw_tx
+                                        })
+                                        .and_then(move |_| {
+                                            counterparty_client
+                                                .notify_re_draw(CRYPTO.own_eth_addr(), url.clone())
+                                                .and_then(move |_| {
+                                                    // Save the new open state of the channel
+                                                    *counterparty = Counterparty::Open {
+                                                        url: url.clone(),
+                                                        channel: CombinedState::new(&Channel {
+                                                            // TODO: what else changes here?
+                                                            balance_0: new_balance_0.clone(),
+                                                            balance_1: new_balance_1.clone(),
+                                                            ..channel.my_state
+                                                        }),
+                                                    };
+                                                    Ok(())
+                                                })
+                                        })
+                                }),
+                        ) as Box<Future<Item = (), Error = Error>>
                     }
                     _ => {
                         // Make user wait
@@ -345,14 +353,20 @@ impl UserApi for Guac {
                         try_future_box!(channel.make_payment(amount));
                         let update_tx = try_future_box!(channel.create_update());
 
-                        Box::new(counterparty_client.receive_payment(&update_tx).and_then(
-                            move |their_update_tx| {
-                                channel.receive_payment_ack(&their_update_tx)?;
+                        Box::new(
+                            counterparty_client
+                                .receive_payment(
+                                    CRYPTO.own_eth_addr(),
+                                    url.clone(),
+                                    update_tx.clone(),
+                                )
+                                .and_then(move |their_update_tx| {
+                                    channel.receive_payment_ack(&their_update_tx)?;
 
-                                *counterparty = Counterparty::Open { channel, url };
-                                Ok(())
-                            },
-                        )) as Box<Future<Item = (), Error = Error>>
+                                    *counterparty = Counterparty::Open { channel, url };
+                                    Ok(())
+                                }),
+                        ) as Box<Future<Item = (), Error = Error>>
                     }
                     _ => {
                         // Make user wait
@@ -407,12 +421,12 @@ impl TransportProtocol for Guac {
                                         };
 
                                         ensure!(
-                                            my_balance == 0.into(),
+                                            my_balance == 0u64.into(),
                                             "My balance in proposed channel must be zero."
                                         );
 
                                         ensure!(
-                                            settling_period_length == 5000.into(),
+                                            settling_period_length == 5000u64.into(),
                                             "I only accept settling periods of 5000 blocks"
                                         );
                                         Ok(())
@@ -560,10 +574,10 @@ impl TransportProtocol for Guac {
                                                     + new_channel_tx.clone().balance_1,
                                                 balance_0: new_channel_tx.balance_0,
                                                 balance_1: new_channel_tx.balance_1,
-                                                sequence_number: 0.into(),
+                                                sequence_number: 0u64.into(),
                                                 settling_period_length: new_channel_tx
                                                     .settling_period_length,
-                                                settling_period_end: 0.into(),
+                                                settling_period_end: 0u64.into(),
                                                 settling_period_started: false,
                                                 i_am_0,
                                             }),
@@ -671,7 +685,7 @@ mod tests {
 
     struct CC {}
 
-    impl CounterpartyClient for CC {
+    impl TransportProtocol for CC {
         fn propose_channel(
             &self,
             _new_channel: &NewChannelTx,
@@ -737,30 +751,25 @@ mod tests {
         }
     }
 
-    struct Link {
-        client: CounterpartyClient,
-        server: CounterpartyApi,
-    }
-
     #[test]
     fn test_register_counterparty() {
         let g1 = Guac {
             storage: Arc::new(Box::new(Data::new())),
             counterparty_client: Arc::new(Box::new(CC {})),
-            blockchain_client: Arc::new(Box::new(BC {})),
+            blockchain_client: Arc::new(Box::new(RefCell::new(BC {}))),
         };
         let g2 = Guac {
             storage: Arc::new(Box::new(Data::new())),
             counterparty_client: Arc::new(Box::new(g1)),
-            blockchain_client: Arc::new(Box::new(BC {})),
+            blockchain_client: Arc::new(Box::new(RefCell::new(BC {}))),
         };
 
-        g.register_counterparty([2; 20].into(), "example.com".to_string())
+        g1.register_counterparty([2; 20].into(), "example.com".to_string())
             .wait()
             .unwrap();
 
         assert_eq!(
-            g.storage
+            g1.storage
                 .get_counterparty([2; 20].into())
                 .wait()
                 .unwrap()
@@ -774,16 +783,21 @@ mod tests {
 
     #[test]
     fn test_fill_channel_new_counterparty() {
-        let g = Guac {
+        let g1 = Guac {
             storage: Arc::new(Box::new(Data::new())),
             counterparty_client: Arc::new(Box::new(CC {})),
-            blockchain_client: Arc::new(Box::new(BC {})),
+            blockchain_client: Arc::new(Box::new(RefCell::new(BC {}))),
+        };
+        let g2 = Guac {
+            storage: Arc::new(Box::new(Data::new())),
+            counterparty_client: Arc::new(Box::new(g1)),
+            blockchain_client: Arc::new(Box::new(RefCell::new(BC {}))),
         };
 
-        g.register_counterparty([2; 20].into(), "example.com".to_string())
+        g1.register_counterparty([2; 20].into(), "example.com".to_string())
             .wait()
             .unwrap();
 
-        g.fill_channel([2; 20].into(), 10.into()).wait().unwrap();
+        g1.fill_channel([2; 20].into(), 10.into()).wait().unwrap();
     }
 }
