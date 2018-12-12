@@ -12,7 +12,7 @@ use futures::IntoFuture;
 use num256::Uint256;
 use std::io::Cursor;
 
-use crypto::{Action, CryptoService};
+// use crypto::{Action, CryptoService};
 use payment_contract::{ChannelId, PaymentContract};
 use CRYPTO;
 

@@ -32,10 +32,10 @@ extern crate tokio;
 pub mod payment_contract;
 
 pub mod channel_client;
-pub mod crypto;
 pub mod error;
+pub mod new_crypto;
 pub mod storage;
 pub mod transport_protocol;
 pub mod web3;
 
-pub use crypto::CRYPTO;
+// pub use crypto::CRYPTO;

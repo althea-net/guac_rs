@@ -1,9 +1,8 @@
 use channel_client::combined_state::CombinedState;
 use clarity::{Address, Signature};
-use crypto::CryptoService;
 use failure::Error;
+use new_crypto;
 use num256::Uint256;
-use CRYPTO;
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Counterparty {
@@ -74,14 +73,14 @@ pub struct ReDrawTx {
 }
 
 impl NewChannelTx {
-    pub fn sign(&self) -> Signature {
-        unimplemented!();
+    pub fn fingerprint(&self) -> [u8; 32] {
+        <[u8; 32]>::default()
     }
 }
 
 impl ReDrawTx {
-    pub fn sign(&self) -> Signature {
-        unimplemented!();
+    pub fn fingerprint(&self) -> [u8; 32] {
+        <[u8; 32]>::default()
     }
 }
 
@@ -129,23 +128,14 @@ impl Channel {
     }
 
     pub fn create_update(&self) -> UpdateTx {
-        let mut update_tx = UpdateTx {
+        UpdateTx {
             channel_id: self.channel_id.clone(),
             sequence_number: self.sequence_number.clone(),
             balance_0: self.balance_0.clone(),
             balance_1: self.balance_1.clone(),
             signature_0: None,
             signature_1: None,
-        };
-
-        let signature = update_tx.sign();
-
-        match self.i_am_0 {
-            true => update_tx.signature_0 = Some(signature.clone()),
-            false => update_tx.signature_1 = Some(signature.clone()),
         }
-
-        update_tx
     }
 
     pub fn apply_update(&mut self, update: &UpdateTx, validate_balance: bool) -> Result<(), Error> {
@@ -193,7 +183,7 @@ pub struct UpdateTx {
 }
 
 impl UpdateTx {
-    pub fn sign(&mut self) -> Signature {
+    pub fn fingerprint(&mut self) -> [u8; 32] {
         let sequence_number: [u8; 32] = self.sequence_number.clone().into();
         let balance_0: [u8; 32] = self.balance_0.clone().into();
         let balance_1: [u8; 32] = self.balance_1.clone().into();
@@ -201,10 +191,10 @@ impl UpdateTx {
         let channel_id: [u8; 32] = self.channel_id.clone().into();
 
         let fingerprint =
-            CRYPTO.hash_bytes(&[&channel_id, &sequence_number, &balance_0, &balance_1]);
+            new_crypto::hash_bytes(&[&channel_id, &sequence_number, &balance_0, &balance_1]);
         let fingerprint: [u8; 32] = fingerprint.clone().into();
 
-        CRYPTO.eth_sign(&fingerprint)
+        return fingerprint;
     }
 
     pub fn set_my_signature(&mut self, i_am_0: bool, signature: &Signature) {
