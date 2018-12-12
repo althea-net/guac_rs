@@ -83,7 +83,7 @@ impl Storage {
                 Some(v) => futures::future::ok(v.clone().lock()),
                 None => futures::future::err(format_err!("node not found")),
             })
-            .and_then(|v: FutureGuard<ChannelManager>| v.from_err().and_then(|v| Ok(v)))
+            .and_then(|v: FutureGuard<ChannelManager>| v.from_err())
     }
 
     pub fn init_data(
@@ -98,10 +98,8 @@ impl Storage {
             .from_err()
             .and_then(move |mut data| {
                 if !data.addr_to_counterparty.contains_key(&k.address) {
-                    data.addr_to_counterparty
-                        .insert(k.address.clone(), k.clone());
-                    data.addr_to_channel
-                        .insert(k.address.clone(), Qutex::new(v));
+                    data.addr_to_counterparty.insert(k.address, k.clone());
+                    data.addr_to_channel.insert(k.address, Qutex::new(v));
                 } else {
                     bail!("Already exists");
                 }

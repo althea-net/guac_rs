@@ -56,7 +56,7 @@ pub fn propose_channel_endpoint(
 
     let to_url = format!("[{}]:4874", from.ip());
 
-    api::propose_channel(to_url, channel.clone())
+    api::propose_channel(to_url, &channel)
         .and_then(move |mut res| Ok(Json(res)))
         .responder()
 }

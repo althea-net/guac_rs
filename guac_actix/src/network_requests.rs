@@ -198,7 +198,7 @@ impl Handler<SendChannelCreatedRequest> for NetworkRequestActorImpl {
 
     fn handle(&mut self, msg: SendChannelCreatedRequest, _ctx: &mut Context<Self>) -> Self::Result {
         Box::new(
-            result(HTTPTransportClient::new(msg.1.clone()))
+            result(HTTPTransportClient::from_url(msg.1.clone()))
                 .from_err()
                 .and_then(move |transport| {
                     transport
@@ -223,7 +223,7 @@ impl Handler<SendProposalRequest> for NetworkRequestActorImpl {
 
     fn handle(&mut self, msg: SendProposalRequest, _ctx: &mut Context<Self>) -> Self::Result {
         Box::new(
-            result(HTTPTransportClient::new(msg.1.clone()))
+            result(HTTPTransportClient::from_url(msg.1.clone()))
                 .from_err()
                 .and_then(move |transport| {
                     transport
@@ -252,7 +252,7 @@ impl Handler<SendChannelJoined> for NetworkRequestActorImpl {
 
     fn handle(&mut self, msg: SendChannelJoined, _ctx: &mut Context<Self>) -> Self::Result {
         Box::new(
-            result(HTTPTransportClient::new(msg.1.clone()))
+            result(HTTPTransportClient::from_url(msg.1.clone()))
                 .from_err()
                 .and_then(move |transport| {
                     transport
@@ -277,7 +277,7 @@ impl Handler<SendChannelUpdate> for NetworkRequestActorImpl {
 
     fn handle(&mut self, msg: SendChannelUpdate, _ctx: &mut Context<Self>) -> Self::Result {
         Box::new(
-            result(HTTPTransportClient::new(msg.1.clone()))
+            result(HTTPTransportClient::from_url(msg.1.clone()))
                 .from_err()
                 .and_then(move |transport| {
                     transport

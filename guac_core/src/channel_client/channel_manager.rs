@@ -105,7 +105,7 @@ impl ChannelManager {
         match self.clone() {
             ChannelManager::New | ChannelManager::Proposed { .. } => {
                 // Will continue to propose channel until successful every tick
-                self.propose_channel(my_address, their_address, 100_000_000_000_000u64.into()) // 0.0001ETH
+                self.propose_channel(my_address, their_address, &100_000_000_000_000u64.into()) // 0.0001ETH
             }
             ChannelManager::PendingOtherCreation { state, .. } => {
                 assert_eq!(state.is_a, false);
@@ -123,7 +123,7 @@ impl ChannelManager {
                     state: CombinedState::new(&state),
                 };
                 self.sanity_check(&my_address);
-                self.pay_counterparty(pending_send)?;
+                self.pay_counterparty(&pending_send)?;
                 Ok(ChannelManagerAction::SendChannelCreatedUpdate(state.swap()))
             }
             ChannelManager::PendingJoin {
@@ -151,7 +151,7 @@ impl ChannelManager {
                     .add(Uint256::from(100_000_000_000_000u64));
 
                 // now we have balance in our channel, we can pay what we owe them
-                state.pay_counterparty(pending_send)?;
+                state.pay_counterparty(&pending_send)?;
 
                 *self = ChannelManager::Joined {
                     state: state.clone(),
@@ -160,7 +160,7 @@ impl ChannelManager {
                     state.my_state().clone()
                 }))
             }
-            ChannelManager::Joined { state: _ } | ChannelManager::Open { state: _ } => Ok(
+            ChannelManager::Joined { .. } | ChannelManager::Open { .. } => Ok(
                 ChannelManagerAction::SendUpdatedState(self.create_payment()?),
             ),
         }
@@ -170,7 +170,7 @@ impl ChannelManager {
         &mut self,
         from: Address,
         to: Address,
-        deposit: Uint256,
+        deposit: &Uint256,
     ) -> Result<ChannelManagerAction, Error> {
         ensure!(from != to, "cannot pay to self");
         let ret;
@@ -371,12 +371,12 @@ impl ChannelManager {
         Ok(())
     }
 
-    pub fn pay_counterparty(&mut self, amount: Uint256) -> Result<(), Error> {
+    pub fn pay_counterparty(&mut self, amount: &Uint256) -> Result<(), Error> {
         *self = match self {
             ChannelManager::Open { ref mut state } => {
                 assert_eq!(state.my_state().is_a, false);
                 assert_eq!(state.their_state().is_a, false);
-                let overflow = state.pay_counterparty(amount)?;
+                let overflow = state.pay_counterparty(&amount)?;
                 trace!("got overflow of {:?}", overflow);
                 if overflow > 0u32.into() {
                     trace!("not enough to pay, joining channel");
@@ -391,7 +391,7 @@ impl ChannelManager {
                 }
             }
             ChannelManager::Joined { ref mut state } => {
-                let overflow = state.pay_counterparty(amount)?;
+                let overflow = state.pay_counterparty(&amount)?;
                 if overflow > 0u32.into() {
                     // TODO: Handle reopening channel
                     trace!("not enough money to pay them");
@@ -407,7 +407,7 @@ impl ChannelManager {
                 ref mut state,
                 ref pending_send,
             } => {
-                let overflow = state.pay_counterparty(amount)?;
+                let overflow = state.pay_counterparty(&amount)?;
 
                 let mut pending_send = pending_send.clone();
                 if overflow > 0u32.into() {
@@ -461,7 +461,8 @@ impl ChannelManager {
             ChannelManager::Open { ref mut state }
             | ChannelManager::Joined { ref mut state }
             | ChannelManager::PendingJoin { ref mut state, .. } => {
-                Ok(state.received_updated_state(rec_update)?)
+                state.received_updated_state(rec_update)?;
+                Ok(())
             }
             // TODO: Handle close and dispute
             _ => bail!("we can only receive updated state in open or joined"),
@@ -524,7 +525,7 @@ mod tests {
                 "0x0000000000000000000000000000000000000002"
                     .parse()
                     .unwrap(),
-                "0x0000000000000000000000000000000000000064"
+                &"0x0000000000000000000000000000000000000064"
                     .parse()
                     .unwrap(),
             )
@@ -541,7 +542,7 @@ mod tests {
         manager_a.proposal_result(true, 0u64.into()).unwrap();
         manager_a.channel_open_event(&Uint256::from(42u64)).unwrap();
 
-        let (channel_a, channel_b) = Channel::new_pair(42u64.into(), 100u32.into(), 0u32.into());
+        let (channel_a, channel_b) = Channel::new_pair(&42u64.into(), 100u32.into(), 0u32.into());
 
         assert_eq!(
             manager_a,
@@ -573,7 +574,7 @@ mod tests {
                 "0x0000000000000000000000000000000000000002"
                     .parse()
                     .unwrap(),
-                "0x0000000000000000000000000000000000000064"
+                &"0x0000000000000000000000000000000000000064"
                     .parse()
                     .unwrap(),
             )
@@ -592,7 +593,7 @@ mod tests {
                 "0x0000000000000000000000000000000000000001"
                     .parse()
                     .unwrap(),
-                "0x0000000000000000000000000000000000000064"
+                &"0x0000000000000000000000000000000000000064"
                     .parse()
                     .unwrap(),
             )

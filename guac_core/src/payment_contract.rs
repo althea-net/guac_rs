@@ -1,9 +1,7 @@
 use clarity::Address;
 use clarity::Signature;
 use failure::Error;
-use futures::future::ok;
 use futures::Future;
-use futures::IntoFuture;
 use num256::Uint256;
 
 /// An alias for a channel ID in a raw bytes form

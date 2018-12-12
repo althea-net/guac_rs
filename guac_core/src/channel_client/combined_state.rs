@@ -1,4 +1,4 @@
-use failure::{err_msg, Error};
+use failure::Error;
 
 use num256::Uint256;
 
@@ -54,8 +54,8 @@ impl CombinedState {
     /// updates, mearly ensures that the next state update we create will give the counterparty the
     /// amount sent. This function returns the "overflow" (amount - current balance in channel) if
     /// we don't have enough monty in the channel
-    pub fn pay_counterparty(&mut self, amount: Uint256) -> Result<Uint256, Error> {
-        if amount > *self.my_state.my_balance_mut() {
+    pub fn pay_counterparty(&mut self, amount: &Uint256) -> Result<Uint256, Error> {
+        if amount > self.my_state.my_balance_mut() {
             // Figure out how much we will still owe them
             let remaining_amount = amount.clone() - self.my_state.my_balance().clone();
 
@@ -150,7 +150,7 @@ impl CombinedState {
         // not acknowledged the update for
         self.my_state = self.their_state.clone();
 
-        assert!(&pending_pay <= self.their_state.my_balance());
+        assert!(pending_pay <= *self.their_state.my_balance());
 
         // so here we put it back
         *self.my_state.my_balance_mut() = self
@@ -209,7 +209,7 @@ mod tests {
     use super::*;
 
     fn new_pair(deposit_a: Uint256, deposit_b: Uint256) -> (CombinedState, CombinedState) {
-        let (channel_a, channel_b) = Channel::new_pair(42u64.into(), deposit_a, deposit_b);
+        let (channel_a, channel_b) = Channel::new_pair(&42u64.into(), deposit_a, deposit_b);
         (
             CombinedState::new(&channel_a),
             CombinedState::new(&channel_b),
@@ -235,7 +235,7 @@ mod tests {
     fn test_channel_manager_unidirectional_overpay() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
-        let overflow = a.pay_counterparty(150u32.into()).unwrap();
+        let overflow = a.pay_counterparty(&150u32.into()).unwrap();
 
         assert_eq!(overflow, 50u32.into());
 
@@ -254,7 +254,7 @@ mod tests {
     fn test_channel_manager_unidirectional() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
-        a.pay_counterparty(20u32.into()).unwrap();
+        a.pay_counterparty(&20u32.into()).unwrap();
 
         let payment = a.create_update().unwrap();
 
@@ -273,7 +273,7 @@ mod tests {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 5
-        a.pay_counterparty(5u32.into()).unwrap();
+        a.pay_counterparty(&5u32.into()).unwrap();
 
         let payment = a.create_update().unwrap();
 
@@ -283,7 +283,7 @@ mod tests {
         a.received_updated_state(&response).unwrap();
 
         // B -> A 3
-        b.pay_counterparty(3u32.into()).unwrap();
+        b.pay_counterparty(&3u32.into()).unwrap();
 
         let payment = b.create_update().unwrap();
 
@@ -300,8 +300,8 @@ mod tests {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 3 and B -> A 5 at the same time
-        a.pay_counterparty(3u32.into()).unwrap();
-        b.pay_counterparty(5u32.into()).unwrap();
+        a.pay_counterparty(&3u32.into()).unwrap();
+        b.pay_counterparty(&5u32.into()).unwrap();
 
         let payment_a = a.create_update().unwrap();
         let payment_b = b.create_update().unwrap();
@@ -329,8 +329,8 @@ mod tests {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 3 and B -> A 5 at the same time
-        a.pay_counterparty(3u32.into()).unwrap();
-        b.pay_counterparty(5u32.into()).unwrap();
+        a.pay_counterparty(&3u32.into()).unwrap();
+        b.pay_counterparty(&5u32.into()).unwrap();
 
         let payment_a = a.create_update().unwrap();
         let payment_b = b.create_update().unwrap();
@@ -344,7 +344,7 @@ mod tests {
         b.received_updated_state(&response_a).unwrap();
 
         // A -> B 1
-        a.pay_counterparty(1u8.into()).unwrap();
+        a.pay_counterparty(&1u8.into()).unwrap();
 
         let payment = a.create_update().unwrap();
 
@@ -363,12 +363,12 @@ mod tests {
 
         // A -> B 1, B offline
         // A -> B 2, B -> A 4
-        a.pay_counterparty(1u8.into()).unwrap();
+        a.pay_counterparty(&1u8.into()).unwrap();
 
         let payment_a1 = a.create_update().unwrap();
 
-        a.pay_counterparty(2u32.into()).unwrap();
-        b.pay_counterparty(4u32.into()).unwrap();
+        a.pay_counterparty(&2u32.into()).unwrap();
+        b.pay_counterparty(&4u32.into()).unwrap();
 
         let payment_a2 = a.create_update().unwrap();
         let payment_b = b.create_update().unwrap();
@@ -411,12 +411,12 @@ mod tests {
 
         // A -> B 3, B no response
         // A -> B 3, B -> A 5
-        a.pay_counterparty(3u32.into()).unwrap();
+        a.pay_counterparty(&3u32.into()).unwrap();
 
         let payment_a1 = a.create_update().unwrap();
 
-        a.pay_counterparty(3u32.into()).unwrap();
-        b.pay_counterparty(5u32.into()).unwrap();
+        a.pay_counterparty(&3u32.into()).unwrap();
+        b.pay_counterparty(&5u32.into()).unwrap();
 
         let payment_a2 = a.create_update().unwrap();
         let payment_b = b.create_update().unwrap();
@@ -433,7 +433,7 @@ mod tests {
         b.received_updated_state(&response_a).unwrap();
 
         // A -> B 10
-        a.pay_counterparty(10u32.into()).unwrap();
+        a.pay_counterparty(&10u32.into()).unwrap();
 
         let payment = a.create_update().unwrap();
 

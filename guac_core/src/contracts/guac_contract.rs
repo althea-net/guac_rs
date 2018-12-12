@@ -1,16 +1,9 @@
-use channel_client::types::UpdateTx;
-use clarity::abi::encode_tokens;
 use clarity::abi::{encode_call, Token};
-use clarity::utils::hex_str_to_bytes;
-use clarity::Transaction;
 use clarity::{Address, Signature};
-use error::GuacError;
 use failure::Error;
-use futures::future::ok;
 use futures::Future;
 use futures::IntoFuture;
 use num256::Uint256;
-use std::io::Cursor;
 
 use crypto::{Action, CryptoService};
 use payment_contract::{ChannelId, PaymentContract};
@@ -28,7 +21,7 @@ pub fn create_update_fingerprint_data(
     balance0: &Uint256,
     balance1: &Uint256,
 ) -> Vec<u8> {
-    let mut msg = "updateState".as_bytes().to_vec();
+    let mut msg = b"updateState".to_vec();
     msg.extend(contract_address.as_bytes());
     msg.extend(channel_id.to_vec());
     msg.extend(&{
@@ -55,7 +48,7 @@ pub fn create_new_channel_fingerprint_data(
     expiration: &Uint256,
     settling: &Uint256,
 ) -> Vec<u8> {
-    let mut msg = "newChannel".as_bytes().to_vec();
+    let mut msg = b"newChannel".to_vec();
     msg.extend(contract_address.clone().as_bytes());
     msg.extend(address0.as_bytes());
     msg.extend(address1.as_bytes());
@@ -85,7 +78,7 @@ pub fn create_close_channel_fast_fingerprint_data(
     balance0: &Uint256,
     balance1: &Uint256,
 ) -> Vec<u8> {
-    let mut msg = "closeChannelFast".as_bytes().to_vec();
+    let mut msg = b"closeChannelFast".to_vec();
     msg.extend(contract_address.as_bytes());
     msg.extend(channel_id.to_vec());
     msg.extend(&{
@@ -113,7 +106,7 @@ pub fn create_redraw_fingerprint_data(
     new_balance_b: &Uint256,
     expiration: &Uint256,
 ) -> Vec<u8> {
-    let mut msg = "reDraw".as_bytes().to_vec();
+    let mut msg = b"reDraw".to_vec();
     msg.extend(contract_addres.as_bytes());
     msg.extend_from_slice(&channel_id[..]);
     msg.extend(&{
@@ -153,7 +146,7 @@ pub fn create_update_with_bounty_fingerprint_data(
     signature1: &Signature,
     bounty_amount: &Uint256,
 ) -> Vec<u8> {
-    let mut msg = "updateStateWithBounty".as_bytes().to_vec();
+    let mut msg = b"updateStateWithBounty".to_vec();
     msg.extend(contract_address.clone().as_bytes());
     msg.extend_from_slice(&channel_id[..]);
     msg.extend(&{
@@ -178,8 +171,8 @@ pub fn create_update_with_bounty_fingerprint_data(
 }
 pub struct GuacContract;
 
-impl GuacContract {
-    pub fn new() -> Self {
+impl Default for GuacContract {
+    fn default() -> Self {
         Self {}
     }
 }
@@ -385,7 +378,7 @@ impl PaymentContract for GuacContract {
             "closeChannel(bytes32)",
             &[
                 // channel id
-                Token::Bytes(channel_id.to_vec().into()),
+                Token::Bytes(channel_id.to_vec()),
             ],
         );
         // Broadcast a transaction on the network with data
@@ -405,7 +398,7 @@ impl PaymentContract for GuacContract {
             "startSettlingPeriod(bytes32,bytes)",
             &[
                 // channel id
-                Token::Bytes(channel_id.to_vec().into()),
+                Token::Bytes(channel_id.to_vec()),
                 signature.into_bytes().to_vec().into(),
             ],
         );
@@ -459,17 +452,13 @@ impl PaymentContract for GuacContract {
         //     data[12..].copy_from_slice(&address1.as_bytes());
         //     data
         // };
-        let event = CRYPTO.wait_for_event(
-            "ChannelReDrawn(bytes32)",
-            Some(vec![channel_id.into()]),
-            None,
-        );
+        let event = CRYPTO.wait_for_event("ChannelReDrawn(bytes32)", Some(vec![channel_id]), None);
 
         let payload = encode_call(
             "reDraw(bytes32,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes)",
             &[
                 // channelId
-                Token::Bytes(channel_id.to_vec().into()),
+                Token::Bytes(channel_id.to_vec()),
                 // sequenceNumber
                 channel_nonce.into(),
                 // oldBalance0

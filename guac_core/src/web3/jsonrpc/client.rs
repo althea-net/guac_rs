@@ -3,12 +3,9 @@ use actix_web::HttpMessage;
 use failure::Error;
 use futures::Future;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::cell::RefCell;
 use std::str;
 use std::sync::{Arc, Mutex};
-use tokio::net::TcpStream;
-use transport_protocol::TransportProtocol;
 use web3::jsonrpc::request::Request;
 use web3::jsonrpc::response::Response;
 

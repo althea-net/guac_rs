@@ -3,19 +3,15 @@ use clarity::utils::bytes_to_hex_str;
 use clarity::Transaction;
 use clarity::{Address, PrivateKey, Signature};
 use failure::Error;
-use multihash::{encode, Hash};
 
 use owning_ref::{RwLockReadGuardRef, RwLockWriteGuardRefMut};
 use sha3::{Digest, Keccak256};
 use std::sync::{Arc, RwLock};
 
-use error::GuacError;
-use futures::future::ok;
 use futures::Future;
 use futures::IntoFuture;
 use futures::Stream;
 use num256::Uint256;
-use std::time;
 use web3::client::{Web3, Web3Client};
 use web3::types::{Log, NewFilter};
 
@@ -119,17 +115,17 @@ impl Crypto {
 }
 
 fn bytes_to_data(s: &[u8]) -> String {
-    let mut foo = "0x".to_string();
-    foo.push_str(&bytes_to_hex_str(&s));
-    foo
+    let mut buf = "0x".to_string();
+    buf.push_str(&bytes_to_hex_str(&s));
+    buf
 }
 
 impl CryptoService for Arc<RwLock<Crypto>> {
     fn init(&self, config: &Config) -> Result<(), Error> {
         let mut service = self.write().unwrap();
         service.web3 = Some(Web3Client::new(&config.address));
-        service.contract = config.contract.clone();
-        service.secret = config.secret.clone();
+        service.contract = config.contract;
+        service.secret = config.secret;
         Ok(())
     }
     fn own_eth_addr(&self) -> Address {
@@ -140,7 +136,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
             .expect("Unable to obtain public key")
     }
     fn secret(&self) -> PrivateKey {
-        self.read().unwrap().secret.clone()
+        self.read().unwrap().secret
     }
     fn secret_mut<'ret, 'me: 'ret>(&'me self) -> RwLockWriteGuardRefMut<'ret, Crypto, PrivateKey> {
         RwLockWriteGuardRefMut::new(self.write().unwrap()).map_mut(|c| &mut c.secret)
@@ -178,14 +174,13 @@ impl CryptoService for Arc<RwLock<Crypto>> {
         self.web3().net_version()
     }
     fn get_nonce(&self) -> Box<Future<Item = Uint256, Error = Error>> {
-        self.web3()
-            .eth_get_transaction_count(self.own_eth_addr().clone())
+        self.web3().eth_get_transaction_count(self.own_eth_addr())
     }
     fn get_gas_price(&self) -> Box<Future<Item = Uint256, Error = Error>> {
         self.web3().eth_gas_price()
     }
     fn get_network_balance(&self) -> Box<Future<Item = Uint256, Error = Error>> {
-        self.web3().eth_get_balance(self.own_eth_addr().clone())
+        self.web3().eth_get_balance(self.own_eth_addr())
     }
 
     fn wait_for_event(
@@ -196,7 +191,7 @@ impl CryptoService for Arc<RwLock<Crypto>> {
     ) -> Box<Future<Item = Log, Error = Error>> {
         // Build a filter with specified topics
         let mut new_filter = NewFilter::default();
-        new_filter.address = vec![self.read().unwrap().contract.clone()];
+        new_filter.address = vec![self.read().unwrap().contract];
         new_filter.topics = Some(vec![
             Some(vec![Some(bytes_to_data(&derive_signature(event)))]),
             topic1.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
@@ -239,8 +234,8 @@ impl CryptoService for Arc<RwLock<Crypto>> {
             .get_network_id()
             .join3(self.get_gas_price(), self.get_nonce());
         // let instance = self.read().unwrap();
-        let contract = self.read().unwrap().contract.clone();
-        let secret = self.read().unwrap().secret.clone();
+        let contract = self.read().unwrap().contract;
+        let secret = self.read().unwrap().secret;
         // let web3 = self.web3().clone();
 
         Box::new(
@@ -248,21 +243,21 @@ impl CryptoService for Arc<RwLock<Crypto>> {
                 .and_then(move |(network_id, gas_price, nonce)| {
                     let transaction = match action {
                         Action::To(address) => Transaction {
-                            to: address.clone(),
-                            nonce: nonce,
-                            gas_price: gas_price.into(),
-                            gas_limit: 6721975u32.into(),
-                            value: value,
+                            to: address,
+                            nonce,
+                            gas_price,
+                            gas_limit: 6_721_975u32.into(),
+                            value,
                             data: Vec::new(),
                             signature: None,
                         },
                         Action::Call(data) => Transaction {
-                            to: contract.clone(),
-                            nonce: nonce,
-                            gas_price: gas_price.into(),
-                            gas_limit: 6721975u32.into(),
-                            value: value,
-                            data: data,
+                            to: contract,
+                            nonce,
+                            gas_price,
+                            gas_limit: 6_721_975u32.into(),
+                            value,
+                            data,
                             signature: None,
                         },
                     };

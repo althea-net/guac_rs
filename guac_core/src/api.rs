@@ -24,7 +24,7 @@ impl<T> NetworkRequest<T> {
 
 pub fn update(update: NetworkRequest<UpdateTx>) -> impl Future<Item = UpdateTx, Error = Error> {
     STORAGE
-        .get_channel(update.from_addr.clone())
+        .get_channel(update.from_addr)
         .and_then(move |mut channel_manager| {
             channel_manager.received_payment(&update.data)?;
             channel_manager.create_payment()
@@ -36,7 +36,7 @@ pub fn propose_channel(
     channel: NetworkRequest<Channel>,
 ) -> impl Future<Item = bool, Error = Error> {
     let counterparty = Counterparty {
-        address: channel.from_addr.clone(),
+        address: channel.from_addr,
         url: to_url,
     };
     trace!("inserting state {:?}", counterparty);
@@ -44,7 +44,7 @@ pub fn propose_channel(
         .init_data(counterparty, ChannelManager::New)
         .then(|_| {
             STORAGE
-                .get_channel(channel.from_addr.clone())
+                .get_channel(channel.from_addr)
                 .and_then(move |mut channel_manager| channel_manager.check_proposal(&channel.data))
         })
 }
@@ -53,7 +53,7 @@ pub fn channel_created(
     channel: NetworkRequest<Channel>,
 ) -> impl Future<Item = bool, Error = Error> {
     STORAGE
-        .get_channel(channel.from_addr.clone())
+        .get_channel(channel.from_addr)
         .and_then(move |mut channel_manager| {
             channel_manager.channel_created(&channel.data, CRYPTO.own_eth_addr())?;
             Ok(true)
@@ -62,7 +62,7 @@ pub fn channel_created(
 
 pub fn channel_joined(channel: NetworkRequest<Channel>) -> impl Future<Item = bool, Error = Error> {
     STORAGE
-        .get_channel(channel.from_addr.clone())
+        .get_channel(channel.from_addr)
         .and_then(move |mut channel_manager| {
             channel_manager.channel_joined(&channel.data)?;
             Ok(true)

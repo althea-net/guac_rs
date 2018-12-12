@@ -3,7 +3,6 @@ use clarity::Address;
 use num256::Uint256;
 use serde::Deserialize;
 use serde::Deserializer;
-use serde::Serialize;
 use serde::Serializer;
 use std::ops::Deref;
 

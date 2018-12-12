@@ -305,7 +305,7 @@ fn contract() {
     };
     CRYPTO.init(&cfg).unwrap();
 
-    let contract: Box<PaymentContract> = Box::new(GuacContract::new());
+    let contract: Box<PaymentContract> = Box::new(GuacContract::default());
 
     println!("Address {:?}", &*CHANNEL_ADDRESS);
     println!("Network ID {:?}", &*NETWORK_ID);
