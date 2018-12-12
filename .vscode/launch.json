@@ -20,14 +20,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'guac_core' module combined_state",
+      "name": "Debug unit tests in library 'guac_core' module channel_manager",
       "cargo": {
         "args": ["test", "--no-run", "--lib", "--package=guac_core"],
         "filter": {
           "kind": "lib"
         }
       },
-      "args": ["combined_state"],
+      "args": ["channel_manager"],
       "cwd": "${workspaceFolder}"
     },
     {
