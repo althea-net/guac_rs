@@ -212,17 +212,17 @@ mod tests {
         // let (channel_a, channel_b) = Channel::new_pair(42u64.into(), deposit_a, deposit_b);
 
         let channel_a = Channel {
-            channel_id: 42.into(),
+            channel_id: 42u64.into(),
             address_0: "0x0000000000000000000000000000000000000001"
                 .parse()
                 .unwrap(),
             address_1: "0x0000000000000000000000000000000000000002"
                 .parse()
                 .unwrap(),
-            settling_period_length: 0.into(),
-            settling_period_end: 0.into(),
+            settling_period_length: 0u64.into(),
+            settling_period_end: 0u64.into(),
             settling_period_started: false,
-            sequence_number: 0.into(),
+            sequence_number: 0u64.into(),
             balance_0: balance_0.clone(),
             balance_1: balance_1.clone(),
             total_balance: balance_0.add(balance_1),
@@ -241,7 +241,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_manager_unidirectional_empty() {
+    fn test_unidirectional_empty() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         let payment = a.create_update().unwrap();
@@ -256,7 +256,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_manager_unidirectional_overpay() {
+    fn test_unidirectional_overpay() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         let overflow = a.make_payment(150u32.into()).unwrap();
@@ -275,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_manager_unidirectional() {
+    fn test_unidirectional() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         a.make_payment(20u32.into()).unwrap();
@@ -293,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_manager_bidirectional() {
+    fn test_bidirectional() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 5
@@ -320,7 +320,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_manager_bidirectional_race() {
+    fn test_bidirectional_race() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 3 and B -> A 5 at the same time
@@ -349,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_manager_bidirectional_race_resume() {
+    fn test_bidirectional_race_resume() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 3 and B -> A 5 at the same time
@@ -382,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_manager_bidirectional_race_multi() {
+    fn test_bidirectional_race_multi() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 1, B offline
@@ -430,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_manager_bidirectional_race_multi_resume() {
+    fn test_bidirectional_race_multi_resume() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 3, B no response
