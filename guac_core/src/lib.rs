@@ -13,7 +13,6 @@ extern crate uuid;
 #[macro_use]
 extern crate lazy_static;
 extern crate hex;
-extern crate multihash;
 extern crate owning_ref;
 extern crate qutex;
 #[macro_use]

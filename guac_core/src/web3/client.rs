@@ -7,13 +7,10 @@
 use clarity::utils::bytes_to_hex_str;
 use clarity::Address;
 use failure::Error;
-use futures::prelude::*;
 use futures::IntoFuture;
-use futures::{future, stream};
-use futures::{Future, Stream};
+use futures::{stream, Future, Stream};
 use futures_timer::Interval;
 use num256::Uint256;
-use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
 use web3::jsonrpc::client::{Client, HTTPClient};

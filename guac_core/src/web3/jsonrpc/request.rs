@@ -9,7 +9,7 @@ pub struct Request<T> {
 impl<T> Request<T> {
     pub fn new(id: u64, method: &str, params: T) -> Self {
         Self {
-            id: id,
+            id,
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
             params,

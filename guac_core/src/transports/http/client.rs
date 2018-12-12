@@ -1,11 +1,9 @@
 use actix_web::client;
 use actix_web::client::ClientResponse;
 use actix_web::client::Connection;
-use actix_web::http::StatusCode;
 use actix_web::HttpMessage;
-use channel_client::types::{Channel, ChannelStatus, UpdateTx};
+use channel_client::types::{Channel, UpdateTx};
 use failure::Error;
-use futures::future::err;
 use futures::Future;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
@@ -25,7 +23,7 @@ pub struct HTTPTransportClient {
 }
 
 impl HTTPTransportClient {
-    pub fn new(url: String) -> Result<HTTPTransportClient, Error> {
+    pub fn with_url(url: &str) -> Result<HTTPTransportClient, Error> {
         Ok(HTTPTransportClient { addr: url.parse()? })
     }
 }
@@ -65,12 +63,7 @@ impl TransportProtocol for HTTPTransportClient {
                 .send()
                 .from_err()
                 .and_then(verify_client_error)
-                .and_then(move |response| {
-                    response
-                        .json()
-                        .from_err()
-                        .and_then(move |res: bool| Ok(res))
-                })
+                .and_then(move |response| response.json().from_err())
         }))
     }
     /// Sends a channel created request
@@ -143,12 +136,7 @@ impl TransportProtocol for HTTPTransportClient {
                     }
                     Ok(response)
                 })
-                .and_then(move |response| {
-                    response
-                        .json()
-                        .from_err()
-                        .and_then(move |res_update: UpdateTx| Ok(res_update))
-                })
+                .and_then(move |response| response.json().from_err())
         }))
     }
 
@@ -195,6 +183,7 @@ impl TransportProtocol for HTTPTransportClient {
 
 #[cfg(test)]
 fn make_channel() -> Channel {
+    use channel_client::types::ChannelStatus;
     Channel {
         channel_id: Some(42u64.into()),
         address_a: "0x0000000000000000000000000000000000000001"
@@ -217,7 +206,7 @@ fn make_channel() -> Channel {
 
 #[test]
 fn proposal() {
-    use actix::{Arbiter, Handler, System};
+    use actix::{Arbiter, System};
     use mockito::mock;
 
     let _m = mock("POST", "/propose")
@@ -248,7 +237,7 @@ fn proposal() {
 
 #[test]
 fn invalid_proposal() {
-    use actix::{Arbiter, Handler, System};
+    use actix::{Arbiter, System};
     use mockito::mock;
 
     let _m = mock("POST", "/propose")
@@ -276,7 +265,7 @@ fn invalid_proposal() {
 
 #[test]
 fn channel_created() {
-    use actix::{Arbiter, Handler, System};
+    use actix::{Arbiter, System};
     use mockito::mock;
 
     let _m = mock("POST", "/channel_created").with_status(200).create();
@@ -300,7 +289,7 @@ fn channel_created() {
 
 #[test]
 fn invalid_channel_created() {
-    use actix::{Arbiter, Handler, System};
+    use actix::{Arbiter, System};
     use mockito::mock;
 
     let _m = mock("POST", "/channel_created").with_status(404).create();
@@ -325,7 +314,7 @@ fn invalid_channel_created() {
 
 #[test]
 fn channel_joined() {
-    use actix::{Arbiter, Handler, System};
+    use actix::{Arbiter, System};
     use mockito::mock;
 
     let _m = mock("POST", "/channel_joined").with_status(200).create();
@@ -349,7 +338,7 @@ fn channel_joined() {
 
 #[test]
 fn invalid_channel_joined() {
-    use actix::{Arbiter, Handler, System};
+    use actix::{Arbiter, System};
     use mockito::mock;
 
     let _m = mock("POST", "/channel_joined").with_status(404).create();
@@ -374,7 +363,7 @@ fn invalid_channel_joined() {
 
 #[test]
 fn update() {
-    use actix::{Arbiter, Handler, System};
+    use actix::{Arbiter, System};
     use mockito::mock;
     use serde_json;
 
@@ -397,7 +386,7 @@ fn update() {
             .parse()
             .expect("Invalid mockito address"),
     };
-    let channel = make_channel();
+    let _channel = make_channel();
     let sys = System::new("test");
     Arbiter::spawn({
         client
@@ -424,7 +413,7 @@ fn update() {
 
 #[test]
 fn invalid_update() {
-    use actix::{Arbiter, Handler, System};
+    use actix::{Arbiter, System};
     use mockito::mock;
     use serde_json;
 
@@ -447,7 +436,7 @@ fn invalid_update() {
             .parse()
             .expect("Invalid mockito address"),
     };
-    let channel = make_channel();
+    let _channel = make_channel();
     let sys = System::new("test");
     Arbiter::spawn({
         client

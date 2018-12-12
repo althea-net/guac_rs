@@ -3,7 +3,6 @@ use failure::{err_msg, Error};
 use num256::Uint256;
 
 use crypto::CryptoService;
-use std::ops::Add;
 use CRYPTO;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -32,7 +31,7 @@ pub struct Channel {
 
 impl Channel {
     pub fn new_pair(
-        channel_id: Uint256,
+        channel_id: &Uint256,
         deposit_a: Uint256,
         deposit_b: Uint256,
     ) -> (Channel, Channel) {
@@ -77,69 +76,79 @@ impl Channel {
 
 impl Channel {
     pub fn get_my_address(&self) -> &Address {
-        match self.is_a {
-            true => &self.address_a,
-            false => &self.address_b,
+        if self.is_a {
+            &self.address_a
+        } else {
+            &self.address_b
         }
     }
     pub fn get_their_address(&self) -> &Address {
-        match self.is_a {
-            true => &self.address_b,
-            false => &self.address_a,
+        if self.is_a {
+            &self.address_b
+        } else {
+            &self.address_a
         }
     }
     pub fn my_balance(&self) -> &Uint256 {
-        match self.is_a {
-            true => &self.balance_a,
-            false => &self.balance_b,
+        if self.is_a {
+            &self.balance_a
+        } else {
+            &self.balance_b
         }
     }
     pub fn their_balance(&self) -> &Uint256 {
-        match self.is_a {
-            true => &self.balance_b,
-            false => &self.balance_a,
+        if self.is_a {
+            &self.balance_b
+        } else {
+            &self.balance_a
         }
     }
     pub fn my_balance_mut(&mut self) -> &mut Uint256 {
-        match self.is_a {
-            true => &mut self.balance_a,
-            false => &mut self.balance_b,
+        if self.is_a {
+            &mut self.balance_a
+        } else {
+            &mut self.balance_b
         }
     }
     pub fn their_balance_mut(&mut self) -> &mut Uint256 {
-        match self.is_a {
-            true => &mut self.balance_b,
-            false => &mut self.balance_a,
+        if self.is_a {
+            &mut self.balance_b
+        } else {
+            &mut self.balance_a
         }
     }
     pub fn my_deposit(&self) -> &Uint256 {
-        match self.is_a {
-            true => &self.deposit_a,
-            false => &self.deposit_b,
+        if self.is_a {
+            &self.deposit_a
+        } else {
+            &self.deposit_b
         }
     }
     pub fn their_deposit(&self) -> &Uint256 {
-        match self.is_a {
-            true => &self.deposit_b,
-            false => &self.deposit_a,
+        if self.is_a {
+            &self.deposit_b
+        } else {
+            &self.deposit_a
         }
     }
     pub fn my_deposit_mut(&mut self) -> &mut Uint256 {
-        match self.is_a {
-            true => &mut self.deposit_a,
-            false => &mut self.deposit_b,
+        if self.is_a {
+            &mut self.deposit_a
+        } else {
+            &mut self.deposit_b
         }
     }
     pub fn their_deposit_mut(&mut self) -> &mut Uint256 {
-        match self.is_a {
-            true => &mut self.deposit_b,
-            false => &mut self.deposit_a,
+        if self.is_a {
+            &mut self.deposit_b
+        } else {
+            &mut self.deposit_a
         }
     }
     pub fn create_update(&self) -> Result<UpdateTx, Error> {
-        let channel_id = self.channel_id.as_ref().ok_or(err_msg(
-            "Unable to create update before channel is open on the network",
-        ))?;
+        let channel_id = self.channel_id.as_ref().ok_or_else(|| {
+            err_msg("Unable to create update before channel is open on the network")
+        })?;
 
         let mut update_tx = UpdateTx {
             channel_id: channel_id.clone(),
@@ -150,7 +159,7 @@ impl Channel {
             signature_b: None,
         };
 
-        update_tx.sign(self.is_a, channel_id.clone());
+        update_tx.sign(self.is_a, &channel_id);
         Ok(update_tx)
     }
     pub fn apply_update(&mut self, update: &UpdateTx, validate_balance: bool) -> Result<(), Error> {
@@ -213,9 +222,10 @@ pub struct UpdateTx {
 
 impl UpdateTx {
     pub fn set_my_signature(&mut self, is_a: bool, signature: &Signature) {
-        match is_a {
-            true => self.signature_a = Some(signature.clone()),
-            false => self.signature_b = Some(signature.clone()),
+        if is_a {
+            self.signature_a = Some(signature.clone());
+        } else {
+            self.signature_b = Some(signature.clone());
         }
     }
     pub fn validate_their_signature(&self, _is_a: bool) -> bool {
@@ -223,25 +233,28 @@ impl UpdateTx {
         true
     }
     pub fn their_balance(&self, is_a: bool) -> &Uint256 {
-        match is_a {
-            true => &self.balance_b,
-            false => &self.balance_a,
+        if is_a {
+            &self.balance_b
+        } else {
+            &self.balance_a
         }
     }
     pub fn my_balance(&self, is_a: bool) -> &Uint256 {
-        match is_a {
-            true => &self.balance_a,
-            false => &self.balance_b,
+        if is_a {
+            &self.balance_a
+        } else {
+            &self.balance_b
         }
     }
     pub fn set_their_signature(&mut self, is_a: bool, signature: &Signature) {
-        match is_a {
-            true => self.signature_b = Some(signature.clone()),
-            false => self.signature_a = Some(signature.clone()),
+        if is_a {
+            self.signature_b = Some(signature.clone())
+        } else {
+            self.signature_a = Some(signature.clone())
         }
     }
 
-    pub fn sign(&mut self, is_a: bool, channel_id: Uint256) {
+    pub fn sign(&mut self, is_a: bool, channel_id: &Uint256) {
         let nonce: [u8; 32] = self.nonce.clone().into();
         let balance_a: [u8; 32] = self.balance_a.clone().into();
         let balance_b: [u8; 32] = self.balance_b.clone().into();
@@ -253,7 +266,7 @@ impl UpdateTx {
 
         let my_sig = CRYPTO.eth_sign(&fingerprint);
 
-        self.set_my_signature(is_a, &my_sig.into());
+        self.set_my_signature(is_a, &my_sig);
     }
 
     pub fn strip_sigs(&self) -> UpdateTx {
