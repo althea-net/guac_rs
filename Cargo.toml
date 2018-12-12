@@ -3,3 +3,4 @@ members = ["guac_core"]
 
 [patch.crates-io]
 clarity={git="https://github.com/althea-mesh/clarity"}
+

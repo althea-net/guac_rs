@@ -1,11 +1,9 @@
 use actix_web::client;
 use actix_web::client::ClientResponse;
 use actix_web::client::Connection;
-use actix_web::http::StatusCode;
 use actix_web::HttpMessage;
-use channel_client::types::{Channel, ChannelStatus, UpdateTx};
+use channel_client::types::{Channel, UpdateTx};
 use failure::Error;
-use futures::future::err;
 use futures::Future;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;

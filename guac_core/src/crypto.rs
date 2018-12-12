@@ -14,7 +14,7 @@ use futures::future::ok;
 use futures::Future;
 use futures::IntoFuture;
 use futures::Stream;
-use num256::Uint256;
+use num256::uint256::Uint256;
 use std::time;
 use web3::client::{Web3, Web3Client};
 use web3::types::{Log, NewFilter};
