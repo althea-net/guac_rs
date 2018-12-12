@@ -44,21 +44,6 @@ pub enum GuacError {
     WrongState(),
 }
 
-// pub trait CounterpartyClient {
-//     fn propose_channel(
-//         &self,
-//         new_channel: &NewChannelTx,
-//     ) -> Box<Future<Item = Signature, Error = Error>>;
-
-//     fn propose_re_draw(&self, re_draw: &ReDrawTx) -> Box<Future<Item = Signature, Error = Error>>;
-
-//     fn notify_channel_opened(&self, channel_id: &Uint256) -> Box<Future<Item = (), Error = Error>>;
-
-//     fn notify_re_draw(&self, my_address: &Address) -> Box<Future<Item = (), Error = Error>>;
-
-//     fn receive_payment(&self, update_tx: &UpdateTx) -> Box<Future<Item = UpdateTx, Error = Error>>;
-// }
-
 pub trait BlockchainClient {
     fn new_channel(&self, new_channel: &NewChannelTx)
         -> Box<Future<Item = Uint256, Error = Error>>;
@@ -93,33 +78,6 @@ pub trait UserApi {
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>>;
 }
-
-// pub trait CounterpartyApi {
-//     fn propose_channel(
-//         &self,
-//         their_address: Address,
-//         new_channel_tx: NewChannelTx,
-//     ) -> Box<Future<Item = Signature, Error = Error>>;
-
-//     fn propose_re_draw(
-//         &self,
-//         their_address: Address,
-//         re_draw_tx: ReDrawTx,
-//     ) -> Box<Future<Item = Signature, Error = Error>>;
-
-//     fn notify_channel_opened(
-//         &self,
-//         their_address: Address,
-//     ) -> Box<Future<Item = (), Error = Error>>;
-
-//     fn notify_re_draw(&self, their_address: Address) -> Box<Future<Item = (), Error = Error>>;
-
-//     fn receive_payment(
-//         &self,
-//         their_address: Address,
-//         update_tx: UpdateTx,
-//     ) -> Box<Future<Item = UpdateTx, Error = Error>>;
-// }
 
 pub trait TransportProtocol {
     fn propose_channel(
@@ -186,7 +144,6 @@ impl UserApi for Guac {
 
         Box::new(storage.get_counterparty(their_address.clone()).and_then(
             move |mut counterparty| {
-                println!("frmp {:?}", counterparty.clone());
                 match counterparty.clone() {
                     Counterparty::New { i_am_0, url } => {
                         let my_address = crypto.own_eth_addr();
