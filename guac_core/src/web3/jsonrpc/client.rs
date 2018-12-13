@@ -7,6 +7,7 @@ use serde_json::Value;
 use std::cell::RefCell;
 use std::str;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tokio::net::TcpStream;
 use transport_protocol::TransportProtocol;
 use web3::jsonrpc::request::Request;
@@ -59,6 +60,7 @@ impl Client for HTTPClient {
                 .json(payload)
                 .unwrap()
                 .send()
+                .timeout(Duration::from_millis(1000))
                 .from_err()
                 .and_then(|response| {
                     response
