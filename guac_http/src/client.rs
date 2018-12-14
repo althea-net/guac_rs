@@ -29,9 +29,9 @@ macro_rules! try_future_box {
 /// This URL will be used to query sub resources over the network. At
 /// some point we might want to include a "API" root by convention here,
 /// not necessarily a transport.
-pub struct HTTPTransportClient;
+pub struct Client;
 
-/// Verifies if the response from server is correct by checking status code.HTTPTransportClient
+/// Verifies if the response from server is correct by checking status code.Client
 ///
 /// Implementation of this is very simplified and all responses are expected to have HTTP 200 OK
 /// response.
@@ -45,7 +45,7 @@ fn verify_client_error(response: ClientResponse) -> Result<ClientResponse, Error
     Ok(response)
 }
 
-impl TransportProtocol for HTTPTransportClient {
+impl TransportProtocol for Client {
     fn propose_channel(
         &self,
         from_address: Address,
