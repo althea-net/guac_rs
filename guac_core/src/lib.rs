@@ -36,7 +36,7 @@ pub mod error;
 pub mod new_crypto;
 pub mod storage;
 // pub mod transport_protocol;
-pub mod web3;
+// pub mod web3;
 
 pub use self::channel_client::channel_manager::TransportProtocol;
 pub use self::channel_client::channel_manager::UserApi;

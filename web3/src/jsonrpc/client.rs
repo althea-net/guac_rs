@@ -2,6 +2,8 @@ use actix_web::client;
 use actix_web::HttpMessage;
 use failure::Error;
 use futures::Future;
+use jsonrpc::request::Request;
+use jsonrpc::response::Response;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::cell::RefCell;
@@ -9,8 +11,6 @@ use std::str;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::net::TcpStream;
-use web3::jsonrpc::request::Request;
-use web3::jsonrpc::response::Response;
 
 pub trait Client {
     fn request_method<T: Serialize, R: 'static>(
