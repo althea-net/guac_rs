@@ -1,7 +1,9 @@
+
 [package]
 name = "guac_actix"
 version = "0.1.0"
 authors = ["Ben Wang <wangben3@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 actix = "0.7"

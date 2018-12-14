@@ -1,5 +1,5 @@
 [workspace]
-members = ["guac_core"]
+members = ["guac_core", "guac_http"]
 
 [patch.crates-io]
 clarity={git="https://github.com/althea-mesh/clarity"}

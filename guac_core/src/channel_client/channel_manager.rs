@@ -3,7 +3,7 @@ use channel_client::types::UpdateTx;
 use channel_client::types::{Counterparty, NewChannelTx, ReDrawTx};
 use channel_client::Channel;
 use clarity::{Address, PrivateKey, Signature};
-// use crypto::CryptoService;
+
 use failure::Error;
 use futures::{future, Future};
 use new_crypto;
@@ -12,7 +12,7 @@ use num256::Uint256;
 
 use std::sync::Arc;
 use storage::Storage;
-// use crypto;
+
 
 #[macro_export]
 macro_rules! try_future_box {
@@ -28,9 +28,9 @@ macro_rules! try_future_box {
 
 #[derive(Clone)]
 pub struct Guac {
-    blockchain_client: Arc<Box<BlockchainClient>>,
-    counterparty_client: Arc<Box<TransportProtocol>>,
-    storage: Arc<Box<Storage>>,
+    blockchain_client: Arc<Box<BlockchainClient + Sync + Send>>,
+    counterparty_client: Arc<Box<TransportProtocol + Sync + Send>>,
+    storage: Arc<Box<Storage + Sync + Send>>,
     crypto: Arc<Box<Crypto>>,
 }
 

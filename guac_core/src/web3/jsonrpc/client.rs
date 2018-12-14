@@ -9,7 +9,6 @@ use std::str;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::net::TcpStream;
-use transport_protocol::TransportProtocol;
 use web3::jsonrpc::request::Request;
 use web3::jsonrpc::response::Response;
 
