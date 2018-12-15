@@ -55,6 +55,33 @@ pub struct NewChannelTx {
     pub signature1: Option<Signature>,
 }
 
+impl NewChannelTx {
+    pub fn fingerprint(&mut self, contract_address: Address) -> [u8; 32] {
+        let func_name: &[u8] = "NewChannel".as_bytes();
+        let contract_address: &[u8] = contract_address.as_bytes();
+        let address_0: &[u8] = self.address_0.as_bytes();
+        let address_1: &[u8] = self.address_1.as_bytes();
+        let balance_0: [u8; 32] = self.balance_0.clone().into();
+        let balance_1: [u8; 32] = self.balance_1.clone().into();
+        let expiration: [u8; 32] = self.expiration.clone().into();
+        let settling_period_length: [u8; 32] = self.settling_period_length.clone().into();
+
+        let fingerprint = new_crypto::hash_bytes(&[
+            func_name,
+            contract_address,
+            &address_0,
+            &address_1,
+            &balance_0,
+            &balance_1,
+            &expiration,
+            &settling_period_length,
+        ]);
+        let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+        return fingerprint;
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ReDrawTx {
     pub channel_id: Uint256,
@@ -72,15 +99,32 @@ pub struct ReDrawTx {
     pub signature1: Option<Signature>,
 }
 
-impl NewChannelTx {
-    pub fn fingerprint(&self) -> [u8; 32] {
-        <[u8; 32]>::default()
-    }
-}
-
 impl ReDrawTx {
-    pub fn fingerprint(&self) -> [u8; 32] {
-        <[u8; 32]>::default()
+    pub fn fingerprint(&mut self, contract_address: Address) -> [u8; 32] {
+        let func_name: &[u8] = "ReDraw".as_bytes();
+        let contract_address: &[u8] = contract_address.as_bytes();
+        let channel_id: [u8; 32] = self.channel_id.clone().into();
+        let sequence_number: [u8; 32] = self.sequence_number.clone().into();
+        let old_balance_0: [u8; 32] = self.old_balance_0.clone().into();
+        let old_balance_1: [u8; 32] = self.old_balance_1.clone().into();
+        let new_balance_0: [u8; 32] = self.new_balance_0.clone().into();
+        let new_balance_1: [u8; 32] = self.new_balance_1.clone().into();
+        let expiration: [u8; 32] = self.expiration.clone().into();
+
+        let fingerprint = new_crypto::hash_bytes(&[
+            func_name,
+            contract_address,
+            &channel_id,
+            &sequence_number,
+            &old_balance_0,
+            &old_balance_1,
+            &new_balance_0,
+            &new_balance_1,
+            &expiration,
+        ]);
+        let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+        return fingerprint;
     }
 }
 
@@ -183,15 +227,22 @@ pub struct UpdateTx {
 }
 
 impl UpdateTx {
-    pub fn fingerprint(&mut self) -> [u8; 32] {
+    pub fn fingerprint(&mut self, contract_address: Address) -> [u8; 32] {
+        let func_name: &[u8] = "Update".as_bytes();
+        let contract_address: &[u8] = contract_address.as_bytes();
+        let channel_id: [u8; 32] = self.channel_id.clone().into();
         let sequence_number: [u8; 32] = self.sequence_number.clone().into();
         let balance_0: [u8; 32] = self.balance_0.clone().into();
         let balance_1: [u8; 32] = self.balance_1.clone().into();
 
-        let channel_id: [u8; 32] = self.channel_id.clone().into();
-
-        let fingerprint =
-            new_crypto::hash_bytes(&[&channel_id, &sequence_number, &balance_0, &balance_1]);
+        let fingerprint = new_crypto::hash_bytes(&[
+            func_name,
+            contract_address,
+            &channel_id,
+            &sequence_number,
+            &balance_0,
+            &balance_1,
+        ]);
         let fingerprint: [u8; 32] = fingerprint.clone().into();
 
         return fingerprint;
