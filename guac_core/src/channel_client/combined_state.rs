@@ -212,7 +212,7 @@ mod tests {
         // let (channel_a, channel_b) = Channel::new_pair(42u64.into(), deposit_a, deposit_b);
 
         let channel_a = Channel {
-            channel_id: 42u64.into(),
+            channel_id: [0u8; 32],
             address_0: "0x0000000000000000000000000000000000000001"
                 .parse()
                 .unwrap(),

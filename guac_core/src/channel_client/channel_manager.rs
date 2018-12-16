@@ -46,18 +46,18 @@ pub enum GuacError {
 pub trait BlockchainApi {
     fn new_channel(
         &self,
-        new_channel_tx: &NewChannelTx,
-    ) -> Box<Future<Item = Uint256, Error = Error>>;
+        new_channel_tx: NewChannelTx,
+    ) -> Box<Future<Item = [u8; 32], Error = Error>>;
 
-    fn re_draw(&self, redraw_tx: &ReDrawTx) -> Box<Future<Item = (), Error = Error>>;
+    fn re_draw(&self, redraw_tx: ReDrawTx) -> Box<Future<Item = (), Error = Error>>;
 
     fn check_for_open(
         &self,
         address_0: &Address,
         address_1: &Address,
-    ) -> Box<Future<Item = Uint256, Error = Error>>;
+    ) -> Box<Future<Item = [u8; 32], Error = Error>>;
 
-    fn check_for_re_draw(&self, channel_id: &Uint256) -> Box<Future<Item = (), Error = Error>>;
+    fn check_for_re_draw(&self, channel_id: [u8; 32]) -> Box<Future<Item = (), Error = Error>>;
 }
 
 pub trait UserApi {
@@ -192,7 +192,7 @@ impl UserApi for Guac {
                                         url: url.clone(),
                                     };
                                     blockchain_client
-                                        .new_channel(&NewChannelTx {
+                                        .new_channel(NewChannelTx {
                                             signature_0: Some(signature_0),
                                             signature_1: Some(signature_1),
                                             ..new_channel_tx
@@ -274,7 +274,7 @@ impl UserApi for Guac {
                                         };
 
                                     blockchain_client
-                                        .re_draw(&ReDrawTx {
+                                        .re_draw(ReDrawTx {
                                             signature_0: Some(signature_0),
                                             signature_1: Some(signature_1),
                                             ..re_draw_tx
@@ -603,7 +603,7 @@ impl CounterpartyApi for Guac {
                             channel,
                         } => Box::new(
                             blockchain_client
-                                .check_for_re_draw(&channel.my_state.channel_id)
+                                .check_for_re_draw(channel.my_state.channel_id)
                                 .and_then(move |_| {
                                     *counterparty = Counterparty::Open {
                                         channel: CombinedState::new(&Channel {

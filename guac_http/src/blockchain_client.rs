@@ -78,12 +78,12 @@ impl BlockchainClient {
                         .into_future()
                         .map(move |(head, _tail)| (filter_id, head))
                         .map_err(|(e, _)| e)
-                })
-                .and_then(|(filter_id, head)| {
-                    web3.eth_uninstall_filter(filter_id).and_then(move |r| {
-                        ensure!(r, "Unable to properly uninstall filter");
-                        Ok(head)
-                    })
+                        .and_then(move |(filter_id, head)| {
+                            web3.eth_uninstall_filter(filter_id).and_then(move |r| {
+                                ensure!(r, "Unable to properly uninstall filter");
+                                Ok(head)
+                            })
+                        })
                 })
                 .map(move |maybe_log| maybe_log.expect("Expected log data but None found"))
                 .from_err()
@@ -125,8 +125,8 @@ impl BlockchainClient {
 impl BlockchainApi for BlockchainClient {
     fn new_channel(
         &self,
-        new_channel_tx: &NewChannelTx,
-    ) -> Box<Future<Item = Uint256, Error = Error>> {
+        new_channel_tx: NewChannelTx,
+    ) -> Box<Future<Item = [u8; 32], Error = Error>> {
         let addr_0_bytes: [u8; 32] = {
             let mut data: [u8; 32] = Default::default();
             data[12..].copy_from_slice(&new_channel_tx.address_0.as_bytes());
@@ -184,7 +184,7 @@ impl BlockchainApi for BlockchainClient {
         )
     }
 
-    fn re_draw(&self, re_draw_tx: &ReDrawTx) -> Box<Future<Item = (), Error = Error>> {
+    fn re_draw(&self, re_draw_tx: ReDrawTx) -> Box<Future<Item = (), Error = Error>> {
         let event = self.wait_for_event(
             "ChannelReDrawn(bytes32)",
             Some(vec![re_draw_tx.channel_id.into()]),
@@ -194,7 +194,7 @@ impl BlockchainApi for BlockchainClient {
         let payload = encode_call(
             "reDraw(bytes32,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes)",
             &[
-                re_draw_tx.channel_id.into(),
+                Token::Bytes(re_draw_tx.channel_id.to_vec()),
                 re_draw_tx.sequence_number.into(),
                 re_draw_tx.old_balance_0.into(),
                 re_draw_tx.old_balance_1.into(),
@@ -231,7 +231,7 @@ impl BlockchainApi for BlockchainClient {
         &self,
         address_0: &Address,
         address_1: &Address,
-    ) -> Box<Future<Item = Uint256, Error = Error>> {
+    ) -> Box<Future<Item = [u8; 32], Error = Error>> {
         let addr_0_bytes: [u8; 32] = {
             let mut data: [u8; 32] = Default::default();
             data[12..].copy_from_slice(&address_0.as_bytes());
@@ -260,12 +260,7 @@ impl BlockchainApi for BlockchainClient {
         )
     }
 
-    fn check_for_re_draw(&self, channel_id: &Uint256) -> Box<Future<Item = (), Error = Error>> {
-        // let channel_id: [u8; 32] = {
-        //     let mut data: [u8; 32] = Default::default();
-        //     data[12..].copy_from_slice(&channel_id.as_bytes());
-        //     data
-        // };
+    fn check_for_re_draw(&self, channel_id: [u8; 32]) -> Box<Future<Item = (), Error = Error>> {
         Box::new(
             self.check_for_event(
                 "ChannelReDrawn(bytes32)",

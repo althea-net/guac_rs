@@ -84,7 +84,7 @@ impl NewChannelTx {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ReDrawTx {
-    pub channel_id: Uint256,
+    pub channel_id: [u8; 32],
 
     pub sequence_number: Uint256,
     pub old_balance_0: Uint256,
@@ -130,7 +130,7 @@ impl ReDrawTx {
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct Channel {
-    pub channel_id: Uint256,
+    pub channel_id: [u8; 32],
     pub address_0: Address,
     pub address_1: Address,
 
@@ -216,7 +216,7 @@ impl Channel {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct UpdateTx {
-    pub channel_id: Uint256,
+    pub channel_id: [u8; 32],
     pub sequence_number: Uint256,
 
     pub balance_0: Uint256,
