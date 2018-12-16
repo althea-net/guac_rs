@@ -44,10 +44,12 @@ pub enum GuacError {
 }
 
 pub trait BlockchainApi {
-    fn new_channel(&self, new_channel: &NewChannelTx)
-        -> Box<Future<Item = Uint256, Error = Error>>;
+    fn new_channel(
+        &self,
+        new_channel_tx: &NewChannelTx,
+    ) -> Box<Future<Item = Uint256, Error = Error>>;
 
-    fn re_draw(&self, new_channel: &ReDrawTx) -> Box<Future<Item = Uint256, Error = Error>>;
+    fn re_draw(&self, redraw_tx: &ReDrawTx) -> Box<Future<Item = (), Error = Error>>;
 
     fn check_for_open(
         &self,
@@ -55,8 +57,7 @@ pub trait BlockchainApi {
         address_1: &Address,
     ) -> Box<Future<Item = Uint256, Error = Error>>;
 
-    fn check_for_re_draw(&self, channel_id: &Uint256)
-        -> Box<Future<Item = Uint256, Error = Error>>;
+    fn check_for_re_draw(&self, channel_id: &Uint256) -> Box<Future<Item = (), Error = Error>>;
 }
 
 pub trait UserApi {

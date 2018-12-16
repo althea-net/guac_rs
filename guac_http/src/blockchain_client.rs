@@ -1,5 +1,5 @@
 use clarity::abi::derive_signature;
-use clarity::abi::{encode_call, encode_tokens};
+use clarity::abi::{encode_call, encode_tokens, Token};
 use clarity::utils::bytes_to_hex_str;
 use clarity::Transaction;
 use clarity::{Address, PrivateKey, Signature};
@@ -34,10 +34,38 @@ impl BlockchainClient {
         topic1: Option<Vec<[u8; 32]>>,
         topic2: Option<Vec<[u8; 32]>>,
     ) -> Box<Future<Item = Log, Error = Error>> {
+        self.get_event(event, topic1, topic2, None, None)
+    }
+
+    fn check_for_event(
+        &self,
+        event: &str,
+        topic1: Option<Vec<[u8; 32]>>,
+        topic2: Option<Vec<[u8; 32]>>,
+    ) -> Box<Future<Item = Log, Error = Error>> {
+        self.get_event(
+            event,
+            topic1,
+            topic2,
+            Some("0".to_string()),
+            Some("Latest".to_string()),
+        )
+    }
+
+    fn get_event(
+        &self,
+        event: &str,
+        topic1: Option<Vec<[u8; 32]>>,
+        topic2: Option<Vec<[u8; 32]>>,
+        from_block: Option<String>,
+        to_block: Option<String>,
+    ) -> Box<Future<Item = Log, Error = Error>> {
         let web3 = self.web3.clone();
         // Build a filter with specified topics
         let mut new_filter = NewFilter::default();
         new_filter.address = vec![self.contract_address.clone()];
+        new_filter.from_block = from_block;
+        new_filter.to_block = to_block;
         new_filter.topics = Some(vec![
             Some(vec![Some(bytes_to_data(&derive_signature(event)))]),
             topic1.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
@@ -88,10 +116,6 @@ impl BlockchainClient {
                     let transaction = transaction.sign(&secret, Some(1u64));
 
                     web3.eth_send_raw_transaction(transaction.to_bytes().unwrap())
-                    // .into_future()
-                    // .map_err(GuacError::from)
-                    // .and_then(|tx| ok(format!("0x{:x}", tx).parse().unwrap()))
-                    // .from_err()
                 })
                 .into_future(),
         )
@@ -123,26 +147,18 @@ impl BlockchainApi for BlockchainClient {
         let payload = encode_call(
             "newChannel(address,address,uint256,uint256,uint256,uint256,bytes,bytes)",
             &[
-                // address0
                 new_channel_tx.address_0.into(),
-                // address1
                 new_channel_tx.address_1.into(),
-                // balance0
                 new_channel_tx.balance_0.into(),
-                // balance1
                 new_channel_tx.balance_1.into(),
-                // expiration
                 new_channel_tx.expiration.into(),
-                // settlingPeriodLength in blocks
                 new_channel_tx.settling_period_length.into(),
-                // signature_0
                 new_channel_tx
                     .signature_0
                     .expect("No signature_0 supplied")
                     .into_bytes()
                     .to_vec()
                     .into(),
-                // signature_1
                 new_channel_tx
                     .signature_1
                     .expect("No signature_1 supplied")
@@ -168,20 +184,95 @@ impl BlockchainApi for BlockchainClient {
         )
     }
 
-    fn re_draw(&self, new_channel: &ReDrawTx) -> Box<Future<Item = Uint256, Error = Error>> {}
+    fn re_draw(&self, re_draw_tx: &ReDrawTx) -> Box<Future<Item = (), Error = Error>> {
+        let event = self.wait_for_event(
+            "ChannelReDrawn(bytes32)",
+            Some(vec![re_draw_tx.channel_id.into()]),
+            None,
+        );
+
+        let payload = encode_call(
+            "reDraw(bytes32,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes)",
+            &[
+                re_draw_tx.channel_id.into(),
+                re_draw_tx.sequence_number.into(),
+                re_draw_tx.old_balance_0.into(),
+                re_draw_tx.old_balance_1.into(),
+                re_draw_tx.new_balance_0.into(),
+                re_draw_tx.new_balance_1.into(),
+                re_draw_tx.expiration.into(),
+                re_draw_tx
+                    .signature_0
+                    .expect("No signature_0 supplied")
+                    .into_bytes()
+                    .to_vec()
+                    .into(),
+                re_draw_tx
+                    .signature_1
+                    .expect("No signature_1 supplied")
+                    .into_bytes()
+                    .to_vec()
+                    .into(),
+            ],
+        );
+        let call = self.broadcast_transaction(payload);
+
+        Box::new(
+            call.join(event)
+                .and_then(|(_tx, response)| {
+                    println!("response {:?}", response);
+                    Ok(())
+                })
+                .into_future(),
+        )
+    }
 
     fn check_for_open(
         &self,
         address_0: &Address,
         address_1: &Address,
     ) -> Box<Future<Item = Uint256, Error = Error>> {
-
+        let addr_0_bytes: [u8; 32] = {
+            let mut data: [u8; 32] = Default::default();
+            data[12..].copy_from_slice(&address_0.as_bytes());
+            data
+        };
+        let addr_1_bytes: [u8; 32] = {
+            let mut data: [u8; 32] = Default::default();
+            data[12..].copy_from_slice(&address_1.as_bytes());
+            data
+        };
+        Box::new(
+            self.check_for_event(
+                "ChannelOpened(address,address,bytes32)",
+                Some(vec![addr_0_bytes]),
+                Some(vec![addr_1_bytes]),
+            )
+            .and_then(|response| {
+                let mut data: [u8; 32] = Default::default();
+                ensure!(
+                    response.data.len() == 32,
+                    "Invalid data length in ChannelOpened event"
+                );
+                data.copy_from_slice(&response.data);
+                Ok(data.into())
+            }),
+        )
     }
 
-    fn check_for_re_draw(
-        &self,
-        channel_id: &Uint256,
-    ) -> Box<Future<Item = Uint256, Error = Error>> {
-
+    fn check_for_re_draw(&self, channel_id: &Uint256) -> Box<Future<Item = (), Error = Error>> {
+        // let channel_id: [u8; 32] = {
+        //     let mut data: [u8; 32] = Default::default();
+        //     data[12..].copy_from_slice(&channel_id.as_bytes());
+        //     data
+        // };
+        Box::new(
+            self.check_for_event(
+                "ChannelReDrawn(bytes32)",
+                Some(vec![channel_id.into()]),
+                None,
+            )
+            .and_then(|_| Ok(())),
+        )
     }
 }
