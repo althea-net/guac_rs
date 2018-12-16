@@ -150,7 +150,7 @@ pub fn create_update_with_bounty_fingerprint_data(
     balance0: &Uint256,
     balance1: &Uint256,
     signature_0: &Signature,
-    signature_1: &Signature,
+    signature1: &Signature,
     bounty_amount: &Uint256,
 ) -> Vec<u8> {
     let mut msg = "updateStateWithBounty".as_bytes().to_vec();
@@ -169,7 +169,7 @@ pub fn create_update_with_bounty_fingerprint_data(
         data
     });
     msg.extend(signature_0.clone().into_bytes().to_vec());
-    msg.extend(signature_1.clone().into_bytes().to_vec());
+    msg.extend(signature1.clone().into_bytes().to_vec());
     msg.extend(&{
         let data: [u8; 32] = bounty_amount.clone().into();
         data
@@ -207,7 +207,7 @@ impl PaymentContract for GuacContract {
     /// * `balance0` - Source balance (own balance)
     /// * `balance1` - Other party initial balance
     /// * `signature_0` - Fingerprint signed by source address
-    /// * `signature_1` - Fingerprint signed by destination address
+    /// * `signature1` - Fingerprint signed by destination address
     /// * `expiration` - Block number which this call will be expired
     /// * `settling_period` - Max. blocks for a settling period to finish
     fn new_channel(
@@ -217,7 +217,7 @@ impl PaymentContract for GuacContract {
         balance0: Uint256,
         balance1: Uint256,
         signature_0: Signature,
-        signature_1: Signature,
+        signature1: Signature,
         expiration: Uint256,
         settling_period: Uint256,
     ) -> Box<Future<Item = ChannelId, Error = Error>> {
@@ -225,14 +225,14 @@ impl PaymentContract for GuacContract {
         assert!(address0 != address1, "Unable to open channel to yourself");
 
         // Reorder addresses
-        let (address0, address1, balance0, balance1, signature_0, signature_1) =
+        let (address0, address1, balance0, balance1, signature_0, signature1) =
             if address0 > address1 {
                 (
-                    address1, address0, balance1, balance0, signature_1, signature_0,
+                    address1, address0, balance1, balance0, signature1, signature_0,
                 )
             } else {
                 (
-                    address0, address1, balance0, balance1, signature_0, signature_1,
+                    address0, address1, balance0, balance1, signature_0, signature1,
                 )
             };
         assert!(address0 < address1);
@@ -270,8 +270,8 @@ impl PaymentContract for GuacContract {
                 settling_period.into(),
                 // signature_0
                 signature_0.into_bytes().to_vec().into(),
-                // signature_1
-                signature_1.into_bytes().to_vec().into(),
+                // signature1
+                signature1.into_bytes().to_vec().into(),
             ],
         );
         let call = CRYPTO.broadcast_transaction(Action::Call(payload), 0u64.into());
@@ -437,14 +437,14 @@ impl PaymentContract for GuacContract {
         // assert!(address0 != address1, "Unable to open channel to yourself");
 
         // // Reorder addresses
-        // let (address0, address1, balance0, balance1, signature_0, signature_1) =
+        // let (address0, address1, balance0, balance1, signature_0, signature1) =
         //     if address0 > address1 {
         //         (
-        //             address1, address0, balance1, balance0, signature_1, signature_0,
+        //             address1, address0, balance1, balance0, signature1, signature_0,
         //         )
         //     } else {
         //         (
-        //             address0, address1, balance0, balance1, signature_0, signature_1,
+        //             address0, address1, balance0, balance1, signature_0, signature1,
         //         )
         //     };
         // assert!(address0 < address1);
