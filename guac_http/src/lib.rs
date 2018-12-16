@@ -13,6 +13,8 @@ extern crate qutex;
 extern crate serde;
 extern crate serde_json;
 extern crate tokio;
+extern crate web3;
 
-mod client;
-mod server;
+mod blockchain_client;
+mod counterparty_client;
+mod counterparty_server;

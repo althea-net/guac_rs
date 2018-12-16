@@ -7,7 +7,7 @@ use failure::Error;
 use futures::Future;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
-use transport_protocol::TransportProtocol;
+use transport_protocol::CounterpartyApi;
 use transports::http::network_request::NetworkRequest;
 /// Represnetation of an transport client that works over HTTP.
 ///
@@ -42,7 +42,7 @@ fn verify_client_error(response: ClientResponse) -> Result<ClientResponse, Error
     Ok(response)
 }
 
-impl TransportProtocol for HTTPTransportClient {
+impl CounterpartyApi for HTTPTransportClient {
     fn send_proposal_request(&self, channel: &Channel) -> Box<Future<Item = bool, Error = Error>> {
         trace!(
             "Send channel proposal request channel={:?} addr={}",

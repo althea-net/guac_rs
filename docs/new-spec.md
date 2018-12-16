@@ -126,7 +126,7 @@ Redraw request succeed. Response parameters:
 
 - `HTTP 400 BAD REQUEST`
 
-The request was invalid for any reason (invalid or wrong parameters, invalid address, malformed parameters). 
+The request was invalid for any reason (invalid or wrong parameters, invalid address, malformed parameters).
 
 ## Contract layer
 
@@ -134,7 +134,7 @@ This component should reflect the functionality of the guac payment channel cont
 
 # Implementation
 
-## TransportProtocol
+## CounterpartyApi
 
 A trait that describes the node to node protocol described above in section [Transport layer](#transport-layer).
 
@@ -150,7 +150,7 @@ struct Channel {
     // Rest of implementation details about the channel
 }
 
-trait TransportProtocol {
+trait CounterpartyApi {
     /// Proposes a channel and returns Signature after signing a fingerprint
     fn propose(&mut self, channel: Channel) -> impl Future<Item = Signature, Error = Error>;
     /// Notifies about channel created
@@ -161,12 +161,12 @@ trait TransportProtocol {
     /// Proposes a channel and returns Signature after signing a fingerprint
     fn redraw(&mut self, channel: Channel) -> impl Future<Item = Signature, Error = Error>;
 };
- 
+
 struct HTTPTransportClient {
-    /// TODO: Implementation details about the client such as base URL, etc. 
+    /// TODO: Implementation details about the client such as base URL, etc.
 };
 
-impl TransportProtocol for HTTPTransportClient {
+impl CounterpartyApi for HTTPTransportClient {
     /// Send `POST http://url/propose` request to other party
     fn propose(&mut self, channel: Channel) -> impl Future<Item = Signature, Error = Error>;
     /// Notifies about channel created with `POST http://url/channel_created`
@@ -179,10 +179,10 @@ impl TransportProtocol for HTTPTransportClient {
 
 struct HTTPTransportServer {
     /// TODO: Implementation details about the server such HTTP as channel storage etc.
-    /// TODO: Instance of HTTP server that would define actual HTTP endpoints should call appropriate methods on instance of this 
+    /// TODO: Instance of HTTP server that would define actual HTTP endpoints should call appropriate methods on instance of this
 }
 
-impl TransportProtocol for HTTPTransportServer {
+impl CounterpartyApi for HTTPTransportServer {
     /// When receiving `POST http://url/propose` request from other party
     fn propose(&mut self, channel: Channel) -> impl Future<Item = Signature, Error = Error>;
     /// When received `POST http://url/channel_created` about channel is created
@@ -203,16 +203,16 @@ In contrast to PaymentProtocol parameters of methods in this trait resembles the
 ```rust
 trait PaymentContract {
     /// Creates new channel with given parameters
-    fn new_channel(&self, 
+    fn new_channel(&self,
         channel_id: &ChannelId,
         address0: &Address,
         address1: &Address,
         balance0: &Uint256,
         balance1: &Uint256,
-        signature0: &Signature,
-        signature1: &Signature) -> impl Future<Item = (), Error = Error>;
+        signature_0: &Signature,
+        signature_1: &Signature) -> impl Future<Item = (), Error = Error>;
     /// Updates the state of the contract with given parameters.
-    /// 
+    ///
     /// Precondition: Channel identified by channel_id has to be created with new_channel before
     /// Postcondition: Channel parameters will be updated with new parameters
     fn update_state(&self,
@@ -220,24 +220,24 @@ trait PaymentContract {
         sequence_number: &Uint256,
         balance0: &Uint256,
         balance1: &Uint256,
-        signature0: &Signature,
-        signature1: &Signature) -> impl Future<Item = (), Error = Error>;
+        signature_0: &Signature,
+        signature_1: &Signature) -> impl Future<Item = (), Error = Error>;
     /// Closes channel fast
     fn close_channel_fast(&self,
         channel_id: &ChannelId,
         sequence_number: &Uint256,
         balance0: &Uint256,
         balance1: &Uint256,
-        signature0: &Signature,
-        signature1: &Signature) -> impl Future<Item = (), Error = Error>;
+        signature_0: &Signature,
+        signature_1: &Signature) -> impl Future<Item = (), Error = Error>;
     /// REfill or withDRAW
     fn redraw(&self,
         channel_id: &ChannelId,
         sequence_number: &Uint256,
         balance0: &Uint256,
         balance1: &Uint256,
-        signature0: &Signature,
-        signature1: &Signature) -> impl Future<Item = (), Error = Error>;
+        signature_0: &Signature,
+        signature_1: &Signature) -> impl Future<Item = (), Error = Error>;
 }
 ```
 
@@ -274,7 +274,7 @@ A binary data of any size have to be expressed as its hexadecimal representation
 
 Examples of valid binary data serialized to strings:
 
-* `0x6333c17b8b1e713b002079309152e2c4ff26f2ab70d428486c5addd9da4695e2`
+- `0x6333c17b8b1e713b002079309152e2c4ff26f2ab70d428486c5addd9da4695e2`
 
 This convention would make it clear on the other side that the string contains binary data that can be deserialized easily.
 

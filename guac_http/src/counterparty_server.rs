@@ -4,7 +4,7 @@ use actix_web::*;
 use clarity::Address;
 use guac_core::channel_client::types::{NewChannelTx, ReDrawTx, UpdateTx};
 use guac_core::Guac;
-use guac_core::TransportProtocol;
+use guac_core::CounterpartyApi;
 
 use futures::Future;
 

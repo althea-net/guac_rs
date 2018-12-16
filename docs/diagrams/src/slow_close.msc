@@ -3,8 +3,8 @@ msc {
     u,a,b,c;
 
     --- [ label = "Channel is open" ];
-    a=>c [label="BlockchainClient update_state"];
-    a=>c [label="BlockchainClient start_settling_period"];
+    a=>c [label="BlockchainApi update_state"];
+    a=>c [label="BlockchainApi start_settling_period"];
     a box a [label="state Settling"];
     ...  [ label = "wait ~days until settling period has ended" ];
     c>>a [label="close_channel"];

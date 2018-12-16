@@ -48,6 +48,7 @@ pub trait Web3 {
 }
 
 /// An instance of Web3Client.
+#[derive(Clone)]
 pub struct Web3Client {
     jsonrpc_client: Arc<Box<HTTPClient>>,
 }
@@ -97,6 +98,7 @@ impl Web3 for Web3Client {
                 .flatten(),
         )
     }
+
     fn eth_get_transaction_count(
         &self,
         address: Address,
