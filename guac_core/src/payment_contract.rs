@@ -14,8 +14,8 @@ pub trait PaymentContract {
         address1: Address,
         balance0: Uint256,
         balance1: Uint256,
-        signature0: Signature,
-        signature1: Signature,
+        signature_0: Signature,
+        signature_1: Signature,
         expiration: Uint256,
         settling_period: Uint256,
     ) -> Box<Future<Item = ChannelId, Error = Error>>;

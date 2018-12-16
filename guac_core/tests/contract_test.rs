@@ -276,8 +276,8 @@ fn create_update_with_bounty_fingerprint(
     sequence_number: Uint256,
     balance0: Uint256,
     balance1: Uint256,
-    signature0: Signature,
-    signature1: Signature,
+    signature_0: Signature,
+    signature_1: Signature,
     bounty_amount: Uint256,
 ) -> Signature {
     let msg = create_update_with_bounty_fingerprint_data(
@@ -286,8 +286,8 @@ fn create_update_with_bounty_fingerprint(
         &sequence_number,
         &balance0,
         &balance1,
-        &signature0,
-        &signature1,
+        &signature_0,
+        &signature_1,
         &bounty_amount,
     );
     secret.sign_msg(&msg)

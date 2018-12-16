@@ -51,12 +51,12 @@ pub struct NewChannelTx {
     pub expiration: Uint256,
     pub settling_period_length: Uint256,
 
-    pub signature0: Option<Signature>,
-    pub signature1: Option<Signature>,
+    pub signature_0: Option<Signature>,
+    pub signature_1: Option<Signature>,
 }
 
 impl NewChannelTx {
-    pub fn fingerprint(&mut self, contract_address: Address) -> [u8; 32] {
+    pub fn fingerprint(&self, contract_address: Address) -> [u8; 32] {
         let func_name: &[u8] = "NewChannel".as_bytes();
         let contract_address: &[u8] = contract_address.as_bytes();
         let address_0: &[u8] = self.address_0.as_bytes();
@@ -95,12 +95,12 @@ pub struct ReDrawTx {
 
     pub expiration: Uint256,
 
-    pub signature0: Option<Signature>,
-    pub signature1: Option<Signature>,
+    pub signature_0: Option<Signature>,
+    pub signature_1: Option<Signature>,
 }
 
 impl ReDrawTx {
-    pub fn fingerprint(&mut self, contract_address: Address) -> [u8; 32] {
+    pub fn fingerprint(&self, contract_address: Address) -> [u8; 32] {
         let func_name: &[u8] = "ReDraw".as_bytes();
         let contract_address: &[u8] = contract_address.as_bytes();
         let channel_id: [u8; 32] = self.channel_id.clone().into();
@@ -227,7 +227,7 @@ pub struct UpdateTx {
 }
 
 impl UpdateTx {
-    pub fn fingerprint(&mut self, contract_address: Address) -> [u8; 32] {
+    pub fn fingerprint(&self, contract_address: Address) -> [u8; 32] {
         let func_name: &[u8] = "Update".as_bytes();
         let contract_address: &[u8] = contract_address.as_bytes();
         let channel_id: [u8; 32] = self.channel_id.clone().into();

@@ -13,7 +13,6 @@ use num256::Uint256;
 use std::sync::Arc;
 use storage::Storage;
 
-
 #[macro_export]
 macro_rules! try_future_box {
     ($expression:expr) => {
@@ -28,8 +27,8 @@ macro_rules! try_future_box {
 
 #[derive(Clone)]
 pub struct Guac {
-    blockchain_client: Arc<Box<BlockchainClient + Sync + Send>>,
-    counterparty_client: Arc<Box<TransportProtocol + Sync + Send>>,
+    blockchain_client: Arc<Box<BlockchainApi + Sync + Send>>,
+    counterparty_client: Arc<Box<CounterpartyApi + Sync + Send>>,
     storage: Arc<Box<Storage + Sync + Send>>,
     crypto: Arc<Box<Crypto>>,
 }
@@ -44,7 +43,7 @@ pub enum GuacError {
     WrongState(),
 }
 
-pub trait BlockchainClient {
+pub trait BlockchainApi {
     fn new_channel(&self, new_channel: &NewChannelTx)
         -> Box<Future<Item = Uint256, Error = Error>>;
 
@@ -79,7 +78,7 @@ pub trait UserApi {
     ) -> Box<Future<Item = (), Error = Error>>;
 }
 
-pub trait TransportProtocol {
+pub trait CounterpartyApi {
     fn propose_channel(
         &self,
         from_address: Address,
@@ -167,20 +166,20 @@ impl UserApi for Guac {
                             balance_1: balance_1.clone(),
                             expiration: 9999999999u64.into(), //TODO: get current block plus some
                             settling_period_length: 5000u64.into(), //TODO: figure out default value
-                            signature0: None,
-                            signature1: None,
+                            signature_0: None,
+                            signature_1: None,
                         };
 
                         let my_signature = new_crypto::eth_sign(
                             crypto.secret,
-                            &new_channel_tx.clone().fingerprint(),
+                            &new_channel_tx.clone().fingerprint(crypto.contract_address),
                         );
 
                         Box::new(
                             counterparty_client
                                 .propose_channel(my_address, url.clone(), new_channel_tx.clone())
                                 .and_then(move |their_signature| {
-                                    let (signature0, signature1) = if i_am_0 {
+                                    let (signature_0, signature_1) = if i_am_0 {
                                         (my_signature, their_signature)
                                     } else {
                                         (their_signature, my_signature)
@@ -193,8 +192,8 @@ impl UserApi for Guac {
                                     };
                                     blockchain_client
                                         .new_channel(&NewChannelTx {
-                                            signature0: Some(signature0),
-                                            signature1: Some(signature1),
+                                            signature_0: Some(signature_0),
+                                            signature_1: Some(signature_1),
                                             ..new_channel_tx
                                         })
                                         .and_then(move |channel_id| {
@@ -244,12 +243,14 @@ impl UserApi for Guac {
                             new_balance_0: new_balance_0.clone(),
                             new_balance_1: new_balance_1.clone(),
                             expiration: 9999999999u64.into(), //TODO: get current block plus some,
-                            signature0: None,
-                            signature1: None,
+                            signature_0: None,
+                            signature_1: None,
                         };
 
-                        let my_signature =
-                            new_crypto::eth_sign(crypto.secret, &re_draw_tx.fingerprint());
+                        let my_signature = new_crypto::eth_sign(
+                            crypto.secret,
+                            &re_draw_tx.fingerprint(crypto.contract_address),
+                        );
 
                         Box::new(
                             counterparty_client
@@ -264,7 +265,7 @@ impl UserApi for Guac {
                                         re_draw_tx: re_draw_tx.clone(),
                                         url: url.clone(),
                                     };
-                                    let (signature0, signature1) =
+                                    let (signature_0, signature_1) =
                                         if channel.clone().my_state.i_am_0 {
                                             (my_signature, their_signature)
                                         } else {
@@ -273,8 +274,8 @@ impl UserApi for Guac {
 
                                     blockchain_client
                                         .re_draw(&ReDrawTx {
-                                            signature0: Some(signature0),
-                                            signature1: Some(signature1),
+                                            signature_0: Some(signature_0),
+                                            signature_1: Some(signature_1),
                                             ..re_draw_tx
                                         })
                                         .and_then(move |_| {
@@ -349,7 +350,7 @@ impl UserApi for Guac {
     }
 }
 
-impl TransportProtocol for Guac {
+impl CounterpartyApi for Guac {
     fn propose_channel(
         &self,
         from_address: Address,
@@ -378,8 +379,8 @@ impl TransportProtocol for Guac {
                                             balance_1,
                                             expiration: _,
                                             settling_period_length,
-                                            signature0: _,
-                                            signature1: _,
+                                            signature_0: _,
+                                            signature_1: _,
                                         } = new_channel_tx_clone_1;
 
                                         ensure!(address_0 < address_1, "Addresses must be sorted.");
@@ -413,7 +414,8 @@ impl TransportProtocol for Guac {
 
                                         let my_signature = new_crypto::eth_sign(
                                             crypto.secret,
-                                            &new_channel_tx_clone_2.fingerprint(),
+                                            &new_channel_tx_clone_2
+                                                .fingerprint(crypto.contract_address),
                                         );
 
                                         Ok(my_signature)
@@ -463,8 +465,8 @@ impl TransportProtocol for Guac {
 
                                         expiration: _,
 
-                                        signature0: _,
-                                        signature1: _,
+                                        signature_0: _,
+                                        signature_1: _,
                                     } = re_draw_tx;
 
                                     ensure!(
@@ -504,7 +506,7 @@ impl TransportProtocol for Guac {
 
                                     let my_signature = new_crypto::eth_sign(
                                         crypto.secret,
-                                        &re_draw_tx_clone_1.fingerprint(),
+                                        &re_draw_tx_clone_1.fingerprint(crypto.contract_address),
                                     );
 
                                     Ok(my_signature)

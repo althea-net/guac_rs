@@ -6,7 +6,7 @@ use futures::Future;
 ///
 /// Its called a "protocol" because it provides a set of methods that both client and server should implement.
 /// For example a server could keep track of channels, and client would issue HTTP requests.
-pub trait TransportProtocol {
+pub trait CounterpartyApi {
     /// Send a proposal to other party
     fn send_proposal_request(&self, channel: &Channel) -> Box<Future<Item = bool, Error = Error>>;
     /// Sends a channel created request

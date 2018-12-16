@@ -5,7 +5,7 @@ msc {
     --- [ label = "Channel is open" ];
     a=>b [label="CounterpartyApi propose_fast_close"];
     b>>a [label="propose_fast_close Signature"];
-    a=>c [label="BlockchainClient fast_close"];
+    a=>c [label="BlockchainApi fast_close"];
     ...  [ label = "After some polling..." ];
     c>>a [label="fast_close success"];
     a=>b [label="CounterpartyApi notify_fast_close"];
