@@ -27,10 +27,10 @@ macro_rules! try_future_box {
 
 #[derive(Clone)]
 pub struct Guac {
-    blockchain_client: Arc<Box<BlockchainApi + Sync + Send>>,
-    counterparty_client: Arc<Box<CounterpartyApi + Sync + Send>>,
-    storage: Arc<Box<Storage + Sync + Send>>,
-    crypto: Arc<Box<Crypto>>,
+    pub blockchain_client: Arc<Box<BlockchainApi + Send + Sync>>,
+    pub counterparty_client: Arc<Box<CounterpartyApi + Send + Sync>>,
+    pub storage: Arc<Box<Storage>>,
+    pub crypto: Arc<Box<Crypto>>,
 }
 
 #[derive(Debug, Fail)]
@@ -127,7 +127,7 @@ impl UserApi for Guac {
             their_address.clone(),
             Counterparty::New {
                 url,
-                i_am_0: crypto.own_eth_addr() < their_address,
+                i_am_0: crypto.own_address < their_address,
             },
         ))
     }
@@ -146,7 +146,7 @@ impl UserApi for Guac {
             move |mut counterparty| {
                 match counterparty.clone() {
                     Counterparty::New { i_am_0, url } => {
-                        let my_address = crypto.own_eth_addr();
+                        let my_address = crypto.own_address;
 
                         let (address_0, address_1) = if i_am_0 {
                             (my_address, their_address)
@@ -171,10 +171,8 @@ impl UserApi for Guac {
                             signature_1: None,
                         };
 
-                        let my_signature = new_crypto::eth_sign(
-                            crypto.secret,
-                            &new_channel_tx.clone().fingerprint(crypto.contract_address),
-                        );
+                        let my_signature = crypto
+                            .eth_sign(&new_channel_tx.clone().fingerprint(crypto.contract_address));
 
                         Box::new(
                             counterparty_client
@@ -248,15 +246,13 @@ impl UserApi for Guac {
                             signature_1: None,
                         };
 
-                        let my_signature = new_crypto::eth_sign(
-                            crypto.secret,
-                            &re_draw_tx.fingerprint(crypto.contract_address),
-                        );
+                        let my_signature =
+                            crypto.eth_sign(&re_draw_tx.fingerprint(crypto.contract_address));
 
                         Box::new(
                             counterparty_client
                                 .propose_re_draw(
-                                    crypto.own_eth_addr(),
+                                    crypto.own_address,
                                     url.clone(),
                                     re_draw_tx.clone(),
                                 )
@@ -281,7 +277,7 @@ impl UserApi for Guac {
                                         })
                                         .and_then(move |_| {
                                             counterparty_client
-                                                .notify_re_draw(crypto.own_eth_addr(), url.clone())
+                                                .notify_re_draw(crypto.own_address, url.clone())
                                                 .and_then(move |_| {
                                                     // Save the new open state of the channel
                                                     *counterparty = Counterparty::Open {
@@ -327,11 +323,7 @@ impl UserApi for Guac {
 
                         Box::new(
                             counterparty_client
-                                .receive_payment(
-                                    crypto.own_eth_addr(),
-                                    url.clone(),
-                                    update_tx.clone(),
-                                )
+                                .receive_payment(crypto.own_address, url.clone(), update_tx.clone())
                                 .and_then(move |their_update_tx| {
                                     channel.receive_payment_ack(&their_update_tx)?;
 
@@ -362,7 +354,7 @@ impl CounterpartyApi for Guac {
         let crypto = self.crypto.clone();
         let new_channel_tx_clone_1 = new_channel_tx.clone();
         let new_channel_tx_clone_2 = new_channel_tx.clone();
-        let my_address = crypto.own_eth_addr();
+        let my_address = crypto.own_address;
 
         Box::new(
             storage
@@ -413,8 +405,7 @@ impl CounterpartyApi for Guac {
                                             url,
                                         };
 
-                                        let my_signature = new_crypto::eth_sign(
-                                            crypto.secret,
+                                        let my_signature = crypto.eth_sign(
                                             &new_channel_tx_clone_2
                                                 .fingerprint(crypto.contract_address),
                                         );
@@ -505,8 +496,7 @@ impl CounterpartyApi for Guac {
                                         url,
                                     };
 
-                                    let my_signature = new_crypto::eth_sign(
-                                        crypto.secret,
+                                    let my_signature = crypto.eth_sign(
                                         &re_draw_tx_clone_1.fingerprint(crypto.contract_address),
                                     );
 
@@ -544,9 +534,9 @@ impl CounterpartyApi for Guac {
                             new_channel_tx,
                         } => {
                             let (address_0, address_1) = if i_am_0 {
-                                (crypto.own_eth_addr(), from_address.clone())
+                                (crypto.own_address, from_address.clone())
                             } else {
-                                (from_address.clone(), crypto.own_eth_addr())
+                                (from_address.clone(), crypto.own_address)
                             };
 
                             Box::new(

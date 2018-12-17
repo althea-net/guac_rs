@@ -19,66 +19,42 @@ use std::sync::Arc;
 use std::time::Duration;
 use types::{Log, NewFilter, TransactionRequest, TransactionResponse};
 
-/// Trait that exposes common Web3 JSONRPC APIs in an asynchronous way
-pub trait Web3 {
-    /// Returns a list of addresses owned by client
-    fn eth_accounts(&self) -> Box<Future<Item = Vec<Address>, Error = Error>>;
-    fn net_version(&self) -> Box<Future<Item = String, Error = Error>>;
-    fn eth_new_filter(&self, new_filter: NewFilter) -> Box<Future<Item = Uint256, Error = Error>>;
-    fn eth_uninstall_filter(&self, filter: Uint256) -> Box<Future<Item = bool, Error = Error>>;
-    fn eth_get_filter_changes(&self, filters: Uint256) -> Box<Stream<Item = Log, Error = Error>>;
-    fn eth_get_transaction_count(
-        &self,
-        address: Address,
-    ) -> Box<Future<Item = Uint256, Error = Error>>;
-
-    fn eth_gas_price(&self) -> Box<Future<Item = Uint256, Error = Error>>;
-    fn eth_get_balance(&self, address: Address) -> Box<Future<Item = Uint256, Error = Error>>;
-    fn eth_send_transaction(
-        &self,
-        transactions: Vec<TransactionRequest>,
-    ) -> Box<Future<Item = Uint256, Error = Error>>;
-    fn eth_block_number(&self) -> Box<Future<Item = Uint256, Error = Error>>;
-    fn eth_send_raw_transaction(&self, data: Vec<u8>)
-        -> Box<Future<Item = Uint256, Error = Error>>;
-    fn eth_get_transaction_by_hash(
-        &self,
-        hash: Uint256,
-    ) -> Box<Future<Item = Option<TransactionResponse>, Error = Error>>;
-}
-
 /// An instance of Web3Client.
 #[derive(Clone)]
-pub struct Web3Client {
+pub struct Web3 {
     jsonrpc_client: Arc<Box<HTTPClient>>,
 }
 
-impl Web3Client {
+impl Web3 {
     pub fn new(url: &str) -> Self {
         Self {
             jsonrpc_client: Arc::new(Box::new(HTTPClient::new(url))),
         }
     }
-}
 
-impl Web3 for Web3Client {
-    fn eth_accounts(&self) -> Box<Future<Item = Vec<Address>, Error = Error>> {
+    pub fn eth_accounts(&self) -> Box<Future<Item = Vec<Address>, Error = Error>> {
         self.jsonrpc_client
             .request_method("eth_accounts", Vec::<String>::new())
     }
-    fn net_version(&self) -> Box<Future<Item = String, Error = Error>> {
+    pub fn net_version(&self) -> Box<Future<Item = String, Error = Error>> {
         self.jsonrpc_client
             .request_method("net_version", Vec::<String>::new())
     }
-    fn eth_new_filter(&self, new_filter: NewFilter) -> Box<Future<Item = Uint256, Error = Error>> {
+    pub fn eth_new_filter(
+        &self,
+        new_filter: NewFilter,
+    ) -> Box<Future<Item = Uint256, Error = Error>> {
         self.jsonrpc_client
             .request_method("eth_newFilter", vec![new_filter])
     }
-    fn eth_uninstall_filter(&self, filter: Uint256) -> Box<Future<Item = bool, Error = Error>> {
+    pub fn eth_uninstall_filter(&self, filter: Uint256) -> Box<Future<Item = bool, Error = Error>> {
         self.jsonrpc_client
             .request_method("eth_uninstallFilter", vec![filter])
     }
-    fn eth_get_filter_changes(&self, filter: Uint256) -> Box<Stream<Item = Log, Error = Error>> {
+    pub fn eth_get_filter_changes(
+        &self,
+        filter: Uint256,
+    ) -> Box<Stream<Item = Log, Error = Error>> {
         let jsonrpc_client = self.jsonrpc_client.clone();
         Box::new(
             // Every 1 second
@@ -99,7 +75,7 @@ impl Web3 for Web3Client {
         )
     }
 
-    fn eth_get_transaction_count(
+    pub fn eth_get_transaction_count(
         &self,
         address: Address,
     ) -> Box<Future<Item = Uint256, Error = Error>> {
@@ -108,28 +84,28 @@ impl Web3 for Web3Client {
             vec![address.to_string(), "latest".to_string()],
         )
     }
-    fn eth_gas_price(&self) -> Box<Future<Item = Uint256, Error = Error>> {
+    pub fn eth_gas_price(&self) -> Box<Future<Item = Uint256, Error = Error>> {
         self.jsonrpc_client
             .request_method("eth_gasPrice", Vec::<String>::new())
     }
-    fn eth_get_balance(&self, address: Address) -> Box<Future<Item = Uint256, Error = Error>> {
+    pub fn eth_get_balance(&self, address: Address) -> Box<Future<Item = Uint256, Error = Error>> {
         self.jsonrpc_client.request_method(
             "eth_getBalance",
             vec![address.to_string(), "latest".to_string()],
         )
     }
-    fn eth_send_transaction(
+    pub fn eth_send_transaction(
         &self,
         transactions: Vec<TransactionRequest>,
     ) -> Box<Future<Item = Uint256, Error = Error>> {
         self.jsonrpc_client
             .request_method("eth_sendTransaction", transactions)
     }
-    fn eth_block_number(&self) -> Box<Future<Item = Uint256, Error = Error>> {
+    pub fn eth_block_number(&self) -> Box<Future<Item = Uint256, Error = Error>> {
         self.jsonrpc_client
             .request_method("eth_blockNumber", Vec::<String>::new())
     }
-    fn eth_send_raw_transaction(
+    pub fn eth_send_raw_transaction(
         &self,
         data: Vec<u8>,
     ) -> Box<Future<Item = Uint256, Error = Error>> {
@@ -138,7 +114,7 @@ impl Web3 for Web3Client {
             vec![format!("0x{}", bytes_to_hex_str(&data))],
         )
     }
-    fn eth_get_transaction_by_hash(
+    pub fn eth_get_transaction_by_hash(
         &self,
         hash: Uint256,
     ) -> Box<Future<Item = Option<TransactionResponse>, Error = Error>> {
