@@ -11,7 +11,6 @@ use guac_core::channel_client::types::{NewChannelTx, ReDrawTx, UpdateTx};
 use guac_core::BlockchainApi;
 use num256::Uint256;
 use web3::client::Web3;
-use web3::client::Web3Client;
 use web3::types::{Log, NewFilter};
 
 fn bytes_to_data(s: &[u8]) -> String {
@@ -21,13 +20,26 @@ fn bytes_to_data(s: &[u8]) -> String {
 }
 
 pub struct BlockchainClient {
-    web3: Web3Client,
+    web3: Web3,
     contract_address: Address,
     own_address: Address,
     secret: PrivateKey,
 }
 
 impl BlockchainClient {
+    pub fn new(
+        contract_address: Address,
+        own_address: Address,
+        secret: PrivateKey,
+        full_node_url: &String,
+    ) -> BlockchainClient {
+        BlockchainClient {
+            contract_address,
+            own_address,
+            secret,
+            web3: Web3::new(full_node_url),
+        }
+    }
     fn wait_for_event(
         &self,
         event: &str,

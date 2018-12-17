@@ -11,32 +11,18 @@ use std::collections::HashMap;
 
 /// Storage contains a futures aware RwLock (QrwLock) which controls access to the inner data
 /// This outer Rwlock should only be mutated very rarely, only to insert and remove counterparties
-pub struct Data {
+pub struct Storage {
     inner: QrwLock<HashMap<Address, Qutex<Counterparty>>>,
 }
 
-impl Data {
-    pub fn new() -> Data {
-        Data {
+impl Storage {
+    pub fn new() -> Storage {
+        Storage {
             inner: QrwLock::new(HashMap::new()),
         }
     }
-}
 
-pub trait Storage {
-    fn get_counterparty(
-        &self,
-        k: Address,
-    ) -> Box<Future<Item = Guard<Counterparty>, Error = Error>>;
-    fn new_counterparty(
-        &self,
-        k: Address,
-        v: Counterparty,
-    ) -> Box<Future<Item = (), Error = Error>>;
-}
-
-impl Storage for Data {
-    fn get_counterparty(
+    pub fn get_counterparty(
         &self,
         k: Address,
     ) -> Box<Future<Item = Guard<Counterparty>, Error = Error>> {
@@ -53,7 +39,7 @@ impl Storage for Data {
         )
     }
 
-    fn new_counterparty(
+    pub fn new_counterparty(
         &self,
         k: Address,
         v: Counterparty,

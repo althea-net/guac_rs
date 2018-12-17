@@ -42,3 +42,5 @@ pub use self::channel_client::channel_manager::BlockchainApi;
 pub use self::channel_client::channel_manager::CounterpartyApi;
 pub use self::channel_client::channel_manager::Guac;
 pub use self::channel_client::channel_manager::UserApi;
+pub use self::new_crypto::Crypto;
+pub use self::storage::Storage;
