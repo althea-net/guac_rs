@@ -14,3 +14,4 @@ futures = "0.1"
 failure = "0.1.1"
 actix-web = {version = "0.7",  default-features = false}
 tokio = "0.1"
+actix = "0.7"
