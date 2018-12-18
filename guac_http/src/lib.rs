@@ -101,7 +101,8 @@ mod tests {
             guac_1
                 .register_counterparty(addr_2, "example.com".to_string())
                 .then(move |res| {
-                    try_future_box!(res);
+                    res.unwrap();
+
                     assert_eq!(
                         storage_1.get_counterparty(addr_2).wait().unwrap().clone(),
                         Counterparty::New {
@@ -110,13 +111,8 @@ mod tests {
                         }
                     );
 
-                    Box::new(future::ok(()))
-                })
-                .then(|res| {
-                    res.unwrap();
                     System::current().stop();
-                    let ret: Result<(), ()> = Ok(());
-                    ret
+                    Box::new(future::ok(()))
                 }),
         );
 
