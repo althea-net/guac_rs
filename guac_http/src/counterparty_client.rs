@@ -7,7 +7,10 @@ use failure::Error;
 use futures::{future, Future};
 use guac_core::channel_client::types::{NewChannelTx, ReDrawTx, UpdateTx};
 use guac_core::CounterpartyApi;
+use std::io::Read;
+use std::io::Write;
 use std::net::SocketAddr;
+use std::str;
 use tokio::net::TcpStream;
 
 macro_rules! try_future_box {
@@ -60,6 +63,8 @@ impl CounterpartyApi for CounterpartyClient {
         let stream = TcpStream::connect(&to_url);
 
         Box::new(stream.from_err().and_then(move |stream| {
+            println!("stream {:?}", stream);
+
             client::post(&endpoint)
                 .with_connection(Connection::from_stream(stream))
                 .json((from_address, new_channel_tx))
