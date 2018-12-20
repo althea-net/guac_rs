@@ -39,8 +39,15 @@ pub enum GuacError {
         display = "Guac is currently waiting on another operation to complete. Try again later."
     )]
     TryAgainLater(),
-    #[fail(display = "Cannot call this method in the current state.")]
-    WrongState(),
+    #[fail(
+        display = "Cannot {} in the current state: {}. State must be: {}",
+        action, current_state, correct_state
+    )]
+    WrongState {
+        action: String,
+        current_state: String,
+        correct_state: String,
+    },
 }
 
 pub trait BlockchainApi {
@@ -137,6 +144,8 @@ impl UserApi for Guac {
         their_address: Address,
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>> {
+        println!("fill_channel {:?} {:?}", their_address, amount);
+
         let counterparty_client = self.counterparty_client.clone();
         let blockchain_client = self.blockchain_client.clone();
         let storage = self.storage.clone();
@@ -189,6 +198,8 @@ impl UserApi for Guac {
                                         i_am_0,
                                         url: url.clone(),
                                     };
+
+                                    println!("HAR");
                                     blockchain_client
                                         .new_channel(NewChannelTx {
                                             signature_0: Some(signature_0),
@@ -333,8 +344,12 @@ impl UserApi for Guac {
                         ) as Box<Future<Item = (), Error = Error>>
                     }
                     _ => {
-                        // Make user wait
-                        return Box::new(future::err(GuacError::TryAgainLater().into())) // TODO: Design a better set of errors, and when to use them
+                        let error = GuacError::WrongState {
+                            correct_state: "Open".to_string(),
+                            current_state: format!("{:?}", counterparty.clone()),
+                            action: "make payment".to_string(),
+                        };
+                        return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
                                 as Box<Future<Item = (), Error = Error>>;
                     }
                 }
@@ -350,6 +365,7 @@ impl CounterpartyApi for Guac {
         _to_url: String,
         new_channel_tx: NewChannelTx,
     ) -> Box<Future<Item = Signature, Error = Error>> {
+        println!("propose_channel {:#?} {:#?}", from_address, new_channel_tx);
         let storage = self.storage.clone();
         let crypto = self.crypto.clone();
         let new_channel_tx_clone_1 = new_channel_tx.clone();
@@ -395,6 +411,7 @@ impl CounterpartyApi for Guac {
                                             settling_period_length == 5000u64.into(),
                                             "I only accept settling periods of 5000 blocks"
                                         );
+                                        println!("HRELOO");
                                         Ok(())
                                     })
                                     .and_then(move |_| {
@@ -409,16 +426,20 @@ impl CounterpartyApi for Guac {
                                             &new_channel_tx_clone_2
                                                 .fingerprint(crypto.contract_address),
                                         );
-
+                                        println!("HRALP");
                                         Ok(my_signature)
                                     }),
                             )
                                 as Box<Future<Item = Signature, Error = Error>>
                         }
                         _ => {
-                            // Can't do that in this state
-                            Box::new(future::err(GuacError::WrongState().into()))
-                                as Box<Future<Item = Signature, Error = Error>>
+                            let error = GuacError::WrongState {
+                                correct_state: "New".to_string(),
+                                current_state: format!("{:?}", counterparty.clone()),
+                                action: "propose channel".to_string(),
+                            };
+                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
+                                as Box<Future<Item = Signature, Error = Error>>;
                         }
                     }
                 }),
@@ -506,9 +527,13 @@ impl CounterpartyApi for Guac {
                                 as Box<Future<Item = Signature, Error = Error>>
                         }
                         _ => {
-                            // Can't do that in this state
-                            Box::new(future::err(GuacError::WrongState().into()))
-                                as Box<Future<Item = Signature, Error = Error>>
+                            let error = GuacError::WrongState {
+                                correct_state: "Open".to_string(),
+                                current_state: format!("{:?}", counterparty.clone()),
+                                action: "propose redraw".to_string(),
+                            };
+                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
+                                as Box<Future<Item = Signature, Error = Error>>;
                         }
                     }
                 }),
@@ -566,9 +591,13 @@ impl CounterpartyApi for Guac {
                             ) as Box<Future<Item = (), Error = Error>>
                         }
                         _ => {
-                            // Can't do that in this state
-                            Box::new(future::err(GuacError::WrongState().into()))
-                                as Box<Future<Item = (), Error = Error>>
+                            let error = GuacError::WrongState {
+                                correct_state: "OtherCreating".to_string(),
+                                current_state: format!("{:?}", counterparty.clone()),
+                                action: "notify channel opened".to_string(),
+                            };
+                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
+                                as Box<Future<Item = (), Error = Error>>;
                         }
                     }
                 }),
@@ -610,9 +639,13 @@ impl CounterpartyApi for Guac {
                                 }),
                         ) as Box<Future<Item = (), Error = Error>>,
                         _ => {
-                            // Can't do that in this state
-                            Box::new(future::err(GuacError::WrongState().into()))
-                                as Box<Future<Item = (), Error = Error>>
+                            let error = GuacError::WrongState {
+                                correct_state: "OtherReDrawing".to_string(),
+                                current_state: format!("{:?}", counterparty.clone()),
+                                action: "notify redraw".to_string(),
+                            };
+                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
+                                as Box<Future<Item = (), Error = Error>>;
                         }
                     }
                 }),
@@ -642,9 +675,13 @@ impl CounterpartyApi for Guac {
                                 as Box<Future<Item = UpdateTx, Error = Error>>
                         }
                         _ => {
-                            // Can't do that in this state
-                            Box::new(future::err(GuacError::WrongState().into()))
-                                as Box<Future<Item = UpdateTx, Error = Error>>
+                            let error = GuacError::WrongState {
+                                correct_state: "Open".to_string(),
+                                current_state: format!("{:?}", counterparty.clone()),
+                                action: "receive payment".to_string(),
+                            };
+                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
+                                as Box<Future<Item = UpdateTx, Error = Error>>;
                         }
                     }
                 }),

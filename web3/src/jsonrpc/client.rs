@@ -53,6 +53,7 @@ impl Client for HTTPClient {
     where
         for<'de> R: Deserialize<'de>,
     {
+        println!("in client{:?} {:?}", method, &self.url);
         let payload = Request::new(self.next_id(), method, params);
         Box::new(
             client::post(&self.url)
@@ -62,6 +63,7 @@ impl Client for HTTPClient {
                 .timeout(Duration::from_millis(1000))
                 .from_err()
                 .and_then(|response| {
+                    println!("got res {:?}", response);
                     response
                         .json()
                         .from_err()
