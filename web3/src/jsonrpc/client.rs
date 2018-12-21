@@ -1,7 +1,7 @@
 use actix_web::client;
 use actix_web::HttpMessage;
 use actix_web::{AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
-use bytes::Bytes;
+// use bytes::Bytes;
 use failure::Error;
 use futures::future::Future;
 // use futures::Future;
