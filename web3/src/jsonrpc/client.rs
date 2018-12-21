@@ -1,7 +1,10 @@
 use actix_web::client;
 use actix_web::HttpMessage;
+use actix_web::{AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
+use bytes::Bytes;
 use failure::Error;
-use futures::Future;
+use futures::future::Future;
+// use futures::Future;
 use jsonrpc::request::Request;
 use jsonrpc::response::Response;
 use serde::{Deserialize, Serialize};
@@ -11,6 +14,7 @@ use std::str;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::net::TcpStream;
+use types::TransactionResponse;
 
 pub trait Client {
     fn request_method<T: Serialize, R: 'static>(
@@ -19,7 +23,9 @@ pub trait Client {
         params: T,
     ) -> Box<Future<Item = R, Error = Error>>
     where
-        for<'de> R: Deserialize<'de>;
+        for<'de> R: Deserialize<'de>,
+        T: std::fmt::Debug,
+        R: std::fmt::Debug;
 }
 
 pub struct HTTPClient {
@@ -52,9 +58,11 @@ impl Client for HTTPClient {
     ) -> Box<Future<Item = R, Error = Error>>
     where
         for<'de> R: Deserialize<'de>,
+        T: std::fmt::Debug,
+        R: std::fmt::Debug,
     {
-        println!("in client{:?} {:?}", method, &self.url);
         let payload = Request::new(self.next_id(), method, params);
+        println!("req {:?}", payload);
         Box::new(
             client::post(&self.url)
                 .json(payload)
@@ -63,12 +71,20 @@ impl Client for HTTPClient {
                 .timeout(Duration::from_millis(1000))
                 .from_err()
                 .and_then(|response| {
-                    println!("got res {:?}", response);
+                    // println!("got resss {:#?}", response.body());
+                    // response.body().from_err().and_then(|res: Bytes| {
+                    //     let data: R = serde_json::from_slice(&res)?;
+                    //     println!("got ressss {:#?}", res);
+                    //     Ok(data)
+                    // })
+
                     response
                         .json()
                         .from_err()
                         .and_then(move |res: Response<R>| {
-                            res.data.into_result().map_err(move |e| {
+                            println!("got res {:#?}", res);
+                            let data = res.data.into_result();
+                            data.map_err(move |e| {
                                 format_err!("JSONRPC Error {}: {}", e.code, e.message)
                             })
                         })

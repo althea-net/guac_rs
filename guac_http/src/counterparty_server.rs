@@ -15,14 +15,10 @@ pub fn init_server(port: u16, guac: Guac) {
             .resource("/propose_channel", |r| {
                 r.method(Method::POST).with_async(
                     move |(req, body): (HttpRequest<Guac>, Json<(Address, NewChannelTx)>)| {
-                        println!("/propose_channel server");
                         let body = body.clone();
                         req.state()
                             .propose_channel(body.0, String::default(), body.1)
-                            .and_then(move |res| {
-                                println!("HERE {:?}", res);
-                                Ok(Json(res))
-                            })
+                            .and_then(move |res| Ok(Json(res)))
                             .responder()
                     },
                 )

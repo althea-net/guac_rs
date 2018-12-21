@@ -144,8 +144,6 @@ impl UserApi for Guac {
         their_address: Address,
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>> {
-        println!("fill_channel {:?} {:?}", their_address, amount);
-
         let counterparty_client = self.counterparty_client.clone();
         let blockchain_client = self.blockchain_client.clone();
         let storage = self.storage.clone();
@@ -199,7 +197,6 @@ impl UserApi for Guac {
                                         url: url.clone(),
                                     };
 
-                                    println!("HAR");
                                     blockchain_client
                                         .new_channel(NewChannelTx {
                                             signature_0: Some(signature_0),
@@ -365,7 +362,6 @@ impl CounterpartyApi for Guac {
         _to_url: String,
         new_channel_tx: NewChannelTx,
     ) -> Box<Future<Item = Signature, Error = Error>> {
-        println!("propose_channel {:#?} {:#?}", from_address, new_channel_tx);
         let storage = self.storage.clone();
         let crypto = self.crypto.clone();
         let new_channel_tx_clone_1 = new_channel_tx.clone();
@@ -411,7 +407,6 @@ impl CounterpartyApi for Guac {
                                             settling_period_length == 5000u64.into(),
                                             "I only accept settling periods of 5000 blocks"
                                         );
-                                        println!("HRELOO");
                                         Ok(())
                                     })
                                     .and_then(move |_| {
@@ -426,7 +421,6 @@ impl CounterpartyApi for Guac {
                                             &new_channel_tx_clone_2
                                                 .fingerprint(crypto.contract_address),
                                         );
-                                        println!("HRALP");
                                         Ok(my_signature)
                                     }),
                             )
