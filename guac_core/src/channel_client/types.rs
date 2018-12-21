@@ -57,7 +57,7 @@ pub struct NewChannelTx {
 
 impl NewChannelTx {
     pub fn fingerprint(&self, contract_address: Address) -> [u8; 32] {
-        let func_name: &[u8] = "NewChannel".as_bytes();
+        let func_name: &[u8] = "newChannel".as_bytes();
         let contract_address: &[u8] = contract_address.as_bytes();
         let address_0: &[u8] = self.address_0.as_bytes();
         let address_1: &[u8] = self.address_1.as_bytes();
