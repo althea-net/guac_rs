@@ -6,7 +6,7 @@ command -v jq >/dev/null 2>&1 || { echo >&2 "I require jq but it's not installed
     git clone https://github.com/althea-mesh/guac .contract && \
     npm install .contract
 
-ganache-cli -u 0 -u 1 -u 2 -m 'cook mango twist then skin sort option civil have still rather guilt' > /dev/null &
+ganache-cli -u 0 -u 1 -u 2 -m 'cook mango twist then skin sort option civil have still rather guilt' -v > .ganache-log &
 
 pushd .contract
 truffle compile

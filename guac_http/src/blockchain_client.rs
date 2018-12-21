@@ -83,6 +83,7 @@ impl BlockchainClient {
             topic1.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
             topic2.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
         ]);
+
         Box::new(
             web3.eth_new_filter(new_filter)
                 .and_then(move |filter_id| {
@@ -111,11 +112,9 @@ impl BlockchainClient {
         let props = web3
             .eth_gas_price()
             .join(web3.eth_get_transaction_count(self.own_address));
-        println!("ralph");
         Box::new(
             props
                 .and_then(move |(gas_price, nonce)| {
-                    println!("ralph");
                     let transaction = Transaction {
                         to: contract_address,
                         nonce: nonce,
@@ -156,7 +155,7 @@ impl BlockchainApi for BlockchainClient {
             Some(vec![addr_0_bytes]),
             Some(vec![addr_1_bytes]),
         );
-        println!("shibby");
+
         let payload = encode_call(
             "newChannel(address,address,uint256,uint256,uint256,uint256,bytes,bytes)",
             &[
@@ -232,10 +231,7 @@ impl BlockchainApi for BlockchainClient {
 
         Box::new(
             call.join(event)
-                .and_then(|(_tx, response)| {
-                    println!("response {:?}", response);
-                    Ok(())
-                })
+                .and_then(|(_tx, response)| Ok(()))
                 .into_future(),
         )
     }

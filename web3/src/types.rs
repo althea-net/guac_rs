@@ -132,7 +132,7 @@ pub struct NewFilter {
     pub topics: Option<Vec<Option<Vec<Option<String>>>>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct TransactionRequest {
     //The address the transaction is send from.
     pub from: Address,
