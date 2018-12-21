@@ -19,6 +19,13 @@ fn bytes_to_data(s: &[u8]) -> String {
     foo
 }
 
+pub enum Action {
+    /// Sends a "traditional" ETH transfer
+    To(Address),
+    /// Does a contract call with provided ddata
+    Call(Vec<u8>),
+}
+
 pub struct BlockchainClient {
     web3: Web3,
     contract_address: Address,
@@ -104,7 +111,11 @@ impl BlockchainClient {
         )
     }
 
-    fn broadcast_transaction(&self, data: Vec<u8>) -> Box<Future<Item = Uint256, Error = Error>> {
+    fn broadcast_transaction(
+        &self,
+        action: Action,
+        value: Uint256,
+    ) -> Box<Future<Item = Uint256, Error = Error>> {
         let web3 = self.web3.clone();
         let contract_address = self.contract_address.clone();
         let secret = self.secret.clone();
@@ -112,18 +123,39 @@ impl BlockchainClient {
         let props = web3
             .eth_gas_price()
             .join(web3.eth_get_transaction_count(self.own_address));
+
         Box::new(
             props
                 .and_then(move |(gas_price, nonce)| {
-                    let transaction = Transaction {
-                        to: contract_address,
-                        nonce: nonce,
-                        gas_price: gas_price.into(),
-                        gas_limit: 6721975u32.into(),
-                        value: 0u64.into(),
-                        data: data,
-                        signature: None,
+                    let transaction = match action {
+                        Action::To(address) => Transaction {
+                            to: address.clone(),
+                            nonce: nonce,
+                            gas_price: gas_price.into(),
+                            gas_limit: 6721975u32.into(),
+                            value: value,
+                            data: Vec::new(),
+                            signature: None,
+                        },
+                        Action::Call(data) => Transaction {
+                            to: contract_address,
+                            nonce: nonce,
+                            gas_price: gas_price.into(),
+                            gas_limit: 6721975u32.into(),
+                            value: value,
+                            data: data,
+                            signature: None,
+                        },
                     };
+                    // let transaction = Transaction {
+                    //     to: contract_address,
+                    //     nonce: nonce,
+                    //     gas_price: gas_price.into(),
+                    //     gas_limit: 6721975u32.into(),
+                    //     value: 0u64.into(),
+                    //     data: data,
+                    //     signature: None,
+                    // };
 
                     let transaction = transaction.sign(&secret, Some(1u64));
 
@@ -133,6 +165,58 @@ impl BlockchainClient {
         )
     }
 }
+
+// fn broadcast_transaction(
+//     &self,
+//     action: Action,
+//     value: Uint256,
+// ) -> Box<Future<Item = Uint256, Error = Error>> {
+//     // We're not relying on web3 signing functionality. Here we're do the signing ourselves.
+//     let props = self
+//         .get_network_id()
+//         .join3(self.get_gas_price(), self.get_nonce());
+//     // let instance = self.read().unwrap();
+//     let contract = self.read().unwrap().contract.clone();
+//     let secret = self.read().unwrap().secret.clone();
+//     // let web3 = self.web3().clone();
+
+//     Box::new(
+//         props
+//             .and_then(move |(network_id, gas_price, nonce)| {
+// let transaction = match action {
+//     Action::To(address) => Transaction {
+//         to: address.clone(),
+//         nonce: nonce,
+//         gas_price: gas_price.into(),
+//         gas_limit: 6721975u32.into(),
+//         value: value,
+//         data: Vec::new(),
+//         signature: None,
+//     },
+//     Action::Call(data) => Transaction {
+//         to: contract.clone(),
+//         nonce: nonce,
+//         gas_price: gas_price.into(),
+//         gas_limit: 6721975u32.into(),
+//         value: value,
+//         data: data,
+//         signature: None,
+//     },
+// };
+
+//                 let transaction = transaction.sign(&secret, Some(network_id.parse().unwrap()));
+
+//                 CRYPTO
+//                     .web3()
+//                     .eth_send_raw_transaction(transaction.to_bytes().unwrap())
+//                 // .into_future()
+//                 // .map_err(GuacError::from)
+//                 // .and_then(|tx| ok(format!("0x{:x}", tx).parse().unwrap()))
+//                 // .from_err()
+//             })
+//             .into_future(),
+//     )
+// }
 
 impl BlockchainApi for BlockchainClient {
     fn new_channel(
@@ -179,7 +263,7 @@ impl BlockchainApi for BlockchainClient {
                     .into(),
             ],
         );
-        let call = self.broadcast_transaction(payload);
+        let call = self.broadcast_transaction(Action::Call(payload), 0u64.into());
 
         Box::new(
             call.join(event)
@@ -227,7 +311,7 @@ impl BlockchainApi for BlockchainClient {
                     .into(),
             ],
         );
-        let call = self.broadcast_transaction(payload);
+        let call = self.broadcast_transaction(Action::Call(payload), 0u64.into());
 
         Box::new(
             call.join(event)
@@ -278,5 +362,12 @@ impl BlockchainApi for BlockchainClient {
             )
             .and_then(|_| Ok(())),
         )
+    }
+    fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
+        let payload = encode_call("quickDeposit()", &[]);
+        let call = self
+            .broadcast_transaction(Action::Call(payload), value)
+            .map(|_| ());
+        Box::new(call)
     }
 }

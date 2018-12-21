@@ -154,7 +154,12 @@ mod tests {
                     guac_2
                         .register_counterparty(guac_1.crypto.own_address, "[::1]:8881".to_string())
                         .and_then(move |_| {
-                            guac_1.fill_channel(guac_2.crypto.own_address, 64u64.into())
+                            guac_1
+                                .blockchain_client
+                                .quick_deposit(64u64.into())
+                                .and_then(move |_| {
+                                    guac_1.fill_channel(guac_2.crypto.own_address, 5u64.into())
+                                })
                         })
                 })
                 .then(|res| {

@@ -65,6 +65,8 @@ pub trait BlockchainApi {
     ) -> Box<Future<Item = [u8; 32], Error = Error>>;
 
     fn check_for_re_draw(&self, channel_id: [u8; 32]) -> Box<Future<Item = (), Error = Error>>;
+
+    fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
 }
 
 pub trait UserApi {
