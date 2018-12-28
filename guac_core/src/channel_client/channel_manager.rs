@@ -1,17 +1,17 @@
-use channel_client::combined_state::CombinedState;
-use channel_client::types::UpdateTx;
-use channel_client::types::{Counterparty, NewChannelTx, ReDrawTx};
-use channel_client::Channel;
+use crate::channel_client::combined_state::CombinedState;
+use crate::channel_client::types::UpdateTx;
+use crate::channel_client::types::{Counterparty, NewChannelTx, ReDrawTx};
+use crate::channel_client::Channel;
 use clarity::{Address, PrivateKey, Signature};
 
 use failure::Error;
 use futures::{future, Future};
-use new_crypto;
-use new_crypto::Crypto;
+use crate::new_crypto;
+use crate::new_crypto::Crypto;
 use num256::Uint256;
 
 use std::sync::Arc;
-use storage::Storage;
+use crate::storage::Storage;
 
 #[macro_export]
 macro_rules! try_future_box {

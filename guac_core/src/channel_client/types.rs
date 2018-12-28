@@ -1,7 +1,7 @@
-use channel_client::combined_state::CombinedState;
+use crate::channel_client::combined_state::CombinedState;
 use clarity::{Address, Signature};
 use failure::Error;
-use new_crypto;
+use crate::new_crypto;
 use num256::Uint256;
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]

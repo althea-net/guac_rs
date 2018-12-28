@@ -5,8 +5,8 @@ use actix_web::{AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
 use failure::Error;
 use futures::future::Future;
 // use futures::Future;
-use jsonrpc::request::Request;
-use jsonrpc::response::Response;
+use crate::jsonrpc::request::Request;
+use crate::jsonrpc::response::Response;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::cell::RefCell;
@@ -14,7 +14,7 @@ use std::str;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::net::TcpStream;
-use types::TransactionResponse;
+use crate::types::TransactionResponse;
 
 pub trait Client {
     fn request_method<T: Serialize, R: 'static>(

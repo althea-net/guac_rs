@@ -21,11 +21,11 @@ mod counterparty_client;
 mod counterparty_server;
 
 use actix::System;
-use blockchain_client::BlockchainClient;
+use crate::blockchain_client::BlockchainClient;
 use clarity::utils::hex_str_to_bytes;
 use clarity::{Address, PrivateKey};
-use config::CONFIG;
-use counterparty_client::CounterpartyClient;
+use crate::config::CONFIG;
+use crate::counterparty_client::CounterpartyClient;
 use failure::Error;
 use futures::{future, Future};
 use guac_core::types::Counterparty;
