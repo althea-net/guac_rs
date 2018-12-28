@@ -31,8 +31,13 @@ use futures::{future, Future};
 use guac_core::types::Counterparty;
 use guac_core::UserApi;
 use guac_core::{Crypto, Guac, Storage};
+use num256::Uint256;
 use std::env;
 use std::sync::Arc;
+use web3::client::Web3;
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[macro_export]
 macro_rules! try_future_box {
@@ -139,36 +144,58 @@ mod tests {
         system.run();
     }
 
-    #[test]
-    fn test_fill_channel() {
-        let system = actix::System::new("test");
+    // #[test]
+    // fn test_fill_channel() {
+    //     let system = actix::System::new("test");
 
-        let (guac_1, guac_2) = make_nodes();
+    //     let (guac_1, guac_2) = make_nodes();
 
-        let storage_1 = guac_1.storage.clone();
+    //     let storage_1 = guac_1.storage.clone();
+    //     let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
+    //     let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
 
-        actix::spawn(
-            guac_1
-                .register_counterparty(guac_2.crypto.own_address, "[::1]:8882".to_string())
-                .and_then(move |_| {
-                    guac_2
-                        .register_counterparty(guac_1.crypto.own_address, "[::1]:8881".to_string())
-                        .and_then(move |_| {
-                            guac_1
-                                .blockchain_client
-                                .quick_deposit(64u64.into())
-                                .and_then(move |_| {
-                                    guac_1.fill_channel(guac_2.crypto.own_address, 5u64.into())
-                                })
-                        })
-                })
-                .then(|res| {
-                    res.unwrap();
-                    System::current().stop();
-                    Box::new(future::ok(()))
-                }),
-        );
+    //     let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
 
-        system.run();
-    }
+    //     actix::spawn(
+    //         web3.evm_snapshot()
+    //             .and_then(move |s| {
+    //                 *snapshot_id.borrow_mut() = s;
+    //                 guac_1
+    //                     .register_counterparty(guac_2.crypto.own_address, "[::1]:8882".to_string())
+    //                     .and_then(move |_| {
+    //                         guac_2
+    //                             .register_counterparty(
+    //                                 guac_1.crypto.own_address,
+    //                                 "[::1]:8881".to_string(),
+    //                             )
+    //                             .and_then(move |_| {
+    //                                 guac_1
+    //                                     .blockchain_client
+    //                                     .quick_deposit(64u64.into())
+    //                                     .and_then(move |_| {
+    //                                         guac_1
+    //                                             .fill_channel(
+    //                                                 guac_2.crypto.own_address,
+    //                                                 5u64.into(),
+    //                                             )
+    //                                             .and_then(move |_| {
+    //                                                 let snapshot_id = snapshot_id;
+    //                                                 web3.evm_revert(snapshot_id.borrow().clone())
+    //                                             })
+    //                                     })
+    //                             })
+    //                     })
+    //             })
+    //             .then(move |res| {
+    //                 web4.evm_revert(snapshot_id.borrow().clone()).then(|_| {
+    //                     res.unwrap();
+
+    //                     System::current().stop();
+    //                     Box::new(future::ok(()))
+    //                 })
+    //             }),
+    //     );
+
+    //     system.run();
+    // }
 }
