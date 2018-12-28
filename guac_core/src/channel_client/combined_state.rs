@@ -2,7 +2,7 @@ use failure::Error;
 
 use num256::Uint256;
 
-use channel_client::types::{Channel, UpdateTx};
+use crate::channel_client::types::{Channel, UpdateTx};
 use std::ops::{Add, Sub};
 
 /// A struct which represents the core payment logic/state of a payment channel. It contains both

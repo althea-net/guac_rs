@@ -315,7 +315,7 @@ impl BlockchainApi for BlockchainClient {
 
         Box::new(
             call.join(event)
-                .and_then(|(_tx, response)| Ok(()))
+                .and_then(|(_tx, _response)| Ok(()))
                 .into_future(),
         )
     }
