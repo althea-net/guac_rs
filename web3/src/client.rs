@@ -125,4 +125,12 @@ impl Web3 {
             vec![hash],
         )
     }
+    pub fn evm_snapshot(&self) -> Box<Future<Item = Uint256, Error = Error>> {
+        self.jsonrpc_client
+            .request_method("evm_snapshot", Vec::<String>::new())
+    }
+    pub fn evm_revert(&self, snapshot_id: Uint256) -> Box<Future<Item = Uint256, Error = Error>> {
+        self.jsonrpc_client
+            .request_method("evm_revert", vec![snapshot_id])
+    }
 }
