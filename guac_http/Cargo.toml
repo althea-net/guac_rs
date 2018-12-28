@@ -3,7 +3,7 @@
 name = "guac_http"
 version = "0.1.0"
 authors = ["Ben Wang <wangben3@gmail.com>", "Jehan Tremback <jehan@altheamesh.com>", "Michal Papierski <michal@papierski.net>"]
-edition = "2018"
+# edition = "2018"
 
 [dependencies]
 actix = "0.7"
