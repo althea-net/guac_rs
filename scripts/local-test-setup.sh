@@ -1,10 +1,14 @@
 #!/bin/bash
 command -v ganache-cli >/dev/null 2>&1 || { echo >&2 "I require ganache-cli but it's not installed.  Aborting."; exit 1; }
+command -v truffle >/dev/null 2>&1 || { echo >&2 "I require truffle but it's not installed.  Aborting."; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo >&2 "I require jq but it's not installed.  Aborting."; exit 1; }
+command -v npm >/dev/null 2>&1 || { echo >&2 "I require npm but it's not installed.  Aborting."; exit 1; }
 
 [ ! -d ".contract" ] && \
     git clone https://github.com/althea-mesh/guac .contract && \
     npm install .contract
+
+kill $(lsof -t -i:8545)
 
 ganache-cli -u 0 -u 1 -u 2 -m 'cook mango twist then skin sort option civil have still rather guilt' -v > .ganache-log &
 
