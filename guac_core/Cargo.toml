@@ -31,7 +31,6 @@ futures-timer = "0.1"
 
 [dev-dependencies]
 lazy_static = "1.0"
-rand = "0.3"
 mockito = "0.13"
 actix = "0.7"
 futures-executor = "0.2"

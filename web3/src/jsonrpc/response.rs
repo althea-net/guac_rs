@@ -10,8 +10,8 @@ pub struct Error<E> {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum ResponseData<R, E> {
-    Success { result: R },
     Error { error: Error<E> },
+    Success { result: R },
 }
 
 impl<R, E> ResponseData<R, E> {

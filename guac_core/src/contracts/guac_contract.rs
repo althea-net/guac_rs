@@ -12,7 +12,7 @@ use futures::IntoFuture;
 use num256::Uint256;
 use std::io::Cursor;
 
-use crypto::{Action, CryptoService};
+// use crypto::{Action, CryptoService};
 use payment_contract::{ChannelId, PaymentContract};
 use CRYPTO;
 
@@ -149,7 +149,7 @@ pub fn create_update_with_bounty_fingerprint_data(
     sequence_number: &Uint256,
     balance0: &Uint256,
     balance1: &Uint256,
-    signature0: &Signature,
+    signature_0: &Signature,
     signature1: &Signature,
     bounty_amount: &Uint256,
 ) -> Vec<u8> {
@@ -168,7 +168,7 @@ pub fn create_update_with_bounty_fingerprint_data(
         let data: [u8; 32] = balance1.clone().into();
         data
     });
-    msg.extend(signature0.clone().into_bytes().to_vec());
+    msg.extend(signature_0.clone().into_bytes().to_vec());
     msg.extend(signature1.clone().into_bytes().to_vec());
     msg.extend(&{
         let data: [u8; 32] = bounty_amount.clone().into();
@@ -206,7 +206,7 @@ impl PaymentContract for GuacContract {
     /// * `address1` - Destination address
     /// * `balance0` - Source balance (own balance)
     /// * `balance1` - Other party initial balance
-    /// * `signature0` - Fingerprint signed by source address
+    /// * `signature_0` - Fingerprint signed by source address
     /// * `signature1` - Fingerprint signed by destination address
     /// * `expiration` - Block number which this call will be expired
     /// * `settling_period` - Max. blocks for a settling period to finish
@@ -216,7 +216,7 @@ impl PaymentContract for GuacContract {
         address1: Address,
         balance0: Uint256,
         balance1: Uint256,
-        signature0: Signature,
+        signature_0: Signature,
         signature1: Signature,
         expiration: Uint256,
         settling_period: Uint256,
@@ -225,14 +225,14 @@ impl PaymentContract for GuacContract {
         assert!(address0 != address1, "Unable to open channel to yourself");
 
         // Reorder addresses
-        let (address0, address1, balance0, balance1, signature0, signature1) =
+        let (address0, address1, balance0, balance1, signature_0, signature1) =
             if address0 > address1 {
                 (
-                    address1, address0, balance1, balance0, signature1, signature0,
+                    address1, address0, balance1, balance0, signature1, signature_0,
                 )
             } else {
                 (
-                    address0, address1, balance0, balance1, signature0, signature1,
+                    address0, address1, balance0, balance1, signature_0, signature1,
                 )
             };
         assert!(address0 < address1);
@@ -268,8 +268,8 @@ impl PaymentContract for GuacContract {
                 expiration.into(),
                 // settlingPeriodLength in blocks
                 settling_period.into(),
-                // signature0
-                signature0.into_bytes().to_vec().into(),
+                // signature_0
+                signature_0.into_bytes().to_vec().into(),
                 // signature1
                 signature1.into_bytes().to_vec().into(),
             ],
@@ -437,14 +437,14 @@ impl PaymentContract for GuacContract {
         // assert!(address0 != address1, "Unable to open channel to yourself");
 
         // // Reorder addresses
-        // let (address0, address1, balance0, balance1, signature0, signature1) =
+        // let (address0, address1, balance0, balance1, signature_0, signature1) =
         //     if address0 > address1 {
         //         (
-        //             address1, address0, balance1, balance0, signature1, signature0,
+        //             address1, address0, balance1, balance0, signature1, signature_0,
         //         )
         //     } else {
         //         (
-        //             address0, address1, balance0, balance1, signature0, signature1,
+        //             address0, address1, balance0, balance1, signature_0, signature1,
         //         )
         //     };
         // assert!(address0 < address1);
@@ -482,7 +482,7 @@ impl PaymentContract for GuacContract {
                 new_balance_b.into(),
                 // expiration
                 expiration.into(),
-                // signature0
+                // signature_0
                 sig_a.into_bytes().to_vec().into(),
                 // signature
                 sig_b.into_bytes().to_vec().into(),

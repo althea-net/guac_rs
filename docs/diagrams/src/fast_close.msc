@@ -1,0 +1,16 @@
+msc {
+    hscale = "2";
+    u,a,b,c;
+
+    --- [ label = "Channel is open" ];
+    a=>b [label="CounterpartyApi propose_fast_close"];
+    b>>a [label="propose_fast_close Signature"];
+    a=>c [label="BlockchainApi fast_close"];
+    ...  [ label = "After some polling..." ];
+    c>>a [label="fast_close success"];
+    a=>b [label="CounterpartyApi notify_fast_close"];
+        b box b [label="state New"];
+    b>>a [label="notify_fast_close success"];
+    a box a [label="state New"];
+    --- [ label = "Channel is closed" ];
+}

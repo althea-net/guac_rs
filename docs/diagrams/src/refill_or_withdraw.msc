@@ -8,10 +8,10 @@ msc {
   b box b [label="state Open"];
   u=>a [label="fillChannel B, 10"];
   a=>b [label="propose reDraw A: 10, B: 10"];
-  b box b [label="state OtherCreating"];
+  b box b [label="state OtherReDrawing"];
   a<<b [label="signature on reDraw A: 10, B: 10"];
 
-  a box a [label="state Creating"];
+  a box a [label="state ReDrawing"];
   a=>c [label="submit reDraw A: 10, B: 10"];
   ...  [ label = "After some polling..." ];
   a<<c [label="ReDraw event"];

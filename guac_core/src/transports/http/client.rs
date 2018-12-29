@@ -1,15 +1,13 @@
 use actix_web::client;
 use actix_web::client::ClientResponse;
 use actix_web::client::Connection;
-use actix_web::http::StatusCode;
 use actix_web::HttpMessage;
-use channel_client::types::{Channel, ChannelStatus, UpdateTx};
+use channel_client::types::{Channel, UpdateTx};
 use failure::Error;
-use futures::future::err;
 use futures::Future;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
-use transport_protocol::TransportProtocol;
+use transport_protocol::CounterpartyApi;
 use transports::http::network_request::NetworkRequest;
 /// Represnetation of an transport client that works over HTTP.
 ///
@@ -44,7 +42,7 @@ fn verify_client_error(response: ClientResponse) -> Result<ClientResponse, Error
     Ok(response)
 }
 
-impl TransportProtocol for HTTPTransportClient {
+impl CounterpartyApi for HTTPTransportClient {
     fn send_proposal_request(&self, channel: &Channel) -> Box<Future<Item = bool, Error = Error>> {
         trace!(
             "Send channel proposal request channel={:?} addr={}",

@@ -31,17 +31,18 @@ extern crate tokio;
 // Traits
 pub mod payment_contract;
 
-// Code
-pub mod api;
 pub mod channel_client;
-pub mod contracts;
-pub mod counterparty;
-pub mod crypto;
 pub mod error;
+pub mod new_crypto;
 pub mod storage;
-pub mod transport_protocol;
-pub mod transports;
-pub mod web3;
 
-pub use crypto::CRYPTO;
-pub use storage::STORAGE;
+// pub mod transport_protocol;
+// pub mod web3;
+
+pub use self::channel_client::channel_manager::BlockchainApi;
+pub use self::channel_client::channel_manager::CounterpartyApi;
+pub use self::channel_client::channel_manager::Guac;
+pub use self::channel_client::channel_manager::UserApi;
+pub use self::channel_client::types;
+pub use self::new_crypto::Crypto;
+pub use self::storage::Storage;

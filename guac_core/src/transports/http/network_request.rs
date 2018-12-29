@@ -1,6 +1,6 @@
 use clarity::Address;
-use crypto::CryptoService;
-use CRYPTO;
+// use crypto::CryptoService;
+// use CRYPTO;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetworkRequest<T> {

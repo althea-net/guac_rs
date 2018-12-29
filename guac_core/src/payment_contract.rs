@@ -1,9 +1,7 @@
 use clarity::Address;
 use clarity::Signature;
 use failure::Error;
-use futures::future::ok;
 use futures::Future;
-use futures::IntoFuture;
 use num256::Uint256;
 
 /// An alias for a channel ID in a raw bytes form
@@ -16,8 +14,8 @@ pub trait PaymentContract {
         address1: Address,
         balance0: Uint256,
         balance1: Uint256,
-        signature0: Signature,
-        signature1: Signature,
+        signature_0: Signature,
+        signature_1: Signature,
         expiration: Uint256,
         settling_period: Uint256,
     ) -> Box<Future<Item = ChannelId, Error = Error>>;
