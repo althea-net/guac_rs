@@ -4,20 +4,18 @@
 //! work on big endian. We can do better than that just crafting our own
 //! JSONRPC requests.
 //!
+use crate::jsonrpc::client::{Client, HTTPClient};
+use crate::types::{Log, NewFilter, TransactionRequest, TransactionResponse};
 use clarity::utils::bytes_to_hex_str;
 use clarity::Address;
 use failure::Error;
-use futures::prelude::*;
+use futures::stream;
 use futures::IntoFuture;
-use futures::{future, stream};
 use futures::{Future, Stream};
 use futures_timer::Interval;
-use crate::jsonrpc::client::{Client, HTTPClient};
 use num256::Uint256;
-use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::types::{Log, NewFilter, TransactionRequest, TransactionResponse};
 
 /// An instance of Web3Client.
 #[derive(Clone)]
@@ -122,7 +120,7 @@ impl Web3 {
             "eth_getTransactionByHash",
             /// XXX: Technically it doesn't need to be Uint256, but since send_raw_transaction is
             /// returning it we'll keep it consistent.
-            vec![hash],
+            vec![format!("{:#x}", hash)],
         )
     }
     pub fn evm_snapshot(&self) -> Box<Future<Item = Uint256, Error = Error>> {
