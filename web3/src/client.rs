@@ -120,7 +120,7 @@ impl Web3 {
             "eth_getTransactionByHash",
             /// XXX: Technically it doesn't need to be Uint256, but since send_raw_transaction is
             /// returning it we'll keep it consistent.
-            vec![format!("{:#x}", hash)],
+            vec![format!("{:#066x}", hash)],
         )
     }
     pub fn evm_snapshot(&self) -> Box<Future<Item = Uint256, Error = Error>> {
@@ -129,6 +129,6 @@ impl Web3 {
     }
     pub fn evm_revert(&self, snapshot_id: Uint256) -> Box<Future<Item = Uint256, Error = Error>> {
         self.jsonrpc_client
-            .request_method("evm_revert", vec![snapshot_id])
+            .request_method("evm_revert", vec![format!("{:#066x}", snapshot_id)])
     }
 }
