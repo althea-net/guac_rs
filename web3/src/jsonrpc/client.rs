@@ -1,20 +1,14 @@
-use actix_web::client;
-use actix_web::HttpMessage;
-use actix_web::{AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
-// use bytes::Bytes;
-use failure::Error;
-use futures::future::Future;
-// use futures::Future;
 use crate::jsonrpc::request::Request;
 use crate::jsonrpc::response::Response;
+use actix_web::client;
+use actix_web::HttpMessage;
+use failure::Error;
+use futures::future::Future;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::cell::RefCell;
 use std::str;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::net::TcpStream;
-use crate::types::TransactionResponse;
 
 pub trait Client {
     fn request_method<T: Serialize, R: 'static>(
@@ -62,7 +56,7 @@ impl Client for HTTPClient {
         R: std::fmt::Debug,
     {
         let payload = Request::new(self.next_id(), method, params);
-        println!("req {:?}", payload);
+        trace!("web3 request {:?}", payload);
         Box::new(
             client::post(&self.url)
                 .json(payload)
@@ -71,18 +65,11 @@ impl Client for HTTPClient {
                 .timeout(Duration::from_millis(1000))
                 .from_err()
                 .and_then(|response| {
-                    // println!("got resss {:#?}", response.body());
-                    // response.body().from_err().and_then(|res: Bytes| {
-                    //     let data: R = serde_json::from_slice(&res)?;
-                    //     println!("got ressss {:#?}", res);
-                    //     Ok(data)
-                    // })
-
                     response
                         .json()
                         .from_err()
                         .and_then(move |res: Response<R>| {
-                            println!("got res {:#?}", res);
+                            trace!("got web3 response {:#?}", res);
                             let data = res.data.into_result();
                             data.map_err(move |e| {
                                 format_err!("JSONRPC Error {}: {}", e.code, e.message)
