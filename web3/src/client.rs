@@ -4,6 +4,8 @@
 //! work on big endian. We can do better than that just crafting our own
 //! JSONRPC requests.
 //!
+use crate::jsonrpc::client::{Client, HTTPClient};
+use crate::types::{Log, NewFilter, TransactionRequest, TransactionResponse};
 use clarity::utils::bytes_to_hex_str;
 use clarity::Address;
 use failure::Error;
@@ -12,12 +14,10 @@ use futures::IntoFuture;
 use futures::{future, stream};
 use futures::{Future, Stream};
 use futures_timer::Interval;
-use crate::jsonrpc::client::{Client, HTTPClient};
 use num256::Uint256;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::types::{Log, NewFilter, TransactionRequest, TransactionResponse};
 
 /// An instance of Web3Client.
 #[derive(Clone)]
@@ -73,6 +73,14 @@ impl Web3 {
                 // Flatten stream of streams into a single stream
                 .flatten(),
         )
+    }
+
+    pub fn eth_get_logs(
+        &self,
+        new_filter: NewFilter,
+    ) -> Box<Future<Item = Vec<Log>, Error = Error>> {
+        self.jsonrpc_client
+            .request_method("eth_getLogs", vec![new_filter])
     }
 
     pub fn eth_get_transaction_count(
