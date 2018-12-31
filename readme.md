@@ -8,6 +8,14 @@ permission of this light client, but they could censor its transactions, in the 
 to the loss of some funds stored in the channel. For this reason it is advisable to connect to
 several bounty hunting nodes.
 
+# TODO:
+
+- Finish unit tests
+- Add checkAccrual (formerly withdraw) function to userAPI
+- Add bounty hunter updates
+- Add real signature verification
+- Add withdraw function to userApi
+
 # Guac APIs
 
 Guac effectively has 2 APIs- a counterparty API which is called by other Guac nodes, and a user api which is called by the user (or a piece of software acting on behalf of the user).
