@@ -4,14 +4,14 @@ use crate::channel_client::types::{Counterparty, NewChannelTx, ReDrawTx};
 use crate::channel_client::Channel;
 use clarity::{Address, PrivateKey, Signature};
 
-use failure::Error;
-use futures::{future, Future};
 use crate::new_crypto;
 use crate::new_crypto::Crypto;
+use failure::Error;
+use futures::{future, Future};
 use num256::Uint256;
 
-use std::sync::Arc;
 use crate::storage::Storage;
+use std::sync::Arc;
 
 #[macro_export]
 macro_rules! try_future_box {
@@ -62,7 +62,7 @@ pub trait BlockchainApi {
         &self,
         address_0: &Address,
         address_1: &Address,
-    ) -> Box<Future<Item = [u8; 32], Error = Error>>;
+    ) -> Box<Future<Item = Option<[u8; 32]>, Error = Error>>;
 
     fn check_for_re_draw(&self, channel_id: [u8; 32]) -> Box<Future<Item = (), Error = Error>>;
 
@@ -563,26 +563,30 @@ impl CounterpartyApi for Guac {
                             Box::new(
                                 blockchain_client
                                     .check_for_open(&address_0, &address_1)
-                                    .and_then(move |channel_id| {
-                                        *counterparty = Counterparty::Open {
-                                            channel: CombinedState::new(&Channel {
-                                                channel_id,
-                                                address_0,
-                                                address_1,
-                                                total_balance: new_channel_tx.clone().balance_0
-                                                    + new_channel_tx.clone().balance_1,
-                                                balance_0: new_channel_tx.balance_0,
-                                                balance_1: new_channel_tx.balance_1,
-                                                sequence_number: 0u64.into(),
-                                                settling_period_length: new_channel_tx
-                                                    .settling_period_length,
-                                                settling_period_end: 0u64.into(),
-                                                settling_period_started: false,
-                                                i_am_0,
-                                            }),
-                                            url,
-                                        };
-                                        Ok(())
+                                    .and_then(move |maybe_channel_id| {
+                                        if let Some(channel_id) = maybe_channel_id {
+                                            *counterparty = Counterparty::Open {
+                                                channel: CombinedState::new(&Channel {
+                                                    channel_id,
+                                                    address_0,
+                                                    address_1,
+                                                    total_balance: new_channel_tx.clone().balance_0
+                                                        + new_channel_tx.clone().balance_1,
+                                                    balance_0: new_channel_tx.balance_0,
+                                                    balance_1: new_channel_tx.balance_1,
+                                                    sequence_number: 0u64.into(),
+                                                    settling_period_length: new_channel_tx
+                                                        .settling_period_length,
+                                                    settling_period_end: 0u64.into(),
+                                                    settling_period_started: false,
+                                                    i_am_0,
+                                                }),
+                                                url,
+                                            };
+                                            Ok(())
+                                        } else {
+                                            bail!("Cannot confirm that channel was opened");
+                                        }
                                     }),
                             ) as Box<Future<Item = (), Error = Error>>
                         }

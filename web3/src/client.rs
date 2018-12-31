@@ -73,6 +73,14 @@ impl Web3 {
         )
     }
 
+    pub fn eth_get_logs(
+        &self,
+        new_filter: NewFilter,
+    ) -> Box<Future<Item = Vec<Log>, Error = Error>> {
+        self.jsonrpc_client
+            .request_method("eth_getLogs", vec![new_filter])
+    }
+
     pub fn eth_get_transaction_count(
         &self,
         address: Address,

@@ -150,7 +150,7 @@ mod tests {
 
         let (guac_1, guac_2) = make_nodes();
 
-        let storage_1 = guac_1.storage.clone();
+        let _storage_1 = guac_1.storage.clone();
         let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
         let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
 

@@ -61,14 +61,30 @@ impl BlockchainClient {
         event: &str,
         topic1: Option<Vec<[u8; 32]>>,
         topic2: Option<Vec<[u8; 32]>>,
-    ) -> Box<Future<Item = Log, Error = Error>> {
-        self.get_event(
-            event,
-            topic1,
-            topic2,
-            Some("0".to_string()),
-            Some("Latest".to_string()),
-        )
+    ) -> Box<Future<Item = Option<Log>, Error = Error>> {
+        // self.get_event(
+        //     event,
+        //     topic1,
+        //     topic2,
+        //     Some("0".to_string()),
+        //     Some("Latest".to_string()),
+        // )
+
+        let web3 = self.web3.clone();
+
+        // Build a filter with specified topics
+        let mut new_filter = NewFilter::default();
+        new_filter.address = vec![self.contract_address.clone()];
+        new_filter.topics = Some(vec![
+            Some(vec![Some(bytes_to_data(&derive_signature(event)))]),
+            topic1.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
+            topic2.map(|v| v.into_iter().map(|val| Some(bytes_to_data(&val))).collect()),
+        ]);
+
+        Box::new(web3.eth_get_logs(new_filter).and_then(|logs| {
+            // Assuming the latest log is at the head of the vec
+            Ok(logs.first().map(|log| log.clone()))
+        }))
     }
 
     fn get_event(
@@ -324,7 +340,7 @@ impl BlockchainApi for BlockchainClient {
         &self,
         address_0: &Address,
         address_1: &Address,
-    ) -> Box<Future<Item = [u8; 32], Error = Error>> {
+    ) -> Box<Future<Item = Option<[u8; 32]>, Error = Error>> {
         let addr_0_bytes: [u8; 32] = {
             let mut data: [u8; 32] = Default::default();
             data[12..].copy_from_slice(&address_0.as_bytes());
@@ -341,14 +357,18 @@ impl BlockchainApi for BlockchainClient {
                 Some(vec![addr_0_bytes]),
                 Some(vec![addr_1_bytes]),
             )
-            .and_then(|response| {
-                let mut data: [u8; 32] = Default::default();
-                ensure!(
-                    response.data.len() == 32,
-                    "Invalid data length in ChannelOpened event"
-                );
-                data.copy_from_slice(&response.data);
-                Ok(data.into())
+            .and_then(|res| {
+                if let Some(response) = res {
+                    let mut data: [u8; 32] = Default::default();
+                    ensure!(
+                        response.data.len() == 32,
+                        "Invalid data length in ChannelOpened event"
+                    );
+                    data.copy_from_slice(&response.data);
+                    Ok(Some(data.into()))
+                } else {
+                    Ok(None)
+                }
             }),
         )
     }
