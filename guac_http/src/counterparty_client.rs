@@ -38,14 +38,17 @@ pub struct CounterpartyClient;
 ///
 /// Implementation of this is very simplified and all responses are expected to have HTTP 200 OK
 /// response.
-fn verify_client_error(response: ClientResponse) -> Result<ClientResponse, Error> {
+fn verify_client_error(
+    response: ClientResponse,
+) -> Box<Future<Item = ClientResponse, Error = Error>> {
     if response.status() != 200 {
-        return Err(format_err!(
-            "Received client error from server: {}",
-            response.status()
-        ));
+        return Box::new(
+            response.body().from_err().and_then(move |bod| {
+                Err(format_err!("HTTP error {}: {:?}", response.status(), bod))
+            }),
+        );
     }
-    Ok(response)
+    Box::new(future::ok(response))
 }
 
 impl CounterpartyApi for CounterpartyClient {

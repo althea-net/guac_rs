@@ -1,13 +1,30 @@
+use actix_web::error::ErrorPreconditionFailed;
 use actix_web::http::Method;
 use actix_web::*;
 
 use clarity::Address;
+use failure::Error;
 use guac_core::channel_client::types::{NewChannelTx, ReDrawTx, UpdateTx};
 use guac_core::CounterpartyApi;
 use guac_core::Guac;
+use guac_core::GuacError;
 
-use futures::future::{err, ok};
+use futures::future;
 use futures::Future;
+// .map_err(|err| match err.downcast::<GuacError::Forbidden>() {
+//     Ok(forbidden) => ok(HttpResponse::Forbidden().body(forbidden.message)),
+//     Err => ok(HttpResponse::InternalServerError().finish()),
+// })
+
+fn convert_error(err: failure::Error) -> HttpResponse {
+    match err.downcast::<GuacError>() {
+        Ok(guac_err) => match guac_err {
+            GuacError::Forbidden { message } => HttpResponse::Forbidden().body(message),
+            _ => HttpResponse::InternalServerError().finish(),
+        },
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
 
 pub fn init_server(port: u16, guac: Guac) {
     server::new(move || {
@@ -29,8 +46,12 @@ pub fn init_server(port: u16, guac: Guac) {
                         let body = body.clone();
                         req.state()
                             .propose_re_draw(body.0, String::default(), body.1)
-                            .and_then(move |res| Ok(Json(res)))
-                            .responder()
+                            .then(|res| match res {
+                                Ok(res) => future::ok::<HttpResponse, failure::Error>(
+                                    HttpResponse::Ok().json(res),
+                                ),
+                                Err(err) => future::ok(convert_error(err)),
+                            })
                     },
                 )
             })
@@ -72,3 +93,7 @@ pub fn init_server(port: u16, guac: Guac) {
     .unwrap()
     .start();
 }
+
+// fn my_func() -> Box<Future<Item = (), Error = Error>> {
+//     Box::new(future::ok(()))
+// }

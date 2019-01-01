@@ -48,6 +48,8 @@ pub enum GuacError {
         current_state: String,
         correct_state: String,
     },
+    #[fail(display = "Invalid request: {}", message)]
+    Forbidden { message: String },
 }
 
 pub trait BlockchainApi {
@@ -478,33 +480,57 @@ impl CounterpartyApi for Guac {
                                         signature_1: _,
                                     } = re_draw_tx;
 
-                                    ensure!(
-                                        channel_id == channel.my_state.channel_id,
-                                        "Incorrect channel ID."
-                                    );
-                                    ensure!(
-                                        sequence_number == channel.my_state.sequence_number,
-                                        "Incorrect sequence number."
-                                    );
-                                    ensure!(
-                                        old_balance_0 == channel.my_state.balance_0,
-                                        "Incorrect old balance_0"
-                                    );
-                                    ensure!(
-                                        old_balance_1 == channel.my_state.balance_1,
-                                        "Incorrect old balance_1"
-                                    );
+                                    if channel_id == channel.my_state.channel_id {
+                                        return future::err(
+                                            GuacError::Forbidden {
+                                                message: "Incorrect channel ID.".to_string(),
+                                            }
+                                            .into(),
+                                        );
+                                    }
+                                    if sequence_number == channel.my_state.sequence_number {
+                                        return future::err(
+                                            GuacError::Forbidden {
+                                                message: "Incorrect sequence number.".to_string(),
+                                            }
+                                            .into(),
+                                        );
+                                    }
+                                    if old_balance_0 == channel.my_state.balance_0 {
+                                        return future::err(
+                                            GuacError::Forbidden {
+                                                message: "Incorrect old balance_0".to_string(),
+                                            }
+                                            .into(),
+                                        );
+                                    }
+                                    if old_balance_1 == channel.my_state.balance_1 {
+                                        return future::err(
+                                            GuacError::Forbidden {
+                                                message: "Incorrect old balance_1".to_string(),
+                                            }
+                                            .into(),
+                                        );
+                                    }
 
                                     if channel.my_state.i_am_0 {
-                                        ensure!(
-                                            new_balance_0 == channel.my_state.balance_0,
-                                            "Incorrect new balance_0"
-                                        );
+                                        if new_balance_0 == channel.my_state.balance_0 {
+                                            return future::err(
+                                                GuacError::Forbidden {
+                                                    message: "Incorrect new balance_0".to_string(),
+                                                }
+                                                .into(),
+                                            );
+                                        }
                                     } else {
-                                        ensure!(
-                                            new_balance_1 == channel.my_state.balance_1,
-                                            "Incorrect new balance_1"
-                                        );
+                                        if new_balance_1 == channel.my_state.balance_1 {
+                                            return future::err(
+                                                GuacError::Forbidden {
+                                                    message: "Incorrect new balance_1".to_string(),
+                                                }
+                                                .into(),
+                                            );
+                                        }
                                     }
 
                                     *counterparty = Counterparty::OtherReDrawing {
@@ -517,7 +543,7 @@ impl CounterpartyApi for Guac {
                                         &re_draw_tx_clone_1.fingerprint(crypto.contract_address),
                                     );
 
-                                    Ok(my_signature)
+                                    future::ok(my_signature)
                                 }),
                             )
                                 as Box<Future<Item = Signature, Error = Error>>
