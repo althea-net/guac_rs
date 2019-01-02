@@ -25,6 +25,19 @@ macro_rules! try_future_box {
     };
 }
 
+macro_rules! forbidden {
+    ($expression:expr, $label:expr) => {
+        if !($expression) {
+            return future::err(
+                GuacError::Forbidden {
+                    message: $label.to_string(),
+                }
+                .into(),
+            );
+        }
+    };
+}
+
 #[derive(Clone)]
 pub struct Guac {
     pub blockchain_client: Arc<Box<BlockchainApi + Send + Sync>>,
@@ -392,26 +405,56 @@ impl CounterpartyApi for Guac {
                                             signature_1: _,
                                         } = new_channel_tx_clone_1;
 
-                                        ensure!(address_0 < address_1, "Addresses must be sorted.");
-
-                                        let my_balance = if address_0 == my_address {
-                                            (balance_0)
-                                        } else if address_1 == my_address {
-                                            (balance_1)
+                                        if i_am_0 {
+                                            forbidden!(
+                                                address_0 == my_address,
+                                                format!(
+                                                    "Address 0 ({}) should equal my address ({})",
+                                                    address_0.to_string(),
+                                                    my_address.to_string()
+                                                )
+                                            );
+                                            forbidden!(
+                                                address_1 == from_address,
+                                                format!(
+                                                    "Address 1 ({}) should equal your address ({})",
+                                                    address_1.to_string(),
+                                                    from_address.to_string()
+                                                )
+                                            );
                                         } else {
-                                            bail!("This is NewChannelTx is not meant for me.")
-                                        };
+                                            forbidden!(
+                                                address_1 == my_address,
+                                                format!(
+                                                    "Address 1 ({}) should equal my address ({})",
+                                                    address_1.to_string(),
+                                                    my_address.to_string()
+                                                )
+                                            );
+                                            forbidden!(
+                                                address_0 == from_address,
+                                                format!(
+                                                    "Address 0 ({}) should equal your address ({})",
+                                                    address_0.to_string(),
+                                                    from_address.to_string()
+                                                )
+                                            );
+                                        }
 
-                                        ensure!(
+                                        let my_balance =
+                                            if i_am_0 { (balance_0) } else { (balance_1) };
+
+                                        forbidden!(
                                             my_balance == 0u64.into(),
                                             "My balance in proposed channel must be zero."
                                         );
 
-                                        ensure!(
+                                        forbidden!(
                                             settling_period_length == 5000u64.into(),
                                             "I only accept settling periods of 5000 blocks"
                                         );
-                                        Ok(())
+
+                                        future::ok(())
                                     })
                                     .and_then(move |_| {
                                         // Save the current state of the counterparty
@@ -480,57 +523,39 @@ impl CounterpartyApi for Guac {
                                         signature_1: _,
                                     } = re_draw_tx;
 
-                                    if channel_id == channel.my_state.channel_id {
-                                        return future::err(
-                                            GuacError::Forbidden {
-                                                message: "Incorrect channel ID.".to_string(),
-                                            }
-                                            .into(),
-                                        );
-                                    }
-                                    if sequence_number == channel.my_state.sequence_number {
-                                        return future::err(
-                                            GuacError::Forbidden {
-                                                message: "Incorrect sequence number.".to_string(),
-                                            }
-                                            .into(),
-                                        );
-                                    }
-                                    if old_balance_0 == channel.my_state.balance_0 {
-                                        return future::err(
-                                            GuacError::Forbidden {
-                                                message: "Incorrect old balance_0".to_string(),
-                                            }
-                                            .into(),
-                                        );
-                                    }
-                                    if old_balance_1 == channel.my_state.balance_1 {
-                                        return future::err(
-                                            GuacError::Forbidden {
-                                                message: "Incorrect old balance_1".to_string(),
-                                            }
-                                            .into(),
-                                        );
-                                    }
+                                    forbidden!(
+                                        channel_id == channel.my_state.channel_id,
+                                        format!("Channel ID ({:?}) should equal my saved channel ID ({:?})", channel_id, channel.my_state.channel_id)
+                                    );
+
+                                    forbidden!(
+                                        sequence_number == channel.my_state.sequence_number,
+                                        format!(
+                                            "Sequence number ({}) should equal {}",
+                                            sequence_number, channel.my_state.sequence_number
+                                        )
+                                    );
+
+                                    forbidden!(
+                                        old_balance_0 == channel.my_state.balance_0,
+                                        format!("Old balance_0 ({}) should equal {}", old_balance_0, channel.my_state.balance_0)
+                                    );
+
+                                   forbidden!(
+                                        old_balance_1 == channel.my_state.balance_1,
+                                        format!("Old balance_1 ({}) should equal {}", old_balance_1, channel.my_state.balance_1)
+                                    );
 
                                     if channel.my_state.i_am_0 {
-                                        if new_balance_0 == channel.my_state.balance_0 {
-                                            return future::err(
-                                                GuacError::Forbidden {
-                                                    message: "Incorrect new balance_0".to_string(),
-                                                }
-                                                .into(),
-                                            );
-                                        }
+                                        forbidden!(
+                                            new_balance_0 == channel.my_state.balance_0,
+                                            format!("New balance_0 ({}) should equal my balance ({})", new_balance_0, channel.my_state.balance_0)
+                                        );
                                     } else {
-                                        if new_balance_1 == channel.my_state.balance_1 {
-                                            return future::err(
-                                                GuacError::Forbidden {
-                                                    message: "Incorrect new balance_1".to_string(),
-                                                }
-                                                .into(),
-                                            );
-                                        }
+                                        forbidden!(
+                                            new_balance_1 == channel.my_state.balance_1,
+                                            format!("New balance_1 ({}) should equal my balance ({})", new_balance_1, channel.my_state.balance_1)
+                                        );
                                     }
 
                                     *counterparty = Counterparty::OtherReDrawing {
