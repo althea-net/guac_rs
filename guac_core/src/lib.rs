@@ -31,6 +31,7 @@ extern crate tokio;
 // Traits
 pub mod payment_contract;
 
+#[macro_use]
 pub mod channel_client;
 pub mod error;
 pub mod new_crypto;
@@ -42,8 +43,8 @@ pub mod storage;
 pub use self::channel_client::channel_manager::BlockchainApi;
 pub use self::channel_client::channel_manager::CounterpartyApi;
 pub use self::channel_client::channel_manager::Guac;
-pub use self::channel_client::channel_manager::GuacError;
 pub use self::channel_client::channel_manager::UserApi;
 pub use self::channel_client::types;
+pub use self::channel_client::types::GuacError;
 pub use self::new_crypto::Crypto;
 pub use self::storage::Storage;

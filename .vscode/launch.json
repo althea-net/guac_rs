@@ -27,7 +27,7 @@
           "kind": "lib"
         }
       },
-      "args": ["channel_manager"],
+      "args": ["bidirectional_simple"],
       "cwd": "${workspaceFolder}"
     },
     {

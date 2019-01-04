@@ -1,6 +1,6 @@
 use crate::channel_client::combined_state::CombinedState;
 use crate::channel_client::types::UpdateTx;
-use crate::channel_client::types::{Counterparty, NewChannelTx, ReDrawTx};
+use crate::channel_client::types::{Counterparty, GuacError, NewChannelTx, ReDrawTx};
 use crate::channel_client::Channel;
 use clarity::{Address, PrivateKey, Signature};
 
@@ -25,44 +25,12 @@ macro_rules! try_future_box {
     };
 }
 
-macro_rules! forbidden {
-    ($expression:expr, $label:expr) => {
-        if !($expression) {
-            return future::err(
-                GuacError::Forbidden {
-                    message: $label.to_string(),
-                }
-                .into(),
-            );
-        }
-    };
-}
-
 #[derive(Clone)]
 pub struct Guac {
     pub blockchain_client: Arc<Box<BlockchainApi + Send + Sync>>,
     pub counterparty_client: Arc<Box<CounterpartyApi + Send + Sync>>,
     pub storage: Arc<Box<Storage>>,
     pub crypto: Arc<Box<Crypto>>,
-}
-
-#[derive(Debug, Fail)]
-pub enum GuacError {
-    #[fail(
-        display = "Guac is currently waiting on another operation to complete. Try again later."
-    )]
-    TryAgainLater(),
-    #[fail(
-        display = "Cannot {} in the current state: {}. State must be: {}",
-        action, current_state, correct_state
-    )]
-    WrongState {
-        action: String,
-        current_state: String,
-        correct_state: String,
-    },
-    #[fail(display = "Invalid request: {}", message)]
-    Forbidden { message: String },
 }
 
 pub trait BlockchainApi {
@@ -504,73 +472,85 @@ impl CounterpartyApi for Guac {
                         Counterparty::Open { url, channel } => {
                             let channel_clone_1 = channel.clone();
                             let re_draw_tx_clone_1 = re_draw_tx.clone();
-                            Box::new(
-                                // Have to do this weird thing with future::ok to get ensure! to work
-                                future::ok(()).and_then(move |_| {
-                                    let ReDrawTx {
-                                        channel_id,
+                            Box::new(future::ok(()).and_then(move |_| {
+                                let ReDrawTx {
+                                    channel_id,
 
-                                        sequence_number,
-                                        old_balance_0,
-                                        old_balance_1,
+                                    sequence_number,
+                                    old_balance_0,
+                                    old_balance_1,
 
-                                        new_balance_0,
-                                        new_balance_1,
+                                    new_balance_0,
+                                    new_balance_1,
 
-                                        expiration: _,
+                                    expiration: _,
 
-                                        signature_0: _,
-                                        signature_1: _,
-                                    } = re_draw_tx;
+                                    signature_0: _,
+                                    signature_1: _,
+                                } = re_draw_tx;
 
+                                forbidden!(
+                                    channel_id == channel.my_state.channel_id,
+                                    format!(
+                                        "Channel ID ({:?}) should equal my saved channel ID ({:?})",
+                                        channel_id, channel.my_state.channel_id
+                                    )
+                                );
+
+                                forbidden!(
+                                    sequence_number > channel.my_state.sequence_number,
+                                    format!(
+                                        "Sequence number ({}) should be higher than {}",
+                                        sequence_number, channel.my_state.sequence_number
+                                    )
+                                );
+
+                                forbidden!(
+                                    old_balance_0 == channel.my_state.balance_0,
+                                    format!(
+                                        "Old balance_0 ({}) should equal {}",
+                                        old_balance_0, channel.my_state.balance_0
+                                    )
+                                );
+
+                                forbidden!(
+                                    old_balance_1 == channel.my_state.balance_1,
+                                    format!(
+                                        "Old balance_1 ({}) should equal {}",
+                                        old_balance_1, channel.my_state.balance_1
+                                    )
+                                );
+
+                                if channel.my_state.i_am_0 {
                                     forbidden!(
-                                        channel_id == channel.my_state.channel_id,
-                                        format!("Channel ID ({:?}) should equal my saved channel ID ({:?})", channel_id, channel.my_state.channel_id)
-                                    );
-
-                                    forbidden!(
-                                        sequence_number == channel.my_state.sequence_number,
+                                        new_balance_0 == channel.my_state.balance_0,
                                         format!(
-                                            "Sequence number ({}) should equal {}",
-                                            sequence_number, channel.my_state.sequence_number
+                                            "New balance_0 ({}) should equal my balance ({})",
+                                            new_balance_0, channel.my_state.balance_0
                                         )
                                     );
-
+                                } else {
                                     forbidden!(
-                                        old_balance_0 == channel.my_state.balance_0,
-                                        format!("Old balance_0 ({}) should equal {}", old_balance_0, channel.my_state.balance_0)
+                                        new_balance_1 == channel.my_state.balance_1,
+                                        format!(
+                                            "New balance_1 ({}) should equal my balance ({})",
+                                            new_balance_1, channel.my_state.balance_1
+                                        )
                                     );
+                                }
 
-                                   forbidden!(
-                                        old_balance_1 == channel.my_state.balance_1,
-                                        format!("Old balance_1 ({}) should equal {}", old_balance_1, channel.my_state.balance_1)
-                                    );
+                                *counterparty = Counterparty::OtherReDrawing {
+                                    channel: channel_clone_1,
+                                    re_draw_tx: re_draw_tx_clone_1.clone(),
+                                    url,
+                                };
 
-                                    if channel.my_state.i_am_0 {
-                                        forbidden!(
-                                            new_balance_0 == channel.my_state.balance_0,
-                                            format!("New balance_0 ({}) should equal my balance ({})", new_balance_0, channel.my_state.balance_0)
-                                        );
-                                    } else {
-                                        forbidden!(
-                                            new_balance_1 == channel.my_state.balance_1,
-                                            format!("New balance_1 ({}) should equal my balance ({})", new_balance_1, channel.my_state.balance_1)
-                                        );
-                                    }
+                                let my_signature = crypto.eth_sign(
+                                    &re_draw_tx_clone_1.fingerprint(crypto.contract_address),
+                                );
 
-                                    *counterparty = Counterparty::OtherReDrawing {
-                                        channel: channel_clone_1,
-                                        re_draw_tx: re_draw_tx_clone_1.clone(),
-                                        url,
-                                    };
-
-                                    let my_signature = crypto.eth_sign(
-                                        &re_draw_tx_clone_1.fingerprint(crypto.contract_address),
-                                    );
-
-                                    future::ok(my_signature)
-                                }),
-                            )
+                                future::ok(my_signature)
+                            }))
                                 as Box<Future<Item = Signature, Error = Error>>
                         }
                         _ => {

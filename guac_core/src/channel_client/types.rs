@@ -4,6 +4,27 @@ use clarity::{Address, Signature};
 use failure::Error;
 use num256::Uint256;
 
+#[derive(Debug, Fail)]
+pub enum GuacError {
+    #[fail(
+        display = "Guac is currently waiting on another operation to complete. Try again later."
+    )]
+    TryAgainLater(),
+    #[fail(
+        display = "Cannot {} in the current state: {}. State must be: {}",
+        action, current_state, correct_state
+    )]
+    WrongState {
+        action: String,
+        current_state: String,
+        correct_state: String,
+    },
+    #[fail(display = "Invalid request: {}", message)]
+    Forbidden { message: String },
+    #[fail(display = "Update too old.")]
+    UpdateTooOld(),
+}
+
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Counterparty {
     New {
@@ -197,10 +218,9 @@ impl Channel {
             "balances do not add up to total balance"
         );
 
-        ensure!(
-            self.sequence_number < update.sequence_number,
-            "Update too old"
-        );
+        if self.sequence_number < update.sequence_number {
+            return Err(GuacError::UpdateTooOld().into());
+        }
 
         if update.my_balance(self.i_am_0) < self.my_balance() && validate_balance {
             bail!("balance validation failed")

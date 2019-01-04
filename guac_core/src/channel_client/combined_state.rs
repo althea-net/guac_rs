@@ -2,8 +2,13 @@ use failure::Error;
 
 use num256::Uint256;
 
-use crate::channel_client::types::{Channel, UpdateTx};
+use crate::channel_client::types::{Channel, GuacError, UpdateTx};
 use std::ops::{Add, Sub};
+
+// TODO:
+// - increment in create update. Only call it when needed
+// - receive_payment_ack returns special error on old sequence number
+// - receive_payment
 
 /// A struct which represents the core payment logic/state of a payment channel. It contains both
 /// our current state as well as the last confirmed state of our counterparty, which is used to
@@ -96,11 +101,10 @@ impl CombinedState {
     /// all the `make_payment`'s which have happened between the last invocation of this
     /// function
     pub fn create_update(&mut self) -> Result<UpdateTx, Error> {
-        let mut state = self.my_state.clone();
+        self.my_state.sequence_number += 1u8.into();
+        self.their_state.sequence_number += 1u8.into();
 
-        state.sequence_number += 1u8.into();
-
-        Ok(state.create_update())
+        Ok(self.my_state.create_update())
     }
 
     /// This is what processes the `UpdateTx` created by the `create_update` on the counterparty.
@@ -128,8 +132,20 @@ impl CombinedState {
         // Save our previous balance in their state
         let our_prev_bal = self.their_state.my_balance().clone();
 
-        // Then apply the update
-        self.their_state.apply_update(&update, false)?;
+        //
+        // self.their_state.apply_update(&update, false)?;
+
+        if let Err(err) = self.their_state.apply_update(&update, false) {
+            match err.downcast::<GuacError>()? {
+                GuacError::UpdateTooOld() => {
+                    return Ok(UpdateTx {
+                        sequence_number: self.their_state.sequence_number.clone(),
+                        ..update.clone()
+                    });
+                }
+                guac_err => return Err(guac_err.into()),
+            }
+        }
 
         ensure!(
             *self.their_state.my_balance() >= our_prev_bal,
@@ -293,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bidirectional() {
+    fn test_bidirectional_simple() {
         let (mut a, mut b) = new_pair(100u32.into(), 100u32.into());
 
         // A -> B 5
