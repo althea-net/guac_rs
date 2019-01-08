@@ -1,7 +1,7 @@
-use crate::channel_client::channel::Channel;
-// use crate::channel_client::combined_state::CombinedState;
-use crate::channel_client::types::UpdateTx;
-use crate::channel_client::types::{Counterparty, GuacError, NewChannelTx, ReDrawTx};
+use crate::channel::Channel;
+// use crate::combined_state::CombinedState;
+use crate::types::UpdateTx;
+use crate::types::{Counterparty, GuacError, NewChannelTx, ReDrawTx};
 use clarity::{Address, Signature};
 
 use crate::crypto::Crypto;
@@ -12,7 +12,6 @@ use num256::Uint256;
 use crate::storage::Storage;
 use std::sync::Arc;
 
-#[macro_export]
 macro_rules! try_future_box {
     ($expression:expr) => {
         match $expression {
@@ -20,6 +19,19 @@ macro_rules! try_future_box {
                 return Box::new(future::err(err.into())) as Box<Future<Item = _, Error = Error>>;
             }
             Ok(value) => value,
+        }
+    };
+}
+
+macro_rules! forbidden {
+    ($expression:expr, $label:expr) => {
+        if !($expression) {
+            return future::err(
+                GuacError::Forbidden {
+                    message: $label.to_string(),
+                }
+                .into(),
+            );
         }
     };
 }

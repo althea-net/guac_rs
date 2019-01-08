@@ -3,7 +3,7 @@ use actix_web::*;
 
 use clarity::Address;
 use failure::Error;
-use guac_core::channel_client::types::{NewChannelTx, ReDrawTx, UpdateTx};
+use guac_core::types::{NewChannelTx, ReDrawTx, UpdateTx};
 use guac_core::CounterpartyApi;
 use guac_core::Guac;
 use guac_core::GuacError;

@@ -7,7 +7,7 @@ use failure::Error;
 use futures::Future;
 use futures::IntoFuture;
 use futures::Stream;
-use guac_core::channel_client::types::{NewChannelTx, ReDrawTx};
+use guac_core::types::{NewChannelTx, ReDrawTx};
 use guac_core::BlockchainApi;
 use num256::Uint256;
 use web3::client::Web3;

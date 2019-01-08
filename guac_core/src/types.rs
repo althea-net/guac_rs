@@ -1,4 +1,4 @@
-use crate::channel_client::channel::Channel;
+use crate::channel::Channel;
 use crate::crypto;
 use clarity::{Address, Signature};
 use num256::Uint256;

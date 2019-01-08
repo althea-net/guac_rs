@@ -5,7 +5,7 @@ use actix_web::HttpMessage;
 use clarity::{Address, Signature};
 use failure::Error;
 use futures::{future, Future};
-use guac_core::channel_client::types::{NewChannelTx, ReDrawTx, UpdateTx};
+use guac_core::types::{NewChannelTx, ReDrawTx, UpdateTx};
 use guac_core::CounterpartyApi;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;

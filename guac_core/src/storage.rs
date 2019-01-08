@@ -1,4 +1,4 @@
-use crate::channel_client::types::Counterparty;
+use crate::types::Counterparty;
 use clarity::Address;
 use failure::Error;
 

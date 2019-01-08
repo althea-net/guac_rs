@@ -24,7 +24,7 @@
 use failure::Error;
 use num256::Uint256;
 
-use crate::channel_client::types::{GuacError, UpdateTx};
+use crate::types::{GuacError, UpdateTx};
 use num::traits::ops::checked::CheckedSub;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

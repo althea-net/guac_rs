@@ -27,16 +27,17 @@ extern crate tiny_keccak;
 extern crate tokio;
 extern crate uuid;
 
-
 #[macro_use]
-pub mod channel_client;
 pub mod crypto;
+pub mod channel;
+pub mod channel_manager;
 pub mod storage;
-pub use self::channel_client::channel_manager::BlockchainApi;
-pub use self::channel_client::channel_manager::CounterpartyApi;
-pub use self::channel_client::channel_manager::Guac;
-pub use self::channel_client::channel_manager::UserApi;
-pub use self::channel_client::types;
-pub use self::channel_client::types::GuacError;
+pub mod types;
+
+pub use self::channel_manager::BlockchainApi;
+pub use self::channel_manager::CounterpartyApi;
+pub use self::channel_manager::Guac;
+pub use self::channel_manager::UserApi;
 pub use self::crypto::Crypto;
 pub use self::storage::Storage;
+pub use self::types::GuacError;
