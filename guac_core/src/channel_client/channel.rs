@@ -11,14 +11,15 @@
 // such a message, the receiver will also update their stored value of s. Packet loss may
 // occur, such that A(s) and B(s) become unsyncronized.
 
-// We would like to prove that A(s) will never be lower than B(s), since if Alice sends Bob a
-// message where s is lower than B(s), Bob will not accept it, and the system will halt.
+// We would like to prove that A(s) will never be lower than B(s) due to packet loss in either
+// direction, since if Alice sends Bob a message where s is lower than B(s),Bob will not accept
+// it, and the system will halt.
 
-// Packet loss in direction Alice -> Bob will only ever cause A(s) to be higher than B(s), since Alice
-// has increased A(s) without Bob increasing B(s).
+// Packet loss in direction Alice -> Bob will only ever cause A(s) to be higher than B(s), since
+// Alice has increased A(s) without Bob increasing B(s).
 
-// Packet loss in direction Bob -> Alice will only ever cause B(s) to be lower than A(s), since Bob
-// has decreased B(s) without Alice decreasing A(s).
+// Packet loss in direction Bob -> Alice will only ever cause B(s) to be lower than A(s), since
+// Bob has decreased B(s) without Alice decreasing A(s).
 
 use failure::Error;
 use num256::Uint256;
@@ -34,19 +35,6 @@ pub struct Channel {
     pub balance_1: Uint256,
     pub accrual: Uint256,
     pub i_am_0: bool,
-}
-
-impl Channel {
-    fn new(channel_id: [u8; 32], i_am_0: bool) -> Channel {
-        Channel {
-            channel_id,
-            sequence_number: 0u8.into(),
-            balance_0: 0u8.into(),
-            balance_1: 0u8.into(),
-            accrual: 0u8.into(),
-            i_am_0,
-        }
-    }
 }
 
 impl Channel {
@@ -147,10 +135,21 @@ impl Channel {
 mod tests {
     use super::*;
 
+    fn new_channel(channel_id: [u8; 32], i_am_0: bool) -> Channel {
+        Channel {
+            channel_id,
+            sequence_number: 0u8.into(),
+            balance_0: 0u8.into(),
+            balance_1: 0u8.into(),
+            accrual: 0u8.into(),
+            i_am_0,
+        }
+    }
+
     #[test]
     fn test_unidirectional_empty() {
-        let mut a = Channel::new([0; 32], true);
-        let mut b = Channel::new([0; 32], false);
+        let mut a = new_channel([0; 32], true);
+        let mut b = new_channel([0; 32], false);
 
         let update = a.make_payment(0u8.into(), None).unwrap();
 

@@ -1,5 +1,5 @@
 use crate::channel_client::channel::Channel;
-use crate::new_crypto;
+use crate::crypto;
 use clarity::{Address, Signature};
 use num256::Uint256;
 
@@ -84,7 +84,7 @@ impl NewChannelTx {
         let expiration: [u8; 32] = self.expiration.clone().into();
         let settling_period_length: [u8; 32] = self.settling_period_length.clone().into();
 
-        let fingerprint = new_crypto::hash_bytes(&[
+        let fingerprint = crypto::hash_bytes(&[
             func_name,
             contract_address,
             &address_0,
@@ -129,7 +129,7 @@ impl ReDrawTx {
         let new_balance_1: [u8; 32] = self.new_balance_1.clone().into();
         let expiration: [u8; 32] = self.expiration.clone().into();
 
-        let fingerprint = new_crypto::hash_bytes(&[
+        let fingerprint = crypto::hash_bytes(&[
             func_name,
             contract_address,
             &channel_id,
@@ -252,7 +252,7 @@ impl UpdateTx {
         let balance_0: [u8; 32] = self.balance_0.clone().into();
         let balance_1: [u8; 32] = self.balance_1.clone().into();
 
-        let fingerprint = new_crypto::hash_bytes(&[
+        let fingerprint = crypto::hash_bytes(&[
             func_name,
             contract_address,
             &channel_id,

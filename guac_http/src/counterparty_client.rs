@@ -7,10 +7,7 @@ use failure::Error;
 use futures::{future, Future};
 use guac_core::channel_client::types::{NewChannelTx, ReDrawTx, UpdateTx};
 use guac_core::CounterpartyApi;
-use std::io::Read;
-use std::io::Write;
 use std::net::SocketAddr;
-use std::str;
 use tokio::net::TcpStream;
 
 macro_rules! try_future_box {
@@ -24,14 +21,6 @@ macro_rules! try_future_box {
     };
 }
 
-/// Represnetation of an transport client that works over HTTP.
-///
-/// Contains useful properties to make an HTTP request. One instance
-/// is bound to single URL.
-///
-/// This URL will be used to query sub resources over the network. At
-/// some point we might want to include a "API" root by convention here,
-/// not necessarily a transport.
 pub struct CounterpartyClient;
 
 /// Verifies if the response from server is correct by checking status code.Client

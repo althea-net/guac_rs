@@ -1,13 +1,13 @@
 use clarity::abi::derive_signature;
-use clarity::abi::{encode_call, encode_tokens, Token};
+use clarity::abi::{encode_call, Token};
 use clarity::utils::bytes_to_hex_str;
 use clarity::Transaction;
-use clarity::{Address, PrivateKey, Signature};
+use clarity::{Address, PrivateKey};
 use failure::Error;
+use futures::Future;
 use futures::IntoFuture;
 use futures::Stream;
-use futures::{future, Future};
-use guac_core::channel_client::types::{NewChannelTx, ReDrawTx, UpdateTx};
+use guac_core::channel_client::types::{NewChannelTx, ReDrawTx};
 use guac_core::BlockchainApi;
 use num256::Uint256;
 use web3::client::Web3;
@@ -62,14 +62,6 @@ impl BlockchainClient {
         topic1: Option<Vec<[u8; 32]>>,
         topic2: Option<Vec<[u8; 32]>>,
     ) -> Box<Future<Item = Option<Log>, Error = Error>> {
-        // self.get_event(
-        //     event,
-        //     topic1,
-        //     topic2,
-        //     Some("0".to_string()),
-        //     Some("Latest".to_string()),
-        // )
-
         let web3 = self.web3.clone();
 
         // Build a filter with specified topics
@@ -163,15 +155,6 @@ impl BlockchainClient {
                             signature: None,
                         },
                     };
-                    // let transaction = Transaction {
-                    //     to: contract_address,
-                    //     nonce: nonce,
-                    //     gas_price: gas_price.into(),
-                    //     gas_limit: 6721975u32.into(),
-                    //     value: 0u64.into(),
-                    //     data: data,
-                    //     signature: None,
-                    // };
 
                     let transaction = transaction.sign(&secret, Some(1u64));
 
@@ -181,58 +164,6 @@ impl BlockchainClient {
         )
     }
 }
-
-// fn broadcast_transaction(
-//     &self,
-//     action: Action,
-//     value: Uint256,
-// ) -> Box<Future<Item = Uint256, Error = Error>> {
-//     // We're not relying on web3 signing functionality. Here we're do the signing ourselves.
-//     let props = self
-//         .get_network_id()
-//         .join3(self.get_gas_price(), self.get_nonce());
-//     // let instance = self.read().unwrap();
-//     let contract = self.read().unwrap().contract.clone();
-//     let secret = self.read().unwrap().secret.clone();
-//     // let web3 = self.web3().clone();
-
-//     Box::new(
-//         props
-//             .and_then(move |(network_id, gas_price, nonce)| {
-// let transaction = match action {
-//     Action::To(address) => Transaction {
-//         to: address.clone(),
-//         nonce: nonce,
-//         gas_price: gas_price.into(),
-//         gas_limit: 6721975u32.into(),
-//         value: value,
-//         data: Vec::new(),
-//         signature: None,
-//     },
-//     Action::Call(data) => Transaction {
-//         to: contract.clone(),
-//         nonce: nonce,
-//         gas_price: gas_price.into(),
-//         gas_limit: 6721975u32.into(),
-//         value: value,
-//         data: data,
-//         signature: None,
-//     },
-// };
-
-//                 let transaction = transaction.sign(&secret, Some(network_id.parse().unwrap()));
-
-//                 CRYPTO
-//                     .web3()
-//                     .eth_send_raw_transaction(transaction.to_bytes().unwrap())
-//                 // .into_future()
-//                 // .map_err(GuacError::from)
-//                 // .and_then(|tx| ok(format!("0x{:x}", tx).parse().unwrap()))
-//                 // .from_err()
-//             })
-//             .into_future(),
-//     )
-// }
 
 impl BlockchainApi for BlockchainClient {
     fn new_channel(

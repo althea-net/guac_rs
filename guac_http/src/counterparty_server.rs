@@ -1,4 +1,3 @@
-use actix_web::error::ErrorPreconditionFailed;
 use actix_web::http::Method;
 use actix_web::*;
 
@@ -16,7 +15,7 @@ use futures::Future;
 //     Err => ok(HttpResponse::InternalServerError().finish()),
 // })
 
-fn convert_error(err: failure::Error) -> HttpResponse {
+fn convert_error(err: Error) -> HttpResponse {
     match err.downcast::<GuacError>() {
         Ok(guac_err) => match guac_err {
             GuacError::Forbidden { message } => HttpResponse::Forbidden().body(message),
@@ -93,7 +92,3 @@ pub fn init_server(port: u16, guac: Guac) {
     .unwrap()
     .start();
 }
-
-// fn my_func() -> Box<Future<Item = (), Error = Error>> {
-//     Box::new(future::ok(()))
-// }

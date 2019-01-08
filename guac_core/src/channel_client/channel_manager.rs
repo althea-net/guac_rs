@@ -4,7 +4,7 @@ use crate::channel_client::types::UpdateTx;
 use crate::channel_client::types::{Counterparty, GuacError, NewChannelTx, ReDrawTx};
 use clarity::{Address, Signature};
 
-use crate::new_crypto::Crypto;
+use crate::crypto::Crypto;
 use failure::Error;
 use futures::{future, Future};
 use num256::Uint256;
@@ -309,9 +309,7 @@ impl UserApi for Guac {
                         Box::new(
                             counterparty_client
                                 .receive_payment(crypto.own_address, url.clone(), update_tx.clone())
-                                .and_then(move |their_update_tx| {
-                                    // channel.receive_payment_ack(&their_update_tx)?;
-
+                                .and_then(move |_| {
                                     *counterparty = Counterparty::Open { channel, url };
                                     Ok(())
                                 }),

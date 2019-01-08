@@ -21,23 +21,10 @@ mod counterparty_client;
 mod counterparty_server;
 
 use crate::blockchain_client::BlockchainClient;
-use crate::config::CONFIG;
 use crate::counterparty_client::CounterpartyClient;
-use actix::System;
-use clarity::utils::hex_str_to_bytes;
 use clarity::{Address, PrivateKey};
-use failure::Error;
-use futures::{future, Future};
-use guac_core::types::Counterparty;
-use guac_core::UserApi;
 use guac_core::{Crypto, Guac, Storage};
-use num256::Uint256;
-use std::env;
 use std::sync::Arc;
-use web3::client::Web3;
-
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[macro_export]
 macro_rules! try_future_box {
@@ -82,6 +69,17 @@ pub fn init_guac(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::CONFIG;
+    use actix::System;
+    use failure::Error;
+    use futures::{future, Future};
+    use guac_core::types::Counterparty;
+    use guac_core::UserApi;
+    use num256::Uint256;
+    use web3::client::Web3;
+
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     fn make_nodes() -> (Guac, Guac) {
         let contract_addr: Address = CONFIG.contract_address.parse().unwrap();
