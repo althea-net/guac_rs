@@ -24,6 +24,7 @@ extern crate actix_web;
 extern crate futures_timer;
 #[cfg(test)]
 extern crate mockito;
+extern crate num;
 extern crate num256;
 extern crate sha3;
 extern crate tokio;

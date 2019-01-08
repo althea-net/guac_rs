@@ -1,10 +1,9 @@
-use crate::channel_client::combined_state::CombinedState;
+use crate::channel_client::channel::Channel;
+// use crate::channel_client::combined_state::CombinedState;
 use crate::channel_client::types::UpdateTx;
 use crate::channel_client::types::{Counterparty, GuacError, NewChannelTx, ReDrawTx};
-use crate::channel_client::Channel;
-use clarity::{Address, PrivateKey, Signature};
+use clarity::{Address, Signature};
 
-use crate::new_crypto;
 use crate::new_crypto::Crypto;
 use failure::Error;
 use futures::{future, Future};
@@ -103,7 +102,7 @@ pub trait CounterpartyApi {
         from_address: Address,
         to_url: String,
         update_tx: UpdateTx,
-    ) -> Box<Future<Item = UpdateTx, Error = Error>>;
+    ) -> Box<Future<Item = (), Error = Error>>;
 }
 
 impl UserApi for Guac {
@@ -193,20 +192,14 @@ impl UserApi for Guac {
                                                 .notify_channel_opened(my_address, url.clone())
                                                 .and_then(move |()| {
                                                     *counterparty = Counterparty::Open {
-                                                        channel: CombinedState::new(&Channel {
+                                                        channel: Channel {
                                                             channel_id,
-                                                            address_0,
-                                                            address_1,
-                                                            total_balance: balance_0.clone()
-                                                                + balance_1.clone(),
+                                                            sequence_number: 0u8.into(),
                                                             balance_0,
                                                             balance_1,
-                                                            sequence_number: 0u64.into(),
-                                                            settling_period_length: 5000u64.into(),
-                                                            settling_period_started: false,
-                                                            settling_period_end: 0u64.into(),
                                                             i_am_0,
-                                                        }),
+                                                            accrual: 0u8.into(),
+                                                        },
                                                         url: url.clone(),
                                                     };
                                                     Ok(())
@@ -218,20 +211,20 @@ impl UserApi for Guac {
                     Counterparty::Open { channel, url } => {
                         let url = url.clone();
 
-                        let balance_0 = channel.my_state.balance_0.clone();
-                        let balance_1 = channel.my_state.balance_1.clone();
+                        let balance_0 = channel.balance_0.clone();
+                        let balance_1 = channel.balance_1.clone();
 
-                        let (new_balance_0, new_balance_1) = if channel.my_state.i_am_0 {
+                        let (new_balance_0, new_balance_1) = if channel.i_am_0 {
                             (balance_0 + amount, balance_1)
                         } else {
                             (balance_0, balance_1 + amount)
                         };
 
                         let re_draw_tx = ReDrawTx {
-                            channel_id: channel.my_state.channel_id.clone(),
-                            sequence_number: channel.my_state.sequence_number.clone(),
-                            old_balance_0: channel.my_state.balance_0.clone(),
-                            old_balance_1: channel.my_state.balance_1.clone(),
+                            channel_id: channel.channel_id.clone(),
+                            sequence_number: channel.sequence_number.clone(),
+                            old_balance_0: channel.balance_0.clone(),
+                            old_balance_1: channel.balance_1.clone(),
                             new_balance_0: new_balance_0.clone(),
                             new_balance_1: new_balance_1.clone(),
                             expiration: 9999999999u64.into(), //TODO: get current block plus some,
@@ -255,12 +248,11 @@ impl UserApi for Guac {
                                         re_draw_tx: re_draw_tx.clone(),
                                         url: url.clone(),
                                     };
-                                    let (signature_0, signature_1) =
-                                        if channel.clone().my_state.i_am_0 {
-                                            (my_signature, their_signature)
-                                        } else {
-                                            (their_signature, my_signature)
-                                        };
+                                    let (signature_0, signature_1) = if channel.clone().i_am_0 {
+                                        (my_signature, their_signature)
+                                    } else {
+                                        (their_signature, my_signature)
+                                    };
 
                                     blockchain_client
                                         .re_draw(ReDrawTx {
@@ -275,12 +267,12 @@ impl UserApi for Guac {
                                                     // Save the new open state of the channel
                                                     *counterparty = Counterparty::Open {
                                                         url: url.clone(),
-                                                        channel: CombinedState::new(&Channel {
+                                                        channel: Channel {
                                                             // TODO: what else changes here?
                                                             balance_0: new_balance_0.clone(),
                                                             balance_1: new_balance_1.clone(),
-                                                            ..channel.my_state
-                                                        }),
+                                                            ..channel
+                                                        },
                                                     };
                                                     Ok(())
                                                 })
@@ -311,14 +303,14 @@ impl UserApi for Guac {
             move |mut counterparty| {
                 match counterparty.clone() {
                     Counterparty::Open { mut channel, url } => {
-                        try_future_box!(channel.make_payment(amount));
-                        let update_tx = try_future_box!(channel.create_update());
+                        // try_future_box!(channel.make_payment(amount, None));
+                        let update_tx = try_future_box!(channel.make_payment(amount, None));
 
                         Box::new(
                             counterparty_client
                                 .receive_payment(crypto.own_address, url.clone(), update_tx.clone())
                                 .and_then(move |their_update_tx| {
-                                    channel.receive_payment_ack(&their_update_tx)?;
+                                    // channel.receive_payment_ack(&their_update_tx)?;
 
                                     *counterparty = Counterparty::Open { channel, url };
                                     Ok(())
@@ -490,51 +482,51 @@ impl CounterpartyApi for Guac {
                                 } = re_draw_tx;
 
                                 forbidden!(
-                                    channel_id == channel.my_state.channel_id,
+                                    channel_id == channel.channel_id,
                                     format!(
                                         "Channel ID ({:?}) should equal my saved channel ID ({:?})",
-                                        channel_id, channel.my_state.channel_id
+                                        channel_id, channel.channel_id
                                     )
                                 );
 
                                 forbidden!(
-                                    sequence_number > channel.my_state.sequence_number,
+                                    sequence_number > channel.sequence_number,
                                     format!(
                                         "Sequence number ({}) should be higher than {}",
-                                        sequence_number, channel.my_state.sequence_number
+                                        sequence_number, channel.sequence_number
                                     )
                                 );
 
                                 forbidden!(
-                                    old_balance_0 == channel.my_state.balance_0,
+                                    old_balance_0 == channel.balance_0,
                                     format!(
                                         "Old balance_0 ({}) should equal {}",
-                                        old_balance_0, channel.my_state.balance_0
+                                        old_balance_0, channel.balance_0
                                     )
                                 );
 
                                 forbidden!(
-                                    old_balance_1 == channel.my_state.balance_1,
+                                    old_balance_1 == channel.balance_1,
                                     format!(
                                         "Old balance_1 ({}) should equal {}",
-                                        old_balance_1, channel.my_state.balance_1
+                                        old_balance_1, channel.balance_1
                                     )
                                 );
 
-                                if channel.my_state.i_am_0 {
+                                if channel.i_am_0 {
                                     forbidden!(
-                                        new_balance_0 == channel.my_state.balance_0,
+                                        new_balance_0 == channel.balance_0,
                                         format!(
                                             "New balance_0 ({}) should equal my balance ({})",
-                                            new_balance_0, channel.my_state.balance_0
+                                            new_balance_0, channel.balance_0
                                         )
                                     );
                                 } else {
                                     forbidden!(
-                                        new_balance_1 == channel.my_state.balance_1,
+                                        new_balance_1 == channel.balance_1,
                                         format!(
                                             "New balance_1 ({}) should equal my balance ({})",
-                                            new_balance_1, channel.my_state.balance_1
+                                            new_balance_1, channel.balance_1
                                         )
                                     );
                                 }
@@ -597,21 +589,14 @@ impl CounterpartyApi for Guac {
                                     .and_then(move |maybe_channel_id| {
                                         if let Some(channel_id) = maybe_channel_id {
                                             *counterparty = Counterparty::Open {
-                                                channel: CombinedState::new(&Channel {
+                                                channel: Channel {
                                                     channel_id,
-                                                    address_0,
-                                                    address_1,
-                                                    total_balance: new_channel_tx.clone().balance_0
-                                                        + new_channel_tx.clone().balance_1,
+                                                    sequence_number: 0u64.into(),
                                                     balance_0: new_channel_tx.balance_0,
                                                     balance_1: new_channel_tx.balance_1,
-                                                    sequence_number: 0u64.into(),
-                                                    settling_period_length: new_channel_tx
-                                                        .settling_period_length,
-                                                    settling_period_end: 0u64.into(),
-                                                    settling_period_started: false,
                                                     i_am_0,
-                                                }),
+                                                    accrual: 0u64.into(),
+                                                },
                                                 url,
                                             };
                                             Ok(())
@@ -653,17 +638,15 @@ impl CounterpartyApi for Guac {
                             channel,
                         } => Box::new(
                             blockchain_client
-                                .check_for_re_draw(channel.my_state.channel_id)
+                                .check_for_re_draw(channel.channel_id)
                                 .and_then(move |_| {
                                     *counterparty = Counterparty::Open {
-                                        channel: CombinedState::new(&Channel {
-                                            total_balance: re_draw_tx.new_balance_0.clone()
-                                                + re_draw_tx.new_balance_1.clone(),
+                                        channel: Channel {
                                             balance_0: re_draw_tx.new_balance_0,
                                             balance_1: re_draw_tx.new_balance_1,
                                             sequence_number: re_draw_tx.sequence_number.clone(),
-                                            ..channel.my_state
-                                        }),
+                                            ..channel
+                                        },
                                         url,
                                     };
                                     Ok(())
@@ -688,7 +671,7 @@ impl CounterpartyApi for Guac {
         from_address: Address,
         _to_url: String,
         update_tx: UpdateTx,
-    ) -> Box<Future<Item = UpdateTx, Error = Error>> {
+    ) -> Box<Future<Item = (), Error = Error>> {
         let storage = self.storage.clone();
         Box::new(
             storage
@@ -697,13 +680,12 @@ impl CounterpartyApi for Guac {
                     match counterparty.clone() {
                         Counterparty::Open { url, mut channel } => {
                             Box::new(future::ok(()).and_then(move |_| {
-                                let my_update_tx = channel.receive_payment(&update_tx);
+                                channel.receive_payment(&update_tx)?;
 
                                 *counterparty = Counterparty::Open { channel, url };
 
-                                my_update_tx
-                            }))
-                                as Box<Future<Item = UpdateTx, Error = Error>>
+                                Ok(())
+                            })) as Box<Future<Item = (), Error = Error>>
                         }
                         _ => {
                             let error = GuacError::WrongState {
@@ -712,7 +694,7 @@ impl CounterpartyApi for Guac {
                                 action: "receive payment".to_string(),
                             };
                             return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
-                                as Box<Future<Item = UpdateTx, Error = Error>>;
+                                as Box<Future<Item = (), Error = Error>>;
                         }
                     }
                 }),

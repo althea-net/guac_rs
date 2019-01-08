@@ -169,7 +169,7 @@ impl CounterpartyApi for CounterpartyClient {
         from_address: Address,
         to_url: String,
         update_tx: UpdateTx,
-    ) -> Box<Future<Item = UpdateTx, Error = Error>> {
+    ) -> Box<Future<Item = (), Error = Error>> {
         let to_url: Result<SocketAddr, std::net::AddrParseError> = to_url.parse();
         let to_url: SocketAddr = try_future_box!(to_url);
         // Prepare an endpoint for sending a proposal
@@ -185,12 +185,7 @@ impl CounterpartyApi for CounterpartyClient {
                 .send()
                 .from_err()
                 .and_then(verify_client_error)
-                .and_then(move |response| {
-                    response
-                        .json()
-                        .from_err()
-                        .and_then(move |res: UpdateTx| Ok(res))
-                })
-        })) as Box<Future<Item = UpdateTx, Error = Error>>
+                .and_then(move |_| Ok(()))
+        })) as Box<Future<Item = (), Error = Error>>
     }
 }

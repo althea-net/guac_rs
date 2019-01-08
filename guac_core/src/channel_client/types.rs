@@ -1,7 +1,6 @@
-use crate::channel_client::combined_state::CombinedState;
+use crate::channel_client::channel::Channel;
 use crate::new_crypto;
 use clarity::{Address, Signature};
-use failure::Error;
 use num256::Uint256;
 
 #[derive(Debug, Fail)]
@@ -23,6 +22,8 @@ pub enum GuacError {
     Forbidden { message: String },
     #[fail(display = "Update too old.")]
     UpdateTooOld(),
+    #[fail(display = "Not enough {}", stuff)]
+    NotEnough { stuff: String },
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
@@ -43,21 +44,17 @@ pub enum Counterparty {
     },
     ReDrawing {
         re_draw_tx: ReDrawTx,
-        channel: CombinedState,
+        channel: Channel,
         url: String,
-        // i_am_0: bool,
     },
     OtherReDrawing {
         re_draw_tx: ReDrawTx,
-        channel: CombinedState,
+        channel: Channel,
         url: String,
-        // i_am_0: bool,
     },
     Open {
-        // last_update_tx:
-        channel: CombinedState,
+        channel: Channel,
         url: String,
-        // i_am_0: bool,
     },
 }
 
@@ -149,90 +146,90 @@ impl ReDrawTx {
     }
 }
 
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-pub struct Channel {
-    pub channel_id: [u8; 32],
-    pub address_0: Address,
-    pub address_1: Address,
+// #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+// pub struct Channel {
+//     pub channel_id: [u8; 32],
+//     pub address_0: Address,
+//     pub address_1: Address,
 
-    pub total_balance: Uint256,
-    pub balance_0: Uint256,
-    pub balance_1: Uint256,
-    pub sequence_number: Uint256,
+//     pub total_balance: Uint256,
+//     pub balance_0: Uint256,
+//     pub balance_1: Uint256,
+//     pub sequence_number: Uint256,
 
-    pub settling_period_length: Uint256,
-    pub settling_period_started: bool,
-    pub settling_period_end: Uint256,
-    pub i_am_0: bool,
-}
+//     pub settling_period_length: Uint256,
+//     pub settling_period_started: bool,
+//     pub settling_period_end: Uint256,
+//     pub i_am_0: bool,
+// }
 
-impl Channel {
-    pub fn my_balance(&self) -> &Uint256 {
-        match self.i_am_0 {
-            true => &self.balance_0,
-            false => &self.balance_1,
-        }
-    }
-    pub fn their_balance(&self) -> &Uint256 {
-        match self.i_am_0 {
-            true => &self.balance_1,
-            false => &self.balance_0,
-        }
-    }
-    pub fn my_balance_mut(&mut self) -> &mut Uint256 {
-        match self.i_am_0 {
-            true => &mut self.balance_0,
-            false => &mut self.balance_1,
-        }
-    }
-    pub fn their_balance_mut(&mut self) -> &mut Uint256 {
-        match self.i_am_0 {
-            true => &mut self.balance_1,
-            false => &mut self.balance_0,
-        }
-    }
+// impl Channel {
+//     pub fn my_balance(&self) -> &Uint256 {
+//         match self.i_am_0 {
+//             true => &self.balance_0,
+//             false => &self.balance_1,
+//         }
+//     }
+//     pub fn their_balance(&self) -> &Uint256 {
+//         match self.i_am_0 {
+//             true => &self.balance_1,
+//             false => &self.balance_0,
+//         }
+//     }
+//     pub fn my_balance_mut(&mut self) -> &mut Uint256 {
+//         match self.i_am_0 {
+//             true => &mut self.balance_0,
+//             false => &mut self.balance_1,
+//         }
+//     }
+//     pub fn their_balance_mut(&mut self) -> &mut Uint256 {
+//         match self.i_am_0 {
+//             true => &mut self.balance_1,
+//             false => &mut self.balance_0,
+//         }
+//     }
 
-    pub fn create_update(&self) -> UpdateTx {
-        UpdateTx {
-            channel_id: self.channel_id.clone(),
-            sequence_number: self.sequence_number.clone(),
-            balance_0: self.balance_0.clone(),
-            balance_1: self.balance_1.clone(),
-            signature_0: None,
-            signature_1: None,
-        }
-    }
+//     pub fn create_update(&self) -> UpdateTx {
+//         UpdateTx {
+//             channel_id: self.channel_id.clone(),
+//             sequence_number: self.sequence_number.clone(),
+//             balance_0: self.balance_0.clone(),
+//             balance_1: self.balance_1.clone(),
+//             signature_0: None,
+//             signature_1: None,
+//         }
+//     }
 
-    pub fn apply_update(&mut self, update: &UpdateTx, validate_balance: bool) -> Result<(), Error> {
-        if update.channel_id != self.channel_id {
-            bail!("update not for the right channel")
-        }
+//     pub fn apply_update(&mut self, update: &UpdateTx, validate_balance: bool) -> Result<(), Error> {
+//         if update.channel_id != self.channel_id {
+//             bail!("update not for the right channel")
+//         }
 
-        if !update.validate_their_signature(self.i_am_0) {
-            bail!("sig is bad")
-        }
+//         if !update.validate_their_signature(self.i_am_0) {
+//             bail!("sig is bad")
+//         }
 
-        ensure!(
-            update.their_balance(self.i_am_0).clone() + update.my_balance(self.i_am_0).clone()
-                == self.total_balance,
-            "balances do not add up to total balance"
-        );
+//         ensure!(
+//             update.their_balance(self.i_am_0).clone() + update.my_balance(self.i_am_0).clone()
+//                 == self.total_balance,
+//             "balances do not add up to total balance"
+//         );
 
-        if self.sequence_number < update.sequence_number {
-            return Err(GuacError::UpdateTooOld().into());
-        }
+//         if self.sequence_number < update.sequence_number {
+//             return Err(GuacError::UpdateTooOld().into());
+//         }
 
-        if update.my_balance(self.i_am_0) < self.my_balance() && validate_balance {
-            bail!("balance validation failed")
-        }
+//         if update.my_balance(self.i_am_0) < self.my_balance() && validate_balance {
+//             bail!("balance validation failed")
+//         }
 
-        self.balance_0 = update.balance_0.clone();
-        self.balance_1 = update.balance_1.clone();
-        self.sequence_number = update.sequence_number.clone();
+//         self.balance_0 = update.balance_0.clone();
+//         self.balance_1 = update.balance_1.clone();
+//         self.sequence_number = update.sequence_number.clone();
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct UpdateTx {
