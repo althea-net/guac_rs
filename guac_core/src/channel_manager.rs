@@ -234,7 +234,7 @@ impl UserApi for Guac {
 
                         let re_draw_tx = ReDrawTx {
                             channel_id: channel.channel_id.clone(),
-                            sequence_number: channel.sequence_number.clone(),
+                            sequence_number: channel.sequence_number.clone() + 1u64.into(),
                             old_balance_0: channel.balance_0.clone(),
                             old_balance_1: channel.balance_1.clone(),
                             new_balance_0: new_balance_0.clone(),
@@ -243,9 +243,6 @@ impl UserApi for Guac {
                             signature_0: None,
                             signature_1: None,
                         };
-
-                        let my_signature =
-                            crypto.eth_sign(&re_draw_tx.fingerprint(crypto.contract_address));
 
                         Box::new(
                             counterparty_client
@@ -260,6 +257,10 @@ impl UserApi for Guac {
                                         re_draw_tx: re_draw_tx.clone(),
                                         url: url.clone(),
                                     };
+
+                                    let my_signature = crypto
+                                        .eth_sign(&re_draw_tx.fingerprint(crypto.contract_address));
+
                                     let (signature_0, signature_1) = if channel.clone().i_am_0 {
                                         (my_signature, their_signature)
                                     } else {

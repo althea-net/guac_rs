@@ -138,7 +138,9 @@ impl Channel {
     /// from the counterparty. Packet loss of payments from us to the counterparty can result in
     /// this returning an innacurate value. If Alice tries to pay Bob 5, but the payment gets lost,
     /// when Bob sends Alice a payment for 5, it will appear to Alice as if Bob was paying her 10,
-    /// since she doesn't know that he didn't get her payment. Also, more intuitively, Bob will not
+    /// since she doesn't know that he didn't get her payment.
+    ///
+    /// Also, more intuitively, Bob will not
     /// have gotten Alice's payment, so his accrual will be lower than it would be if he had. In
     /// many cases this would actually be the more serious problem.
     ///
