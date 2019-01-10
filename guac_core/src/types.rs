@@ -123,7 +123,7 @@ pub struct ReDrawTx {
 
 impl ReDrawTx {
     pub fn fingerprint(&self, contract_address: Address) -> [u8; 32] {
-        let func_name: &[u8] = "ReDraw".as_bytes();
+        let func_name: &[u8] = "reDraw".as_bytes();
         let contract_address: &[u8] = contract_address.as_bytes();
         let channel_id: [u8; 32] = self.channel_id.clone().into();
         let sequence_number: [u8; 32] = self.sequence_number.clone().into();
