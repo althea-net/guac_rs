@@ -14,103 +14,30 @@
           "kind": "lib"
         }
       },
-      "args": [],
+      "args": ["test_unidirectional"],
       "cwd": "${workspaceFolder}"
     },
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'guac_core' module channel_manager",
+      "name": "Debug unit tests in library 'guac_http'",
       "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=guac_core"],
-        "filter": {
-          "kind": "lib"
-        }
-      },
-      "args": ["bidirectional_simple"],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug test 'contract_test'",
-      "cargo": {
-        "args": ["build", "--test=contract_test", "--package=guac_core"],
-        "filter": {
-          "kind": "test"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in test 'contract_test'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--test=contract_test",
-          "--package=guac_core"
-        ],
-        "filter": {
-          "kind": "test"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in library 'guac_actix'",
-      "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=guac_actix"],
+        "args": ["test", "--no-run", "--lib", "--package=guac_http"],
         "filter": {
           "kind": "lib"
         }
       },
       "args": [],
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "RUST_TEST_THREADS": 1
-      }
+      "cwd": "${workspaceFolder}"
     },
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug individual unit tests in library 'guac_actix'",
+      "name": "Debug unit tests in library 'web3'",
       "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=guac_actix"],
+        "args": ["test", "--no-run", "--lib", "--package=web3"],
         "filter": {
           "kind": "lib"
-        }
-      },
-      "args": ["make_payment"],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'guac_http'",
-      "cargo": {
-        "args": ["build", "--bin=guac_http", "--package=guac_http"],
-        "filter": {
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'guac_http'",
-      "cargo": {
-        "args": ["test", "--no-run", "--bin=guac_http", "--package=guac_http"],
-        "filter": {
-          "kind": "bin"
         }
       },
       "args": [],

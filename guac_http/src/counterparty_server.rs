@@ -19,6 +19,7 @@ fn convert_error(err: Error) -> HttpResponse {
     match err.downcast::<GuacError>() {
         Ok(guac_err) => match guac_err {
             GuacError::Forbidden { message } => HttpResponse::Forbidden().body(message),
+            GuacError::UpdateTooOld { correct_seq } => HttpResponse::Conflict().json(correct_seq),
             _ => HttpResponse::InternalServerError().finish(),
         },
         Err(_) => HttpResponse::InternalServerError().finish(),

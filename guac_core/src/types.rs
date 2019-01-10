@@ -9,6 +9,7 @@ pub enum GuacError {
         display = "Guac is currently waiting on another operation to complete. Try again later."
     )]
     TryAgainLater(),
+
     #[fail(
         display = "Cannot {} in the current state: {}. State must be: {}",
         action, current_state, correct_state
@@ -18,10 +19,13 @@ pub enum GuacError {
         current_state: String,
         correct_state: String,
     },
+
     #[fail(display = "Invalid request: {}", message)]
     Forbidden { message: String },
-    #[fail(display = "Update too old.")]
-    UpdateTooOld(),
+
+    #[fail(display = "Update too old. Correct sequence number: {}", correct_seq)]
+    UpdateTooOld { correct_seq: Uint256 },
+
     #[fail(display = "Not enough {}", stuff)]
     NotEnough { stuff: String },
 }
