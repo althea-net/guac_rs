@@ -28,6 +28,9 @@ pub enum GuacError {
 
     #[fail(display = "Not enough {}", stuff)]
     NotEnough { stuff: String },
+
+    #[fail(display = "Something has gone wrong: {}", message)]
+    Error { message: String },
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]

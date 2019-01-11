@@ -12,6 +12,13 @@ use num256::Uint256;
 use crate::storage::Storage;
 use std::sync::Arc;
 
+/// Todo:
+/// - Test sequence number correction routine
+/// - Set reasonable expiration on new channel and redraw txs
+/// - Implement expiration timer in state machine
+/// - Get rid of useless "register counterparty" step
+/// - Deal with incorrect accrual in packet loss scenario
+
 macro_rules! try_future_box {
     ($expression:expr) => {
         match $expression {
@@ -114,7 +121,7 @@ pub trait CounterpartyApi {
         from_address: Address,
         to_url: String,
         update_tx: UpdateTx,
-    ) -> Box<Future<Item = (), Error = Error>>;
+    ) -> Box<Future<Item = Option<Uint256>, Error = Error>>;
 }
 
 impl UserApi for Guac {
@@ -317,14 +324,42 @@ impl UserApi for Guac {
                 match counterparty.clone() {
                     Counterparty::Open { mut channel, url } => {
                         // try_future_box!(channel.make_payment(amount, None));
-                        let update_tx = try_future_box!(channel.make_payment(amount, None));
+                        let update_tx = try_future_box!(channel.make_payment(amount.clone(), None));
 
                         Box::new(
                             counterparty_client
                                 .receive_payment(crypto.own_address, url.clone(), update_tx.clone())
-                                .and_then(move |_| {
-                                    *counterparty = Counterparty::Open { channel, url };
-                                    Ok(())
+                                .and_then(move |res: Option<Uint256>| {
+                                    if let Some(current_seq) = res {
+                                        let update_tx = try_future_box!(
+                                            channel.make_payment(amount, Some(current_seq))
+                                        );
+
+                                        Box::new(
+                                            counterparty_client
+                                                .receive_payment(
+                                                    crypto.own_address,
+                                                    url.clone(),
+                                                    update_tx.clone(),
+                                                )
+                                                .and_then(move |res: Option<Uint256>| {
+                                                    if let Some(_) = res {
+                                                        Err(GuacError::Error {
+                                                            message: "Sequence number disagreement"
+                                                                .to_string(),
+                                                        }
+                                                        .into())
+                                                    } else {
+                                                        Ok(())
+                                                    }
+                                                }),
+                                        )
+                                            as Box<Future<Item = (), Error = Error>>
+                                    } else {
+                                        *counterparty = Counterparty::Open { channel, url };
+                                        Box::new(future::ok(()))
+                                            as Box<Future<Item = (), Error = Error>>
+                                    }
                                 }),
                         ) as Box<Future<Item = (), Error = Error>>
                     }
@@ -682,7 +717,7 @@ impl CounterpartyApi for Guac {
         from_address: Address,
         _to_url: String,
         update_tx: UpdateTx,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> Box<Future<Item = Option<Uint256>, Error = Error>> {
         let storage = self.storage.clone();
         Box::new(
             storage
@@ -691,12 +726,13 @@ impl CounterpartyApi for Guac {
                     match counterparty.clone() {
                         Counterparty::Open { url, mut channel } => {
                             Box::new(future::ok(()).and_then(move |_| {
-                                channel.receive_payment(&update_tx)?;
+                                let maybe_seq = channel.receive_payment(&update_tx)?;
 
                                 *counterparty = Counterparty::Open { channel, url };
 
-                                Ok(())
-                            })) as Box<Future<Item = (), Error = Error>>
+                                Ok(maybe_seq)
+                            }))
+                                as Box<Future<Item = Option<Uint256>, Error = Error>>
                         }
                         _ => {
                             let error = GuacError::WrongState {
@@ -705,7 +741,7 @@ impl CounterpartyApi for Guac {
                                 action: "receive payment".to_string(),
                             };
                             return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
-                                as Box<Future<Item = (), Error = Error>>;
+                                as Box<Future<Item = Option<Uint256>, Error = Error>>;
                         }
                     }
                 }),

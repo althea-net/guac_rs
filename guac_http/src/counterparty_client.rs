@@ -7,6 +7,7 @@ use failure::Error;
 use futures::{future, Future};
 use guac_core::types::{NewChannelTx, ReDrawTx, UpdateTx};
 use guac_core::CounterpartyApi;
+use num256::Uint256;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
@@ -158,7 +159,7 @@ impl CounterpartyApi for CounterpartyClient {
         from_address: Address,
         to_url: String,
         update_tx: UpdateTx,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> Box<Future<Item = Option<Uint256>, Error = Error>> {
         let to_url: Result<SocketAddr, std::net::AddrParseError> = to_url.parse();
         let to_url: SocketAddr = try_future_box!(to_url);
         // Prepare an endpoint for sending a proposal
@@ -174,7 +175,12 @@ impl CounterpartyApi for CounterpartyClient {
                 .send()
                 .from_err()
                 .and_then(verify_client_error)
-                .and_then(move |_| Ok(()))
-        })) as Box<Future<Item = (), Error = Error>>
+                .and_then(move |response| {
+                    response
+                        .json()
+                        .from_err()
+                        .and_then(move |res: Option<Uint256>| Ok(res))
+                })
+        })) as Box<Future<Item = Option<Uint256>, Error = Error>>
     }
 }
