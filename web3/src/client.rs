@@ -46,8 +46,10 @@ impl Web3 {
             .request_method("eth_newFilter", vec![new_filter])
     }
     pub fn eth_uninstall_filter(&self, filter: Uint256) -> Box<Future<Item = bool, Error = Error>> {
-        self.jsonrpc_client
-            .request_method("eth_uninstallFilter", vec![filter])
+        self.jsonrpc_client.request_method(
+            "eth_uninstallFilter",
+            vec![format!("{:#x}", filter.clone())],
+        )
     }
     pub fn eth_get_filter_changes(
         &self,
@@ -61,7 +63,10 @@ impl Web3 {
                     jsonrpc_client
                         .clone()
                         // Call eth_getFilterChanges every second
-                        .request_method("eth_getFilterChanges", vec![filter.clone()])
+                        .request_method(
+                            "eth_getFilterChanges",
+                            vec![format!("{:#x}", filter.clone())],
+                        )
                         // Convert list of logs into a Future of Stream
                         .map(move |logs: Vec<Log>| stream::iter_ok(logs.into_iter()))
                         .into_future()
