@@ -321,4 +321,8 @@ impl BlockchainApi for BlockchainClient {
             .map(|_| ());
         Box::new(call)
     }
+
+    fn get_current_block(&self) -> Box<Future<Item = Uint256, Error = Error>> {
+        self.web3.eth_block_number()
+    }
 }

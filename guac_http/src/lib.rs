@@ -26,6 +26,8 @@ use clarity::{Address, PrivateKey};
 use guac_core::{Crypto, Guac, Storage};
 use std::sync::Arc;
 
+use std::{thread, time};
+
 #[macro_export]
 macro_rules! try_future_box {
     ($expression:expr) => {
@@ -157,26 +159,6 @@ mod tests {
                 .and_then(move |s| {
                     *snapshot_id.borrow_mut() = s;
                     make_and_fill_channel(guac_1, guac_2)
-                    // guac_1
-                    //     .register_counterparty(guac_2.crypto.own_address, "[::1]:8882".to_string())
-                    //     .and_then(move |_| {
-                    //         guac_2
-                    //             .register_counterparty(
-                    //                 guac_1.crypto.own_address,
-                    //                 "[::1]:8881".to_string(),
-                    //             )
-                    //             .and_then(move |_| {
-                    //                 guac_1
-                    //                     .blockchain_client
-                    //                     .quick_deposit(64u64.into())
-                    //                     .and_then(move |_| {
-                    //                         guac_1.fill_channel(
-                    //                             guac_2.crypto.own_address,
-                    //                             5u64.into(),
-                    //                         )
-                    //                     })
-                    //             })
-                    //     })
                 })
                 .then(move |res| {
                     let snapshot_id_2 = snapshot_id_2.borrow().clone();
