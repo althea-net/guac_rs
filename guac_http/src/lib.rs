@@ -204,11 +204,24 @@ mod tests {
                                 .blockchain_client
                                 .quick_deposit(64u64.into())
                                 .and_then(move |_| {
-                                    guac_1.fill_channel(
-                                        guac_2.crypto.own_address,
-                                        "[::1]:8882".to_string(),
-                                        5u64.into(),
-                                    )
+                                    guac_1
+                                        .fill_channel(
+                                            guac_2.crypto.own_address,
+                                            "[::1]:8882".to_string(),
+                                            5u64.into(),
+                                        )
+                                        .and_then(move |_| {
+                                            guac_2
+                                                .blockchain_client
+                                                .quick_deposit(64u64.into())
+                                                .and_then(move |_| {
+                                                    guac_2.fill_channel(
+                                                        guac_1.crypto.own_address,
+                                                        "[::1]:8881".to_string(),
+                                                        5u64.into(),
+                                                    )
+                                                })
+                                        })
                                 })
                         })
                 }),
@@ -272,11 +285,20 @@ mod tests {
                 .and_then(move |s| {
                     *snapshot_id.borrow_mut() = s;
                     make_and_fill_channel(guac_1.clone(), guac_2.clone()).and_then(move |_| {
-                        guac_1.make_payment(
-                            guac_2.crypto.own_address,
-                            "[::1]:8882".to_string(),
-                            1u64.into(),
-                        )
+                        guac_2
+                            .make_payment(
+                                guac_1.crypto.own_address,
+                                "[::1]:8881".to_string(),
+                                1u64.into(),
+                            )
+                            .and_then(move |_| {
+                                println!("helloooooooo");
+                                guac_1.make_payment(
+                                    guac_2.crypto.own_address,
+                                    "[::1]:8882".to_string(),
+                                    1u64.into(),
+                                )
+                            })
                     })
                 })
                 .then(move |res| {
