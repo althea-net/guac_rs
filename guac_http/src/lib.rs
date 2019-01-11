@@ -118,7 +118,7 @@ mod tests {
 
         actix::spawn(
             guac_1
-                .register_counterparty(guac_2.crypto.own_address, "example.com".to_string())
+                .register_counterparty(guac_2.crypto.own_address)
                 .then(move |res| {
                     res.unwrap();
 
@@ -128,10 +128,7 @@ mod tests {
                             .wait()
                             .unwrap()
                             .clone(),
-                        Counterparty::New {
-                            i_am_0: true,
-                            url: "example.com".to_string()
-                        }
+                        Counterparty::New { i_am_0: true }
                     );
 
                     System::current().stop();
@@ -198,16 +195,20 @@ mod tests {
     fn make_and_fill_channel(guac_1: Guac, guac_2: Guac) -> Box<Future<Item = (), Error = Error>> {
         Box::new(
             guac_1
-                .register_counterparty(guac_2.crypto.own_address, "[::1]:8882".to_string())
+                .register_counterparty(guac_2.crypto.own_address)
                 .and_then(move |_| {
                     guac_2
-                        .register_counterparty(guac_1.crypto.own_address, "[::1]:8881".to_string())
+                        .register_counterparty(guac_1.crypto.own_address)
                         .and_then(move |_| {
                             guac_1
                                 .blockchain_client
                                 .quick_deposit(64u64.into())
                                 .and_then(move |_| {
-                                    guac_1.fill_channel(guac_2.crypto.own_address, 5u64.into())
+                                    guac_1.fill_channel(
+                                        guac_2.crypto.own_address,
+                                        "[::1]:8882".to_string(),
+                                        5u64.into(),
+                                    )
                                 })
                         })
                 }),
@@ -215,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn test_make_payment() {
+    fn test_make_payment_simple() {
         let system = actix::System::new("test");
 
         let (guac_1, guac_2) = make_nodes();
@@ -232,7 +233,50 @@ mod tests {
                 .and_then(move |s| {
                     *snapshot_id.borrow_mut() = s;
                     make_and_fill_channel(guac_1.clone(), guac_2.clone()).and_then(move |_| {
-                        guac_1.make_payment(guac_2.crypto.own_address, 1u64.into())
+                        guac_1.make_payment(
+                            guac_2.crypto.own_address,
+                            "[::1]:8882".to_string(),
+                            1u64.into(),
+                        )
+                    })
+                })
+                .then(move |res| {
+                    let snapshot_id_2 = snapshot_id_2.borrow().clone();
+                    web4.evm_revert(snapshot_id_2).then(|_| {
+                        res.unwrap();
+
+                        System::current().stop();
+                        Box::new(future::ok(()))
+                    })
+                }),
+        );
+
+        system.run();
+    }
+
+    #[test]
+    fn test_make_payment_packet_loss() {
+        let system = actix::System::new("test");
+
+        let (guac_1, guac_2) = make_nodes();
+
+        let _storage_1 = guac_1.storage.clone();
+        let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
+        let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
+
+        let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
+        let snapshot_id_2 = snapshot_id.clone();
+
+        actix::spawn(
+            web3.evm_snapshot()
+                .and_then(move |s| {
+                    *snapshot_id.borrow_mut() = s;
+                    make_and_fill_channel(guac_1.clone(), guac_2.clone()).and_then(move |_| {
+                        guac_1.make_payment(
+                            guac_2.crypto.own_address,
+                            "[::1]:8882".to_string(),
+                            1u64.into(),
+                        )
                     })
                 })
                 .then(move |res| {
@@ -268,9 +312,17 @@ mod tests {
                     *snapshot_id.borrow_mut() = s;
                     make_and_fill_channel(guac_1.clone(), guac_2.clone()).and_then(move |_| {
                         guac_1
-                            .make_payment(guac_2.crypto.own_address, 1u64.into())
+                            .make_payment(
+                                guac_2.crypto.own_address,
+                                "[::1]:8882".to_string(),
+                                1u64.into(),
+                            )
                             .and_then(move |_| {
-                                guac_1.fill_channel(guac_2.crypto.own_address, 1u64.into())
+                                guac_1.fill_channel(
+                                    guac_2.crypto.own_address,
+                                    "[::1]:8882".to_string(),
+                                    1u64.into(),
+                                )
                             })
                     })
                 })

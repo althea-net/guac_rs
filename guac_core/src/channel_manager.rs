@@ -74,17 +74,19 @@ pub trait UserApi {
     fn register_counterparty(
         &self,
         their_address: Address,
-        url: String,
     ) -> Box<Future<Item = (), Error = Error>>;
+
     fn fill_channel(
         &self,
         their_address: Address,
+        their_url: String,
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>>;
 
     fn make_payment(
         &self,
         their_address: Address,
+        their_url: String,
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>>;
 }
@@ -128,7 +130,6 @@ impl UserApi for Guac {
     fn register_counterparty(
         &self,
         their_address: Address,
-        url: String,
     ) -> Box<Future<Item = (), Error = Error>> {
         let storage = self.storage.clone();
         let crypto = self.crypto.clone();
@@ -136,7 +137,6 @@ impl UserApi for Guac {
         Box::new(storage.new_counterparty(
             their_address.clone(),
             Counterparty::New {
-                url,
                 i_am_0: crypto.own_address < their_address,
             },
         ))
@@ -145,6 +145,7 @@ impl UserApi for Guac {
     fn fill_channel(
         &self,
         their_address: Address,
+        their_url: String,
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>> {
         let counterparty_client = self.counterparty_client.clone();
@@ -155,7 +156,7 @@ impl UserApi for Guac {
         Box::new(storage.get_counterparty(their_address.clone()).and_then(
             move |mut counterparty| {
                 match counterparty.clone() {
-                    Counterparty::New { i_am_0, url } => {
+                    Counterparty::New { i_am_0 } => {
                         let my_address = crypto.own_address;
 
                         let (address_0, address_1) = if i_am_0 {
@@ -186,7 +187,11 @@ impl UserApi for Guac {
 
                         Box::new(
                             counterparty_client
-                                .propose_channel(my_address, url.clone(), new_channel_tx.clone())
+                                .propose_channel(
+                                    my_address,
+                                    their_url.clone(),
+                                    new_channel_tx.clone(),
+                                )
                                 .and_then(move |their_signature| {
                                     let (signature_0, signature_1) = if i_am_0 {
                                         (my_signature, their_signature)
@@ -197,7 +202,6 @@ impl UserApi for Guac {
                                     *counterparty = Counterparty::Creating {
                                         new_channel_tx: new_channel_tx.clone(),
                                         i_am_0,
-                                        url: url.clone(),
                                     };
 
                                     blockchain_client
@@ -208,7 +212,10 @@ impl UserApi for Guac {
                                         })
                                         .and_then(move |channel_id| {
                                             counterparty_client
-                                                .notify_channel_opened(my_address, url.clone())
+                                                .notify_channel_opened(
+                                                    my_address,
+                                                    their_url.clone(),
+                                                )
                                                 .and_then(move |()| {
                                                     *counterparty = Counterparty::Open {
                                                         channel: Channel {
@@ -219,7 +226,6 @@ impl UserApi for Guac {
                                                             i_am_0,
                                                             accrual: 0u8.into(),
                                                         },
-                                                        url: url.clone(),
                                                     };
                                                     Ok(())
                                                 })
@@ -227,9 +233,7 @@ impl UserApi for Guac {
                                 }),
                         ) as Box<Future<Item = (), Error = Error>>
                     }
-                    Counterparty::Open { channel, url } => {
-                        let url = url.clone();
-
+                    Counterparty::Open { channel } => {
                         let balance_0 = channel.balance_0.clone();
                         let balance_1 = channel.balance_1.clone();
 
@@ -255,14 +259,13 @@ impl UserApi for Guac {
                             counterparty_client
                                 .propose_re_draw(
                                     crypto.own_address,
-                                    url.clone(),
+                                    their_url.clone(),
                                     re_draw_tx.clone(),
                                 )
                                 .and_then(move |their_signature| {
                                     *counterparty = Counterparty::ReDrawing {
                                         channel: channel.clone(),
                                         re_draw_tx: re_draw_tx.clone(),
-                                        url: url.clone(),
                                     };
 
                                     let my_signature = crypto
@@ -282,11 +285,13 @@ impl UserApi for Guac {
                                         })
                                         .and_then(move |_| {
                                             counterparty_client
-                                                .notify_re_draw(crypto.own_address, url.clone())
+                                                .notify_re_draw(
+                                                    crypto.own_address,
+                                                    their_url.clone(),
+                                                )
                                                 .and_then(move |_| {
                                                     // Save the new open state of the channel
                                                     *counterparty = Counterparty::Open {
-                                                        url: url.clone(),
                                                         channel: Channel {
                                                             // TODO: what else changes here?
                                                             balance_0: new_balance_0.clone(),
@@ -313,6 +318,7 @@ impl UserApi for Guac {
     fn make_payment(
         &self,
         their_address: Address,
+        their_url: String,
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>> {
         let storage = self.storage.clone();
@@ -322,13 +328,17 @@ impl UserApi for Guac {
         Box::new(storage.get_counterparty(their_address.clone()).and_then(
             move |mut counterparty| {
                 match counterparty.clone() {
-                    Counterparty::Open { mut channel, url } => {
+                    Counterparty::Open { mut channel } => {
                         // try_future_box!(channel.make_payment(amount, None));
                         let update_tx = try_future_box!(channel.make_payment(amount.clone(), None));
 
                         Box::new(
                             counterparty_client
-                                .receive_payment(crypto.own_address, url.clone(), update_tx.clone())
+                                .receive_payment(
+                                    crypto.own_address,
+                                    their_url.clone(),
+                                    update_tx.clone(),
+                                )
                                 .and_then(move |res: Option<Uint256>| {
                                     if let Some(current_seq) = res {
                                         let update_tx = try_future_box!(
@@ -339,7 +349,7 @@ impl UserApi for Guac {
                                             counterparty_client
                                                 .receive_payment(
                                                     crypto.own_address,
-                                                    url.clone(),
+                                                    their_url.clone(),
                                                     update_tx.clone(),
                                                 )
                                                 .and_then(move |res: Option<Uint256>| {
@@ -356,7 +366,7 @@ impl UserApi for Guac {
                                         )
                                             as Box<Future<Item = (), Error = Error>>
                                     } else {
-                                        *counterparty = Counterparty::Open { channel, url };
+                                        *counterparty = Counterparty::Open { channel };
                                         Box::new(future::ok(()))
                                             as Box<Future<Item = (), Error = Error>>
                                     }
@@ -396,7 +406,7 @@ impl CounterpartyApi for Guac {
                 .get_counterparty(from_address.clone())
                 .and_then(move |mut counterparty| {
                     match counterparty.clone() {
-                        Counterparty::New { url, i_am_0 } => {
+                        Counterparty::New { i_am_0 } => {
                             Box::new(
                                 future::ok(())
                                     .and_then(move |_| {
@@ -467,7 +477,6 @@ impl CounterpartyApi for Guac {
                                         *counterparty = Counterparty::OtherCreating {
                                             i_am_0,
                                             new_channel_tx: new_channel_tx_clone_2.clone(),
-                                            url,
                                         };
 
                                         let my_signature = crypto.eth_sign(
@@ -507,7 +516,7 @@ impl CounterpartyApi for Guac {
                 .get_counterparty(from_address.clone())
                 .and_then(move |mut counterparty| {
                     match counterparty.clone() {
-                        Counterparty::Open { url, channel } => {
+                        Counterparty::Open { channel } => {
                             let channel_clone_1 = channel.clone();
                             let re_draw_tx_clone_1 = re_draw_tx.clone();
                             Box::new(future::ok(()).and_then(move |_| {
@@ -580,7 +589,6 @@ impl CounterpartyApi for Guac {
                                 *counterparty = Counterparty::OtherReDrawing {
                                     channel: channel_clone_1,
                                     re_draw_tx: re_draw_tx_clone_1.clone(),
-                                    url,
                                 };
 
                                 let my_signature = crypto.eth_sign(
@@ -620,7 +628,6 @@ impl CounterpartyApi for Guac {
                     match counterparty.clone() {
                         Counterparty::OtherCreating {
                             i_am_0,
-                            url,
                             new_channel_tx,
                         } => {
                             let (address_0, address_1) = if i_am_0 {
@@ -643,7 +650,6 @@ impl CounterpartyApi for Guac {
                                                     i_am_0,
                                                     accrual: 0u64.into(),
                                                 },
-                                                url,
                                             };
                                             Ok(())
                                         } else {
@@ -679,7 +685,6 @@ impl CounterpartyApi for Guac {
                 .and_then(move |mut counterparty| {
                     match counterparty.clone() {
                         Counterparty::OtherReDrawing {
-                            url,
                             re_draw_tx,
                             channel,
                         } => Box::new(
@@ -693,7 +698,6 @@ impl CounterpartyApi for Guac {
                                             sequence_number: re_draw_tx.sequence_number.clone(),
                                             ..channel
                                         },
-                                        url,
                                     };
                                     Ok(())
                                 }),
@@ -724,11 +728,11 @@ impl CounterpartyApi for Guac {
                 .get_counterparty(from_address.clone())
                 .and_then(move |mut counterparty| {
                     match counterparty.clone() {
-                        Counterparty::Open { url, mut channel } => {
+                        Counterparty::Open { mut channel } => {
                             Box::new(future::ok(()).and_then(move |_| {
                                 let maybe_seq = channel.receive_payment(&update_tx)?;
 
-                                *counterparty = Counterparty::Open { channel, url };
+                                *counterparty = Counterparty::Open { channel };
 
                                 Ok(maybe_seq)
                             }))

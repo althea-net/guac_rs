@@ -36,32 +36,26 @@ pub enum GuacError {
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Counterparty {
     New {
-        url: String,
         i_am_0: bool,
     },
     Creating {
         new_channel_tx: NewChannelTx,
-        url: String,
         i_am_0: bool,
     },
     OtherCreating {
         new_channel_tx: NewChannelTx,
-        url: String,
         i_am_0: bool,
     },
     ReDrawing {
         re_draw_tx: ReDrawTx,
         channel: Channel,
-        url: String,
     },
     OtherReDrawing {
         re_draw_tx: ReDrawTx,
         channel: Channel,
-        url: String,
     },
     Open {
         channel: Channel,
-        url: String,
     },
 }
 
