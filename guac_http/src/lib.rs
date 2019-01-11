@@ -275,7 +275,6 @@ mod tests {
                                 1u64.into(),
                             )
                             .then(move |_| {
-                                println!("helloooooooo");
                                 guac_1.make_payment(
                                     guac_2.crypto.own_address,
                                     "[::1]:8882".to_string(),
