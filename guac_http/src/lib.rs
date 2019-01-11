@@ -288,10 +288,11 @@ mod tests {
                         guac_2
                             .make_payment(
                                 guac_1.crypto.own_address,
-                                "[::1]:8881".to_string(),
+                                // intentionally wrong address
+                                "[::1]:8883".to_string(),
                                 1u64.into(),
                             )
-                            .and_then(move |_| {
+                            .then(move |_| {
                                 println!("helloooooooo");
                                 guac_1.make_payment(
                                     guac_2.crypto.own_address,
