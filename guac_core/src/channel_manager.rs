@@ -90,6 +90,10 @@ pub trait UserApi {
         their_url: String,
         amount: Uint256,
     ) -> Box<Future<Item = (), Error = Error>>;
+
+    fn check_accrual(&self, their_address: Address) -> Box<Future<Item = Uint256, Error = Error>>;
+
+    fn get_state(&self, their_address: Address) -> Box<Future<Item = Counterparty, Error = Error>>;
 }
 
 pub trait CounterpartyApi {
@@ -128,6 +132,75 @@ pub trait CounterpartyApi {
 }
 
 impl UserApi for Guac {
+    fn check_accrual(&self, their_address: Address) -> Box<Future<Item = Uint256, Error = Error>> {
+        let storage = self.storage.clone();
+
+        Box::new(
+            storage
+                .get_counterparty(their_address.clone())
+                .and_then(|mut counterparty| match counterparty.clone() {
+                    Counterparty::Open { channel, .. } => {
+                        return Box::new(future::ok(()).and_then(move |_| {
+                            let mut channel = channel.clone();
+                            let accrual = channel.check_accrual();
+                            *counterparty = Counterparty::Open { channel }; // How do i make it save the right variant?
+                            Ok(accrual)
+                        }))
+                            as Box<Future<Item = Uint256, Error = Error>>;
+                    }
+                    Counterparty::ReDrawing {
+                        channel,
+                        re_draw_tx,
+                    } => {
+                        return Box::new(future::ok(()).and_then(move |_| {
+                            let mut channel = channel.clone();
+                            let accrual = channel.check_accrual();
+                            *counterparty = Counterparty::ReDrawing {
+                                channel,
+                                re_draw_tx,
+                            }; // How do i make it save the right variant?
+                            Ok(accrual)
+                        }))
+                            as Box<Future<Item = Uint256, Error = Error>>;
+                    }
+                    Counterparty::OtherReDrawing {
+                        channel,
+                        re_draw_tx,
+                    } => {
+                        return Box::new(future::ok(()).and_then(move |_| {
+                            let mut channel = channel.clone();
+                            let accrual = channel.check_accrual();
+                            *counterparty = Counterparty::OtherReDrawing {
+                                channel,
+                                re_draw_tx,
+                            }; // How do i make it save the right variant?
+                            Ok(accrual)
+                        }))
+                            as Box<Future<Item = Uint256, Error = Error>>;
+                    }
+                    _ => {
+                        let error = GuacError::WrongState {
+                            correct_state: "Open".to_string(),
+                            current_state: format!("{:?}", counterparty.clone()),
+                            action: "check_accrual".to_string(),
+                        };
+                        return Box::new(future::err(error.into()))
+                            as Box<Future<Item = Uint256, Error = Error>>;
+                    }
+                }),
+        )
+    }
+
+    fn get_state(&self, their_address: Address) -> Box<Future<Item = Counterparty, Error = Error>> {
+        let storage = self.storage.clone();
+
+        Box::new(
+            storage
+                .get_counterparty(their_address.clone())
+                .and_then(|counterparty| Ok(counterparty.clone())),
+        )
+    }
+
     fn register_counterparty(
         &self,
         their_address: Address,
@@ -396,8 +469,8 @@ impl UserApi for Guac {
                             current_state: format!("{:?}", counterparty.clone()),
                             action: "make payment".to_string(),
                         };
-                        return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
-                                as Box<Future<Item = (), Error = Error>>;
+                        return Box::new(future::err(error.into()))
+                            as Box<Future<Item = (), Error = Error>>;
                     }
                 }
             },
@@ -511,7 +584,7 @@ impl CounterpartyApi for Guac {
                                 current_state: format!("{:?}", counterparty.clone()),
                                 action: "propose channel".to_string(),
                             };
-                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
+                            return Box::new(future::err(error.into()))
                                 as Box<Future<Item = Signature, Error = Error>>;
                         }
                     }
@@ -531,100 +604,96 @@ impl CounterpartyApi for Guac {
         Box::new(
             storage
                 .get_counterparty(from_address.clone())
-                .and_then(move |mut counterparty| {
-                    match counterparty.clone() {
-                        Counterparty::Open { channel } => {
-                            let channel_clone_1 = channel.clone();
-                            let re_draw_tx_clone_1 = re_draw_tx.clone();
-                            Box::new(future::ok(()).and_then(move |_| {
-                                let ReDrawTx {
-                                    channel_id,
+                .and_then(move |mut counterparty| match counterparty.clone() {
+                    Counterparty::Open { channel } => {
+                        let channel_clone_1 = channel.clone();
+                        let re_draw_tx_clone_1 = re_draw_tx.clone();
+                        Box::new(future::ok(()).and_then(move |_| {
+                            let ReDrawTx {
+                                channel_id,
 
-                                    sequence_number,
-                                    old_balance_0,
-                                    old_balance_1,
+                                sequence_number,
+                                old_balance_0,
+                                old_balance_1,
 
-                                    new_balance_0,
-                                    new_balance_1,
+                                new_balance_0,
+                                new_balance_1,
 
-                                    expiration: _,
+                                expiration: _,
 
-                                    signature_0: _,
-                                    signature_1: _,
-                                } = re_draw_tx;
+                                signature_0: _,
+                                signature_1: _,
+                            } = re_draw_tx;
 
+                            forbidden!(
+                                channel_id == channel.channel_id,
+                                format!(
+                                    "Channel ID ({:?}) should equal my saved channel ID ({:?})",
+                                    channel_id, channel.channel_id
+                                )
+                            );
+
+                            forbidden!(
+                                sequence_number > channel.sequence_number,
+                                format!(
+                                    "Sequence number ({}) should be higher than {}",
+                                    sequence_number, channel.sequence_number
+                                )
+                            );
+
+                            forbidden!(
+                                old_balance_0 == channel.balance_0,
+                                format!(
+                                    "Old balance_0 ({}) should equal {}",
+                                    old_balance_0, channel.balance_0
+                                )
+                            );
+
+                            forbidden!(
+                                old_balance_1 == channel.balance_1,
+                                format!(
+                                    "Old balance_1 ({}) should equal {}",
+                                    old_balance_1, channel.balance_1
+                                )
+                            );
+
+                            if channel.i_am_0 {
                                 forbidden!(
-                                    channel_id == channel.channel_id,
+                                    new_balance_0 == channel.balance_0,
                                     format!(
-                                        "Channel ID ({:?}) should equal my saved channel ID ({:?})",
-                                        channel_id, channel.channel_id
+                                        "New balance_0 ({}) should equal my balance ({})",
+                                        new_balance_0, channel.balance_0
                                     )
                                 );
-
+                            } else {
                                 forbidden!(
-                                    sequence_number > channel.sequence_number,
+                                    new_balance_1 == channel.balance_1,
                                     format!(
-                                        "Sequence number ({}) should be higher than {}",
-                                        sequence_number, channel.sequence_number
+                                        "New balance_1 ({}) should equal my balance ({})",
+                                        new_balance_1, channel.balance_1
                                     )
                                 );
+                            }
 
-                                forbidden!(
-                                    old_balance_0 == channel.balance_0,
-                                    format!(
-                                        "Old balance_0 ({}) should equal {}",
-                                        old_balance_0, channel.balance_0
-                                    )
-                                );
-
-                                forbidden!(
-                                    old_balance_1 == channel.balance_1,
-                                    format!(
-                                        "Old balance_1 ({}) should equal {}",
-                                        old_balance_1, channel.balance_1
-                                    )
-                                );
-
-                                if channel.i_am_0 {
-                                    forbidden!(
-                                        new_balance_0 == channel.balance_0,
-                                        format!(
-                                            "New balance_0 ({}) should equal my balance ({})",
-                                            new_balance_0, channel.balance_0
-                                        )
-                                    );
-                                } else {
-                                    forbidden!(
-                                        new_balance_1 == channel.balance_1,
-                                        format!(
-                                            "New balance_1 ({}) should equal my balance ({})",
-                                            new_balance_1, channel.balance_1
-                                        )
-                                    );
-                                }
-
-                                *counterparty = Counterparty::OtherReDrawing {
-                                    channel: channel_clone_1,
-                                    re_draw_tx: re_draw_tx_clone_1.clone(),
-                                };
-
-                                let my_signature = crypto.eth_sign(
-                                    &re_draw_tx_clone_1.fingerprint(crypto.contract_address),
-                                );
-
-                                future::ok(my_signature)
-                            }))
-                                as Box<Future<Item = Signature, Error = Error>>
-                        }
-                        _ => {
-                            let error = GuacError::WrongState {
-                                correct_state: "Open".to_string(),
-                                current_state: format!("{:?}", counterparty.clone()),
-                                action: "propose redraw".to_string(),
+                            *counterparty = Counterparty::OtherReDrawing {
+                                channel: channel_clone_1,
+                                re_draw_tx: re_draw_tx_clone_1.clone(),
                             };
-                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
-                                as Box<Future<Item = Signature, Error = Error>>;
-                        }
+
+                            let my_signature = crypto
+                                .eth_sign(&re_draw_tx_clone_1.fingerprint(crypto.contract_address));
+
+                            future::ok(my_signature)
+                        })) as Box<Future<Item = Signature, Error = Error>>
+                    }
+                    _ => {
+                        let error = GuacError::WrongState {
+                            correct_state: "Open".to_string(),
+                            current_state: format!("{:?}", counterparty.clone()),
+                            action: "propose redraw".to_string(),
+                        };
+                        return Box::new(future::err(error.into()))
+                            as Box<Future<Item = Signature, Error = Error>>;
                     }
                 }),
         )
@@ -641,49 +710,47 @@ impl CounterpartyApi for Guac {
         Box::new(
             storage
                 .get_counterparty(from_address.clone())
-                .and_then(move |mut counterparty| {
-                    match counterparty.clone() {
-                        Counterparty::OtherCreating {
-                            i_am_0,
-                            new_channel_tx,
-                        } => {
-                            let (address_0, address_1) = if i_am_0 {
-                                (crypto.own_address, from_address.clone())
-                            } else {
-                                (from_address.clone(), crypto.own_address)
-                            };
+                .and_then(move |mut counterparty| match counterparty.clone() {
+                    Counterparty::OtherCreating {
+                        i_am_0,
+                        new_channel_tx,
+                    } => {
+                        let (address_0, address_1) = if i_am_0 {
+                            (crypto.own_address, from_address.clone())
+                        } else {
+                            (from_address.clone(), crypto.own_address)
+                        };
 
-                            Box::new(
-                                blockchain_client
-                                    .check_for_open(&address_0, &address_1)
-                                    .and_then(move |maybe_channel_id| {
-                                        if let Some(channel_id) = maybe_channel_id {
-                                            *counterparty = Counterparty::Open {
-                                                channel: Channel {
-                                                    channel_id,
-                                                    sequence_number: 0u64.into(),
-                                                    balance_0: new_channel_tx.balance_0,
-                                                    balance_1: new_channel_tx.balance_1,
-                                                    i_am_0,
-                                                    accrual: 0u64.into(),
-                                                },
-                                            };
-                                            Ok(())
-                                        } else {
-                                            bail!("Cannot confirm that channel was opened");
-                                        }
-                                    }),
-                            ) as Box<Future<Item = (), Error = Error>>
-                        }
-                        _ => {
-                            let error = GuacError::WrongState {
-                                correct_state: "OtherCreating".to_string(),
-                                current_state: format!("{:?}", counterparty.clone()),
-                                action: "notify channel opened".to_string(),
-                            };
-                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
-                                as Box<Future<Item = (), Error = Error>>;
-                        }
+                        Box::new(
+                            blockchain_client
+                                .check_for_open(&address_0, &address_1)
+                                .and_then(move |maybe_channel_id| {
+                                    if let Some(channel_id) = maybe_channel_id {
+                                        *counterparty = Counterparty::Open {
+                                            channel: Channel {
+                                                channel_id,
+                                                sequence_number: 0u64.into(),
+                                                balance_0: new_channel_tx.balance_0,
+                                                balance_1: new_channel_tx.balance_1,
+                                                i_am_0,
+                                                accrual: 0u64.into(),
+                                            },
+                                        };
+                                        Ok(())
+                                    } else {
+                                        bail!("Cannot confirm that channel was opened");
+                                    }
+                                }),
+                        ) as Box<Future<Item = (), Error = Error>>
+                    }
+                    _ => {
+                        let error = GuacError::WrongState {
+                            correct_state: "OtherCreating".to_string(),
+                            current_state: format!("{:?}", counterparty.clone()),
+                            action: "notify channel opened".to_string(),
+                        };
+                        return Box::new(future::err(error.into()))
+                            as Box<Future<Item = (), Error = Error>>;
                     }
                 }),
         )
@@ -699,35 +766,33 @@ impl CounterpartyApi for Guac {
         Box::new(
             storage
                 .get_counterparty(from_address.clone())
-                .and_then(move |mut counterparty| {
-                    match counterparty.clone() {
-                        Counterparty::OtherReDrawing {
-                            re_draw_tx,
-                            channel,
-                        } => Box::new(
-                            blockchain_client
-                                .check_for_re_draw(channel.channel_id)
-                                .and_then(move |_| {
-                                    *counterparty = Counterparty::Open {
-                                        channel: Channel {
-                                            balance_0: re_draw_tx.new_balance_0,
-                                            balance_1: re_draw_tx.new_balance_1,
-                                            sequence_number: re_draw_tx.sequence_number.clone(),
-                                            ..channel
-                                        },
-                                    };
-                                    Ok(())
-                                }),
-                        ) as Box<Future<Item = (), Error = Error>>,
-                        _ => {
-                            let error = GuacError::WrongState {
-                                correct_state: "OtherReDrawing".to_string(),
-                                current_state: format!("{:?}", counterparty.clone()),
-                                action: "notify redraw".to_string(),
-                            };
-                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
-                                as Box<Future<Item = (), Error = Error>>;
-                        }
+                .and_then(move |mut counterparty| match counterparty.clone() {
+                    Counterparty::OtherReDrawing {
+                        re_draw_tx,
+                        channel,
+                    } => Box::new(
+                        blockchain_client
+                            .check_for_re_draw(channel.channel_id)
+                            .and_then(move |_| {
+                                *counterparty = Counterparty::Open {
+                                    channel: Channel {
+                                        balance_0: re_draw_tx.new_balance_0,
+                                        balance_1: re_draw_tx.new_balance_1,
+                                        sequence_number: re_draw_tx.sequence_number.clone(),
+                                        ..channel
+                                    },
+                                };
+                                Ok(())
+                            }),
+                    ) as Box<Future<Item = (), Error = Error>>,
+                    _ => {
+                        let error = GuacError::WrongState {
+                            correct_state: "OtherReDrawing".to_string(),
+                            current_state: format!("{:?}", counterparty.clone()),
+                            action: "notify redraw".to_string(),
+                        };
+                        return Box::new(future::err(error.into()))
+                            as Box<Future<Item = (), Error = Error>>;
                     }
                 }),
         )
@@ -743,27 +808,25 @@ impl CounterpartyApi for Guac {
         Box::new(
             storage
                 .get_counterparty(from_address.clone())
-                .and_then(move |mut counterparty| {
-                    match counterparty.clone() {
-                        Counterparty::Open { mut channel } => {
-                            Box::new(future::ok(()).and_then(move |_| {
-                                let maybe_seq = channel.receive_payment(&update_tx)?;
+                .and_then(move |mut counterparty| match counterparty.clone() {
+                    Counterparty::Open { mut channel } => {
+                        Box::new(future::ok(()).and_then(move |_| {
+                            let maybe_seq = channel.receive_payment(&update_tx)?;
 
-                                *counterparty = Counterparty::Open { channel };
+                            *counterparty = Counterparty::Open { channel };
 
-                                Ok(maybe_seq)
-                            }))
-                                as Box<Future<Item = Option<Uint256>, Error = Error>>
-                        }
-                        _ => {
-                            let error = GuacError::WrongState {
-                                correct_state: "Open".to_string(),
-                                current_state: format!("{:?}", counterparty.clone()),
-                                action: "receive payment".to_string(),
-                            };
-                            return Box::new(future::err(error.into())) // TODO: Design a better set of errors, and when to use them
-                                as Box<Future<Item = Option<Uint256>, Error = Error>>;
-                        }
+                            Ok(maybe_seq)
+                        }))
+                            as Box<Future<Item = Option<Uint256>, Error = Error>>
+                    }
+                    _ => {
+                        let error = GuacError::WrongState {
+                            correct_state: "Open".to_string(),
+                            current_state: format!("{:?}", counterparty.clone()),
+                            action: "receive payment".to_string(),
+                        };
+                        return Box::new(future::err(error.into()))
+                            as Box<Future<Item = Option<Uint256>, Error = Error>>;
                     }
                 }),
         )
