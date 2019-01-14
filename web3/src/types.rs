@@ -147,7 +147,7 @@ pub struct TransactionRequest {
     // Integer of the value sent with this transaction
     pub value: Option<Uint256>,
     // The compiled code of a contract OR the hash of the invoked method signature and encoded parameters. For details see Ethereum Contract ABI
-    pub data: Option<String>,
+    pub data: Option<Data>,
     //  This allows to overwrite your own pending transactions that use the same nonce.
     pub nonce: Option<Uint256>,
 }

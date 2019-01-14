@@ -11,7 +11,7 @@ use guac_core::types::{NewChannelTx, ReDrawTx};
 use guac_core::BlockchainApi;
 use num256::Uint256;
 use web3::client::Web3;
-use web3::types::{Log, NewFilter};
+use web3::types::{Data, Log, NewFilter, TransactionRequest};
 
 fn bytes_to_data(s: &[u8]) -> String {
     let mut foo = "0x".to_string();
@@ -166,6 +166,41 @@ impl BlockchainClient {
 }
 
 impl BlockchainApi for BlockchainClient {
+    fn balance_of(&self) -> Box<Future<Item = Uint256, Error = Error>> {
+        let web3 = self.web3.clone();
+        let contract_address = self.contract_address.clone();
+        let own_address = self.own_address.clone();
+        let secret = self.secret.clone();
+
+        let props = web3
+            .eth_gas_price()
+            .join(web3.eth_get_transaction_count(own_address));
+
+        let payload = encode_call("balanceOf(address)", &[own_address.into()]);
+
+        Box::new(
+            props
+                .and_then(move |(gas_price, nonce)| {
+                    let transaction = TransactionRequest {
+                        from: own_address,
+                        to: Some(contract_address),
+                        nonce: Some(nonce),
+                        gas: None,
+                        gas_price: gas_price.into(),
+                        // gas_limit: 6721975u32.into(),
+                        value: Some(0u64.into()),
+                        data: Some(Data(payload)),
+
+                        // signature: None,
+                    };
+                    // let transaction = transaction.sign(&secret, Some(1u64));
+                    web3.eth_call(transaction)
+                })
+                .and_then(|bytes| Ok(Uint256::from_bytes_be(&bytes)))
+                // .into_future(),
+        )
+    }
+
     fn new_channel(
         &self,
         new_channel_tx: NewChannelTx,

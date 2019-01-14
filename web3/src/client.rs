@@ -16,6 +16,7 @@ use futures_timer::Interval;
 use num256::Uint256;
 use std::sync::Arc;
 use std::time::Duration;
+use types::Data;
 
 /// An instance of Web3Client.
 #[derive(Clone)]
@@ -111,6 +112,13 @@ impl Web3 {
     ) -> Box<Future<Item = Uint256, Error = Error>> {
         self.jsonrpc_client
             .request_method("eth_sendTransaction", transactions)
+    }
+    pub fn eth_call(
+        &self,
+        transaction: TransactionRequest,
+    ) -> Box<Future<Item = Data, Error = Error>> {
+        self.jsonrpc_client
+            .request_method("eth_call", vec![transaction])
     }
     pub fn eth_block_number(&self) -> Box<Future<Item = Uint256, Error = Error>> {
         self.jsonrpc_client

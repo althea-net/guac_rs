@@ -24,6 +24,7 @@ use crate::blockchain_client::BlockchainClient;
 use crate::counterparty_client::CounterpartyClient;
 use clarity::{Address, PrivateKey};
 use guac_core::{Crypto, Guac, Storage};
+use num256::Uint256;
 use std::sync::Arc;
 
 use std::{thread, time};
@@ -38,6 +39,12 @@ macro_rules! try_future_box {
             Ok(value) => value,
         }
     };
+}
+
+fn eth_to_wei(eth: u64) -> Uint256 {
+    let eth: Uint256 = eth.into();
+    let mult = 1000000000000000000u64.into();
+    eth * mult
 }
 
 pub fn init_guac(
@@ -184,23 +191,23 @@ mod tests {
                         .and_then(move |_| {
                             guac_1
                                 .blockchain_client
-                                .quick_deposit(64u64.into())
+                                .quick_deposit(eth_to_wei(10))
                                 .and_then(move |_| {
                                     guac_1
                                         .fill_channel(
                                             guac_2.crypto.own_address,
                                             "[::1]:8882".to_string(),
-                                            5u64.into(),
+                                            eth_to_wei(5),
                                         )
                                         .and_then(move |_| {
                                             guac_2
                                                 .blockchain_client
-                                                .quick_deposit(64u64.into())
+                                                .quick_deposit(eth_to_wei(10))
                                                 .and_then(move |_| {
                                                     guac_2.fill_channel(
                                                         guac_1.crypto.own_address,
                                                         "[::1]:8881".to_string(),
-                                                        5u64.into(),
+                                                        eth_to_wei(5),
                                                     )
                                                 })
                                         })
@@ -231,7 +238,7 @@ mod tests {
                         guac_1.make_payment(
                             guac_2.crypto.own_address,
                             "[::1]:8882".to_string(),
-                            1u64.into(),
+                            eth_to_wei(1),
                         )
                     })
                 })
@@ -327,6 +334,76 @@ mod tests {
                                     "[::1]:8882".to_string(),
                                     1u64.into(),
                                 )
+                            })
+                    })
+                })
+                .then(move |res| {
+                    let snapshot_id_2 = snapshot_id_2.borrow().clone();
+                    web4.evm_revert(snapshot_id_2).then(|_| {
+                        res.unwrap();
+
+                        System::current().stop();
+                        Box::new(future::ok(()))
+                    })
+                }),
+        );
+
+        system.run();
+    }
+
+    #[test]
+    fn test_withdraw_channel() {
+        let system = actix::System::new("test");
+
+        let (guac_1, guac_2) = make_nodes();
+
+        let _storage_1 = guac_1.storage.clone();
+        let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
+        let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
+
+        let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
+        let snapshot_id_2 = snapshot_id.clone();
+
+        actix::spawn(
+            web3.evm_snapshot()
+                .and_then(move |s| {
+                    *snapshot_id.borrow_mut() = s;
+                    make_and_fill_channel(guac_1.clone(), guac_2.clone()).and_then(move |_| {
+                        guac_1
+                            .make_payment(
+                                guac_2.crypto.own_address,
+                                "[::1]:8882".to_string(),
+                                eth_to_wei(1),
+                            )
+                            .and_then(move |_| {
+                                guac_1
+                                    .withdraw(
+                                        guac_2.crypto.own_address,
+                                        "[::1]:8882".to_string(),
+                                        eth_to_wei(4),
+                                    )
+                                    .and_then(move |_| {
+                                        guac_2
+                                            .withdraw(
+                                                guac_1.crypto.own_address,
+                                                "[::1]:8881".to_string(),
+                                                eth_to_wei(6),
+                                            )
+                                            .and_then(move |_| {
+                                                guac_1.blockchain_client.balance_of().and_then(
+                                                    move |balance| {
+                                                        assert_eq!(balance, eth_to_wei(9));
+                                                        guac_2
+                                                            .blockchain_client
+                                                            .balance_of()
+                                                            .and_then(move |balance| {
+                                                                assert_eq!(balance, eth_to_wei(11));
+                                                                Ok(())
+                                                            })
+                                                    },
+                                                )
+                                            })
+                                    })
                             })
                     })
                 })
