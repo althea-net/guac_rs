@@ -119,13 +119,13 @@ impl BlockchainClient {
         )
     }
 
-    fn broadcast_transaction(
+    fn send_raw_transaction(
         &self,
-        action: Action,
+        to_address: Address,
+        data: Vec<u8>,
         value: Uint256,
     ) -> Box<Future<Item = Uint256, Error = Error>> {
         let web3 = self.web3.clone();
-        let contract_address = self.contract_address.clone();
         let secret = self.secret.clone();
 
         let props = web3
@@ -135,25 +135,14 @@ impl BlockchainClient {
         Box::new(
             props
                 .and_then(move |(gas_price, nonce)| {
-                    let transaction = match action {
-                        Action::To(address) => Transaction {
-                            to: address.clone(),
-                            nonce: nonce,
-                            gas_price: gas_price.into(),
-                            gas_limit: 6721975u32.into(),
-                            value: value,
-                            data: Vec::new(),
-                            signature: None,
-                        },
-                        Action::Call(data) => Transaction {
-                            to: contract_address,
-                            nonce: nonce,
-                            gas_price: gas_price.into(),
-                            gas_limit: 6721975u32.into(),
-                            value: value,
-                            data: data,
-                            signature: None,
-                        },
+                    let transaction = Transaction {
+                        to: to_address,
+                        nonce: nonce,
+                        gas_price: gas_price.into(),
+                        gas_limit: 6721975u32.into(),
+                        value,
+                        data,
+                        signature: None,
                     };
 
                     let transaction = transaction.sign(&secret, Some(1u64));
@@ -170,7 +159,6 @@ impl BlockchainApi for BlockchainClient {
         let web3 = self.web3.clone();
         let contract_address = self.contract_address.clone();
         let own_address = self.own_address.clone();
-        let secret = self.secret.clone();
 
         let props = web3
             .eth_gas_price()
@@ -187,24 +175,22 @@ impl BlockchainApi for BlockchainClient {
                         nonce: Some(nonce),
                         gas: None,
                         gas_price: gas_price.into(),
-                        // gas_limit: 6721975u32.into(),
                         value: Some(0u64.into()),
                         data: Some(Data(payload)),
-
-                        // signature: None,
                     };
-                    // let transaction = transaction.sign(&secret, Some(1u64));
+
                     web3.eth_call(transaction)
                 })
-                .and_then(|bytes| Ok(Uint256::from_bytes_be(&bytes)))
-                // .into_future(),
+                .and_then(|bytes| Ok(Uint256::from_bytes_be(&bytes))),
         )
     }
 
-    fn new_channel(
+    fn deposit_then_new_channel(
         &self,
+        amount: Uint256,
         new_channel_tx: NewChannelTx,
     ) -> Box<Future<Item = [u8; 32], Error = Error>> {
+        let contract_address = self.contract_address.clone();
         let addr_0_bytes: [u8; 32] = {
             let mut data: [u8; 32] = Default::default();
             data[12..].copy_from_slice(&new_channel_tx.address_0.as_bytes());
@@ -223,7 +209,7 @@ impl BlockchainApi for BlockchainClient {
         );
 
         let payload = encode_call(
-            "newChannel(address,address,uint256,uint256,uint256,uint256,bytes,bytes)",
+            "depositThenNewChannel(address,address,uint256,uint256,uint256,uint256,bytes,bytes)",
             &[
                 new_channel_tx.address_0.into(),
                 new_channel_tx.address_1.into(),
@@ -245,7 +231,8 @@ impl BlockchainApi for BlockchainClient {
                     .into(),
             ],
         );
-        let call = self.broadcast_transaction(Action::Call(payload), 0u64.into());
+
+        let call = self.send_raw_transaction(contract_address, payload, amount);
 
         Box::new(
             call.join(event)
@@ -262,7 +249,12 @@ impl BlockchainApi for BlockchainClient {
         )
     }
 
-    fn re_draw(&self, re_draw_tx: ReDrawTx) -> Box<Future<Item = (), Error = Error>> {
+    fn deposit_then_re_draw(
+        &self,
+        amount: Uint256,
+        re_draw_tx: ReDrawTx,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        let contract_address = self.contract_address.clone();
         let event = self.wait_for_event(
             "ChannelReDrawn(bytes32)",
             Some(vec![re_draw_tx.channel_id.into()]),
@@ -270,7 +262,7 @@ impl BlockchainApi for BlockchainClient {
         );
 
         let payload = encode_call(
-            "reDraw(bytes32,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes)",
+            "depositThenRedraw(bytes32,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes)",
             &[
                 Token::Bytes(re_draw_tx.channel_id.to_vec()),
                 re_draw_tx.sequence_number.into(),
@@ -293,7 +285,57 @@ impl BlockchainApi for BlockchainClient {
                     .into(),
             ],
         );
-        let call = self.broadcast_transaction(Action::Call(payload), 0u64.into());
+
+        let call = self.send_raw_transaction(contract_address, payload, amount);
+
+        Box::new(
+            call.join(event)
+                .and_then(|(_tx, _response)| Ok(()))
+                .into_future(),
+        )
+    }
+
+    fn re_draw_then_withdraw(
+        &self,
+        amount: Uint256,
+        re_draw_tx: ReDrawTx,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        let contract_address = self.contract_address.clone();
+        let event = self.wait_for_event(
+            "ChannelReDrawn(bytes32)",
+            Some(vec![re_draw_tx.channel_id.into()]),
+            None,
+        );
+
+        println!("amount: {:?}, old_balance_0: {:?}, old_balance_1: {:?}, new_balance_0: {:?}, new_balance_1: {:?}", amount.clone(), re_draw_tx.old_balance_0.clone(), re_draw_tx.old_balance_1.clone(), re_draw_tx.new_balance_0.clone(), re_draw_tx.new_balance_1.clone());
+
+        let payload = encode_call(
+            "redrawThenWithdraw(uint256,bytes32,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes)",
+            &[
+                amount.clone().into(),
+                Token::Bytes(re_draw_tx.channel_id.to_vec()),
+                re_draw_tx.sequence_number.into(),
+                re_draw_tx.old_balance_0.into(),
+                re_draw_tx.old_balance_1.into(),
+                re_draw_tx.new_balance_0.into(),
+                re_draw_tx.new_balance_1.into(),
+                re_draw_tx.expiration.into(),
+                re_draw_tx
+                    .signature_0
+                    .expect("No signature_0 supplied")
+                    .into_bytes()
+                    .to_vec()
+                    .into(),
+                re_draw_tx
+                    .signature_1
+                    .expect("No signature_1 supplied")
+                    .into_bytes()
+                    .to_vec()
+                    .into(),
+            ],
+        );
+
+        let call = self.send_raw_transaction(contract_address, payload, amount);
 
         Box::new(
             call.join(event)
@@ -349,10 +391,12 @@ impl BlockchainApi for BlockchainClient {
             .and_then(|_| Ok(())),
         )
     }
+
     fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>> {
+        let contract_address = self.contract_address.clone();
         let payload = encode_call("quickDeposit()", &[]);
         let call = self
-            .broadcast_transaction(Action::Call(payload), value)
+            .send_raw_transaction(contract_address, payload, value)
             .map(|_| ());
         Box::new(call)
     }

@@ -13,9 +13,8 @@ use crate::storage::Storage;
 use std::sync::Arc;
 
 /// Todo:
+/// - Deposit to and withdraw from contract token along with channel
 /// - Implement expiration timer in state machine
-/// - Withdraw
-/// - Add more comprehensive checks after unit tests are done
 /// - Get rid of useless "register counterparty" step
 /// - Deal with incorrect accrual in packet loss scenario
 
@@ -52,14 +51,14 @@ pub struct Guac {
 }
 
 pub trait BlockchainApi {
-    fn new_channel(
-        &self,
-        new_channel_tx: NewChannelTx,
-    ) -> Box<Future<Item = [u8; 32], Error = Error>>;
+    // fn new_channel(
+    //     &self,
+    //     new_channel_tx: NewChannelTx,
+    // ) -> Box<Future<Item = [u8; 32], Error = Error>>;
 
     fn balance_of(&self) -> Box<Future<Item = Uint256, Error = Error>>;
 
-    fn re_draw(&self, redraw_tx: ReDrawTx) -> Box<Future<Item = (), Error = Error>>;
+    // fn re_draw(&self, redraw_tx: ReDrawTx) -> Box<Future<Item = (), Error = Error>>;
 
     fn check_for_open(
         &self,
@@ -72,6 +71,24 @@ pub trait BlockchainApi {
     fn quick_deposit(&self, value: Uint256) -> Box<Future<Item = (), Error = Error>>;
 
     fn get_current_block(&self) -> Box<Future<Item = Uint256, Error = Error>>;
+
+    fn deposit_then_new_channel(
+        &self,
+        amount: Uint256,
+        new_channel_tx: NewChannelTx,
+    ) -> Box<Future<Item = [u8; 32], Error = Error>>;
+
+    fn deposit_then_re_draw(
+        &self,
+        amount: Uint256,
+        re_draw_tx: ReDrawTx,
+    ) -> Box<Future<Item = (), Error = Error>>;
+
+    fn re_draw_then_withdraw(
+        &self,
+        amount: Uint256,
+        re_draw_tx: ReDrawTx,
+    ) -> Box<Future<Item = (), Error = Error>>;
 }
 
 pub trait UserApi {
@@ -216,9 +233,9 @@ impl UserApi for Guac {
                         };
 
                         let (balance_0, balance_1) = if i_am_0 {
-                            (amount, 0u64.into())
+                            (amount.clone(), 0u64.into())
                         } else {
-                            (0u64.into(), amount)
+                            (0u64.into(), amount.clone())
                         };
 
                         Box::new(
@@ -261,11 +278,14 @@ impl UserApi for Guac {
                                             };
 
                                             blockchain_client
-                                                .new_channel(NewChannelTx {
-                                                    signature_0: Some(signature_0),
-                                                    signature_1: Some(signature_1),
-                                                    ..new_channel_tx
-                                                })
+                                                .deposit_then_new_channel(
+                                                    amount.clone(),
+                                                    NewChannelTx {
+                                                        signature_0: Some(signature_0),
+                                                        signature_1: Some(signature_1),
+                                                        ..new_channel_tx
+                                                    },
+                                                )
                                                 .and_then(move |channel_id| {
                                                     counterparty_client
                                                         .notify_channel_opened(
@@ -295,9 +315,9 @@ impl UserApi for Guac {
                         let balance_1 = channel.balance_1.clone();
 
                         let (new_balance_0, new_balance_1) = if channel.i_am_0 {
-                            (balance_0 + amount, balance_1)
+                            (balance_0 + amount.clone(), balance_1)
                         } else {
-                            (balance_0, balance_1 + amount)
+                            (balance_0, balance_1 + amount.clone())
                         };
 
                         Box::new(
@@ -341,11 +361,14 @@ impl UserApi for Guac {
                                                 };
 
                                             blockchain_client
-                                                .re_draw(ReDrawTx {
-                                                    signature_0: Some(signature_0),
-                                                    signature_1: Some(signature_1),
-                                                    ..re_draw_tx
-                                                })
+                                                .deposit_then_re_draw(
+                                                    amount.clone(),
+                                                    ReDrawTx {
+                                                        signature_0: Some(signature_0),
+                                                        signature_1: Some(signature_1),
+                                                        ..re_draw_tx
+                                                    },
+                                                )
                                                 .and_then(move |_| {
                                                     counterparty_client
                                                         .notify_re_draw(
@@ -400,10 +423,12 @@ impl UserApi for Guac {
                         let balance_1 = channel.balance_1.clone();
 
                         let (new_balance_0, new_balance_1) = if channel.i_am_0 {
-                            (balance_0 - amount, balance_1)
+                            (balance_0 - amount.clone(), balance_1)
                         } else {
-                            (balance_0, balance_1 - amount)
+                            (balance_0, balance_1 - amount.clone())
                         };
+
+                        println!("i_am_0: {:?}", channel.i_am_0);
 
                         Box::new(
                             blockchain_client
@@ -446,11 +471,14 @@ impl UserApi for Guac {
                                                 };
 
                                             blockchain_client
-                                                .re_draw(ReDrawTx {
-                                                    signature_0: Some(signature_0),
-                                                    signature_1: Some(signature_1),
-                                                    ..re_draw_tx
-                                                })
+                                                .re_draw_then_withdraw(
+                                                    amount.clone(),
+                                                    ReDrawTx {
+                                                        signature_0: Some(signature_0),
+                                                        signature_1: Some(signature_1),
+                                                        ..re_draw_tx
+                                                    },
+                                                )
                                                 .and_then(move |_| {
                                                     counterparty_client
                                                         .notify_re_draw(
