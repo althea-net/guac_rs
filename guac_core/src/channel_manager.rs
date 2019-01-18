@@ -13,7 +13,8 @@ use crate::storage::Storage;
 use std::sync::Arc;
 
 /// Todo:
-/// - Deposit to and withdraw from contract token along with channel
+/// - Integrate sig verification
+/// - Get to the bottom of balance discrepancies in tests
 /// - Implement expiration timer in state machine
 /// - Get rid of useless "register counterparty" step
 /// - Deal with incorrect accrual in packet loss scenario
@@ -51,14 +52,7 @@ pub struct Guac {
 }
 
 pub trait BlockchainApi {
-    // fn new_channel(
-    //     &self,
-    //     new_channel_tx: NewChannelTx,
-    // ) -> Box<Future<Item = [u8; 32], Error = Error>>;
-
     fn balance_of(&self) -> Box<Future<Item = Uint256, Error = Error>>;
-
-    // fn re_draw(&self, redraw_tx: ReDrawTx) -> Box<Future<Item = (), Error = Error>>;
 
     fn check_for_open(
         &self,
@@ -266,6 +260,24 @@ impl UserApi for Guac {
                                             new_channel_tx.clone(),
                                         )
                                         .and_then(move |their_signature| {
+                                            let fingerprint = new_channel_tx
+                                                .clone()
+                                                .fingerprint(crypto.contract_address);
+
+                                            let recovered_address = try_future_box!(
+                                                their_signature.recover(&fingerprint)
+                                            );
+
+                                            if recovered_address != their_address {
+                                                return Box::new(future::err(
+                                                    GuacError::Error {
+                                                        message: "Their signature is incorrect"
+                                                            .into(),
+                                                    }
+                                                    .into(),
+                                                ));
+                                            }
+
                                             let (signature_0, signature_1) = if i_am_0 {
                                                 (my_signature, their_signature)
                                             } else {
@@ -277,35 +289,39 @@ impl UserApi for Guac {
                                                 i_am_0,
                                             };
 
-                                            blockchain_client
-                                                .deposit_then_new_channel(
-                                                    amount.clone(),
-                                                    NewChannelTx {
-                                                        signature_0: Some(signature_0),
-                                                        signature_1: Some(signature_1),
-                                                        ..new_channel_tx
-                                                    },
-                                                )
-                                                .and_then(move |channel_id| {
-                                                    counterparty_client
-                                                        .notify_channel_opened(
-                                                            my_address,
-                                                            their_url.clone(),
-                                                        )
-                                                        .and_then(move |()| {
-                                                            *counterparty = Counterparty::Open {
-                                                                channel: Channel {
-                                                                    channel_id,
-                                                                    sequence_number: 0u8.into(),
-                                                                    balance_0,
-                                                                    balance_1,
-                                                                    i_am_0,
-                                                                    accrual: 0u8.into(),
-                                                                },
-                                                            };
-                                                            Ok(())
-                                                        })
-                                                })
+                                            Box::new(
+                                                blockchain_client
+                                                    .deposit_then_new_channel(
+                                                        amount.clone(),
+                                                        NewChannelTx {
+                                                            signature_0: Some(signature_0),
+                                                            signature_1: Some(signature_1),
+                                                            ..new_channel_tx
+                                                        },
+                                                    )
+                                                    .and_then(move |channel_id| {
+                                                        counterparty_client
+                                                            .notify_channel_opened(
+                                                                my_address,
+                                                                their_url.clone(),
+                                                            )
+                                                            .and_then(move |()| {
+                                                                *counterparty =
+                                                                    Counterparty::Open {
+                                                                        channel: Channel {
+                                                                            channel_id,
+                                                                            sequence_number: 0u8
+                                                                                .into(),
+                                                                            balance_0,
+                                                                            balance_1,
+                                                                            i_am_0,
+                                                                            accrual: 0u8.into(),
+                                                                        },
+                                                                    };
+                                                                Ok(())
+                                                            })
+                                                    }),
+                                            )
                                         })
                                 }),
                         ) as Box<Future<Item = (), Error = Error>>
@@ -344,6 +360,24 @@ impl UserApi for Guac {
                                             re_draw_tx.clone(),
                                         )
                                         .and_then(move |their_signature| {
+                                            let fingerprint = re_draw_tx
+                                                .clone()
+                                                .fingerprint(crypto.contract_address);
+
+                                            let recovered_address = try_future_box!(
+                                                their_signature.recover(&fingerprint)
+                                            );
+
+                                            if recovered_address != their_address {
+                                                return Box::new(future::err(
+                                                    GuacError::Error {
+                                                        message: "Their signature is incorrect"
+                                                            .into(),
+                                                    }
+                                                    .into(),
+                                                ));
+                                            }
+
                                             *counterparty = Counterparty::ReDrawing {
                                                 channel: channel.clone(),
                                                 re_draw_tx: re_draw_tx.clone(),
@@ -360,36 +394,41 @@ impl UserApi for Guac {
                                                     (their_signature, my_signature)
                                                 };
 
-                                            blockchain_client
-                                                .deposit_then_re_draw(
-                                                    amount.clone(),
-                                                    ReDrawTx {
-                                                        signature_0: Some(signature_0),
-                                                        signature_1: Some(signature_1),
-                                                        ..re_draw_tx
-                                                    },
-                                                )
-                                                .and_then(move |_| {
-                                                    counterparty_client
-                                                        .notify_re_draw(
-                                                            crypto.own_address,
-                                                            their_url.clone(),
-                                                        )
-                                                        .and_then(move |_| {
-                                                            // Save the new open state of the channel
-                                                            *counterparty = Counterparty::Open {
-                                                                channel: Channel {
-                                                                    // TODO: what else changes here?
-                                                                    balance_0: new_balance_0
-                                                                        .clone(),
-                                                                    balance_1: new_balance_1
-                                                                        .clone(),
-                                                                    ..channel
-                                                                },
-                                                            };
-                                                            Ok(())
-                                                        })
-                                                })
+                                            Box::new(
+                                                blockchain_client
+                                                    .deposit_then_re_draw(
+                                                        amount.clone(),
+                                                        ReDrawTx {
+                                                            signature_0: Some(signature_0),
+                                                            signature_1: Some(signature_1),
+                                                            ..re_draw_tx
+                                                        },
+                                                    )
+                                                    .and_then(move |_| {
+                                                        counterparty_client
+                                                            .notify_re_draw(
+                                                                crypto.own_address,
+                                                                their_url.clone(),
+                                                            )
+                                                            .and_then(move |_| {
+                                                                // Save the new open state of the channel
+                                                                *counterparty =
+                                                                    Counterparty::Open {
+                                                                        channel: Channel {
+                                                                            // TODO: what else changes here?
+                                                                            balance_0:
+                                                                                new_balance_0
+                                                                                    .clone(),
+                                                                            balance_1:
+                                                                                new_balance_1
+                                                                                    .clone(),
+                                                                            ..channel
+                                                                        },
+                                                                    };
+                                                                Ok(())
+                                                            })
+                                                    }),
+                                            )
                                         })
                                 }),
                         ) as Box<Future<Item = (), Error = Error>>
@@ -454,6 +493,24 @@ impl UserApi for Guac {
                                             re_draw_tx.clone(),
                                         )
                                         .and_then(move |their_signature| {
+                                            let fingerprint = re_draw_tx
+                                                .clone()
+                                                .fingerprint(crypto.contract_address);
+
+                                            let recovered_address = try_future_box!(
+                                                their_signature.recover(&fingerprint)
+                                            );
+
+                                            if recovered_address != their_address {
+                                                return Box::new(future::err(
+                                                    GuacError::Error {
+                                                        message: "Their signature is incorrect"
+                                                            .into(),
+                                                    }
+                                                    .into(),
+                                                ));
+                                            }
+
                                             *counterparty = Counterparty::ReDrawing {
                                                 channel: channel.clone(),
                                                 re_draw_tx: re_draw_tx.clone(),
@@ -470,36 +527,41 @@ impl UserApi for Guac {
                                                     (their_signature, my_signature)
                                                 };
 
-                                            blockchain_client
-                                                .re_draw_then_withdraw(
-                                                    amount.clone(),
-                                                    ReDrawTx {
-                                                        signature_0: Some(signature_0),
-                                                        signature_1: Some(signature_1),
-                                                        ..re_draw_tx
-                                                    },
-                                                )
-                                                .and_then(move |_| {
-                                                    counterparty_client
-                                                        .notify_re_draw(
-                                                            crypto.own_address,
-                                                            their_url.clone(),
-                                                        )
-                                                        .and_then(move |_| {
-                                                            // Save the new open state of the channel
-                                                            *counterparty = Counterparty::Open {
-                                                                channel: Channel {
-                                                                    // TODO: what else changes here?
-                                                                    balance_0: new_balance_0
-                                                                        .clone(),
-                                                                    balance_1: new_balance_1
-                                                                        .clone(),
-                                                                    ..channel
-                                                                },
-                                                            };
-                                                            Ok(())
-                                                        })
-                                                })
+                                            Box::new(
+                                                blockchain_client
+                                                    .re_draw_then_withdraw(
+                                                        amount.clone(),
+                                                        ReDrawTx {
+                                                            signature_0: Some(signature_0),
+                                                            signature_1: Some(signature_1),
+                                                            ..re_draw_tx
+                                                        },
+                                                    )
+                                                    .and_then(move |_| {
+                                                        counterparty_client
+                                                            .notify_re_draw(
+                                                                crypto.own_address,
+                                                                their_url.clone(),
+                                                            )
+                                                            .and_then(move |_| {
+                                                                // Save the new open state of the channel
+                                                                *counterparty =
+                                                                    Counterparty::Open {
+                                                                        channel: Channel {
+                                                                            // TODO: what else changes here?
+                                                                            balance_0:
+                                                                                new_balance_0
+                                                                                    .clone(),
+                                                                            balance_1:
+                                                                                new_balance_1
+                                                                                    .clone(),
+                                                                            ..channel
+                                                                        },
+                                                                    };
+                                                                Ok(())
+                                                            })
+                                                    }),
+                                            )
                                         })
                                 }),
                         ) as Box<Future<Item = (), Error = Error>>
@@ -596,8 +658,6 @@ impl CounterpartyApi for Guac {
     ) -> Box<Future<Item = Signature, Error = Error>> {
         let storage = self.storage.clone();
         let crypto = self.crypto.clone();
-        let new_channel_tx_clone_1 = new_channel_tx.clone();
-        let new_channel_tx_clone_2 = new_channel_tx.clone();
         let my_address = crypto.own_address;
 
         Box::new(
@@ -608,81 +668,88 @@ impl CounterpartyApi for Guac {
                         Counterparty::New { i_am_0 } => {
                             Box::new(
                                 future::ok(())
-                                    .and_then(move |_| {
-                                        let NewChannelTx {
-                                            address_0,
-                                            address_1,
-                                            balance_0,
-                                            balance_1,
-                                            expiration: _,
-                                            settling_period_length,
-                                            signature_0: _,
-                                            signature_1: _,
-                                        } = new_channel_tx_clone_1;
+                                    .and_then({
+                                        let new_channel_tx = new_channel_tx.clone();
+                                        move |_| {
+                                            let NewChannelTx {
+                                                address_0,
+                                                address_1,
+                                                balance_0,
+                                                balance_1,
+                                                expiration: _,
+                                                settling_period_length,
+                                                signature_0: _,
+                                                signature_1: _,
+                                            } = new_channel_tx.clone();
 
-                                        if i_am_0 {
-                                            forbidden!(
-                                                address_0 == my_address,
-                                                format!(
+                                            if i_am_0 {
+                                                forbidden!(
+                                                    address_0 == my_address,
+                                                    format!(
                                                     "Address 0 ({}) should equal my address ({})",
                                                     address_0.to_string(),
                                                     my_address.to_string()
                                                 )
-                                            );
-                                            forbidden!(
-                                                address_1 == from_address,
-                                                format!(
+                                                );
+                                                forbidden!(
+                                                    address_1 == from_address,
+                                                    format!(
                                                     "Address 1 ({}) should equal your address ({})",
                                                     address_1.to_string(),
                                                     from_address.to_string()
                                                 )
-                                            );
-                                        } else {
-                                            forbidden!(
-                                                address_1 == my_address,
-                                                format!(
+                                                );
+                                            } else {
+                                                forbidden!(
+                                                    address_1 == my_address,
+                                                    format!(
                                                     "Address 1 ({}) should equal my address ({})",
                                                     address_1.to_string(),
                                                     my_address.to_string()
                                                 )
-                                            );
-                                            forbidden!(
-                                                address_0 == from_address,
-                                                format!(
+                                                );
+                                                forbidden!(
+                                                    address_0 == from_address,
+                                                    format!(
                                                     "Address 0 ({}) should equal your address ({})",
                                                     address_0.to_string(),
                                                     from_address.to_string()
                                                 )
+                                                );
+                                            }
+
+                                            let my_balance =
+                                                if i_am_0 { balance_0 } else { balance_1 };
+
+                                            forbidden!(
+                                                my_balance == 0u64.into(),
+                                                "My balance in proposed channel must be zero."
                                             );
+
+                                            forbidden!(
+                                                settling_period_length == 5000u64.into(),
+                                                "I only accept settling periods of 5000 blocks"
+                                            );
+
+                                            future::ok(())
                                         }
-
-                                        let my_balance =
-                                            if i_am_0 { (balance_0) } else { (balance_1) };
-
-                                        forbidden!(
-                                            my_balance == 0u64.into(),
-                                            "My balance in proposed channel must be zero."
-                                        );
-
-                                        forbidden!(
-                                            settling_period_length == 5000u64.into(),
-                                            "I only accept settling periods of 5000 blocks"
-                                        );
-
-                                        future::ok(())
                                     })
-                                    .and_then(move |_| {
-                                        // Save the current state of the counterparty
-                                        *counterparty = Counterparty::OtherCreating {
-                                            i_am_0,
-                                            new_channel_tx: new_channel_tx_clone_2.clone(),
-                                        };
+                                    .and_then({
+                                        let crypto = crypto.clone();
+                                        let new_channel_tx = new_channel_tx.clone();
+                                        move |_| {
+                                            // Save the current state of the counterparty
+                                            *counterparty = Counterparty::OtherCreating {
+                                                i_am_0,
+                                                new_channel_tx: new_channel_tx.clone(),
+                                            };
 
-                                        let my_signature = crypto.eth_sign(
-                                            &new_channel_tx_clone_2
-                                                .fingerprint(crypto.contract_address),
-                                        );
-                                        Ok(my_signature)
+                                            let my_signature = crypto.eth_sign(
+                                                &new_channel_tx
+                                                    .fingerprint(crypto.contract_address),
+                                            );
+                                            Ok(my_signature)
+                                        }
                                     }),
                             )
                                 as Box<Future<Item = Signature, Error = Error>>
@@ -914,12 +981,41 @@ impl CounterpartyApi for Guac {
         update_tx: UpdateTx,
     ) -> Box<Future<Item = Option<Uint256>, Error = Error>> {
         let storage = self.storage.clone();
+        let crypto = self.crypto.clone();
         Box::new(
             storage
                 .get_counterparty(from_address.clone())
                 .and_then(move |mut counterparty| match counterparty.clone() {
                     Counterparty::Open { mut channel } => {
                         Box::new(future::ok(()).and_then(move |_| {
+                            let their_signature = if channel.i_am_0 {
+                                update_tx.clone().signature_1
+                            } else {
+                                update_tx.clone().signature_0
+                            };
+
+                            let their_signature = match their_signature {
+                                Some(sig) => sig,
+                                None => {
+                                    return Err(GuacError::Forbidden {
+                                        message: "No signature supplied".into(),
+                                    }
+                                    .into())
+                                }
+                            };
+
+                            let fingerprint =
+                                update_tx.clone().fingerprint(crypto.contract_address);
+
+                            let recovered_address = their_signature.recover(&fingerprint)?;
+
+                            if recovered_address != from_address {
+                                return Err(GuacError::Forbidden {
+                                    message: "Your signature is incorrect".into(),
+                                }
+                                .into());
+                            }
+
                             let maybe_seq = channel.receive_payment(&update_tx)?;
 
                             *counterparty = Counterparty::Open { channel };
