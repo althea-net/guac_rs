@@ -2,4 +2,3 @@
 members = ["guac_core", "guac_http", "web3"]
 
 [patch.crates-io]
-clarity = { git = "https://github.com/mpapierski/clarity", branch =  "72-signatures"}
