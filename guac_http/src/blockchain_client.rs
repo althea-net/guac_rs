@@ -147,7 +147,11 @@ impl BlockchainClient {
 
                     let transaction = transaction.sign(&secret, Some(1u64));
 
-                    web3.eth_send_raw_transaction(transaction.to_bytes().unwrap())
+                    web3.eth_send_raw_transaction(
+                        transaction
+                            .to_bytes()
+                            .expect("transaction.to_bytes() failed"),
+                    )
                 })
                 .into_future(),
         )

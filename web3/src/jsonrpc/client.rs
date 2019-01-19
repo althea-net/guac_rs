@@ -37,7 +37,7 @@ impl HTTPClient {
 
     fn next_id(&self) -> u64 {
         let counter = self.id_counter.clone();
-        let counter = counter.lock().unwrap();
+        let counter = counter.lock().expect("id error");
         let mut value = counter.borrow_mut();
         *value += 1;
         *value
@@ -60,7 +60,7 @@ impl Client for HTTPClient {
         Box::new(
             client::post(&self.url)
                 .json(payload)
-                .unwrap()
+                .expect("json error")
                 .send()
                 .timeout(Duration::from_millis(1000))
                 .from_err()

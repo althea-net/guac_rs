@@ -118,37 +118,6 @@ mod tests {
     }
 
     #[test]
-    fn test_register_counterparty() {
-        let system = actix::System::new("test");
-
-        let (guac_1, guac_2) = make_nodes();
-
-        let storage_1 = guac_1.storage.clone();
-
-        actix::spawn(
-            guac_1
-                .register_counterparty(guac_2.crypto.own_address)
-                .then(move |res| {
-                    res.unwrap();
-
-                    assert_eq!(
-                        storage_1
-                            .get_counterparty(guac_2.crypto.own_address)
-                            .wait()
-                            .unwrap()
-                            .clone(),
-                        Counterparty::New { i_am_0: true }
-                    );
-
-                    System::current().stop();
-                    Box::new(future::ok(()))
-                }),
-        );
-
-        system.run();
-    }
-
-    #[test]
     fn test_quick_deposit() {
         let system = actix::System::new("test");
 
@@ -216,12 +185,12 @@ mod tests {
 
     fn make_and_fill_channel(guac_1: Guac, guac_2: Guac) -> Box<Future<Item = (), Error = Error>> {
         Box::new(
-            guac_1
-                .register_counterparty(guac_2.crypto.own_address)
-                .and_then(move |_| {
-                    guac_2
-                        .register_counterparty(guac_1.crypto.own_address)
-                        .and_then(move |_| {
+            // guac_1
+            //     .register_counterparty(guac_2.crypto.own_address)
+            //     .and_then(move |_| {
+                    // guac_2
+                    //     .register_counterparty(guac_1.crypto.own_address)
+                    //     .and_then(move |_| {
                             guac_1
                                 .fill_channel(
                                     guac_2.crypto.own_address,
@@ -235,8 +204,8 @@ mod tests {
                                         eth_to_wei(50),
                                     )
                                 })
-                        })
-                }),
+                        // })
+                // }),
         )
     }
 

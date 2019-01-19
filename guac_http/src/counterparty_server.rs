@@ -10,10 +10,6 @@ use guac_core::GuacError;
 
 use futures::future;
 use futures::Future;
-// .map_err(|err| match err.downcast::<GuacError::Forbidden>() {
-//     Ok(forbidden) => ok(HttpResponse::Forbidden().body(forbidden.message)),
-//     Err => ok(HttpResponse::InternalServerError().finish()),
-// })
 
 fn convert_error(err: Error) -> HttpResponse {
     match err.downcast::<GuacError>() {
@@ -33,10 +29,15 @@ pub fn init_server(port: u16, guac: Guac) {
                 r.method(Method::POST).with_async(
                     move |(req, body): (HttpRequest<Guac>, Json<(Address, NewChannelTx)>)| {
                         let body = body.clone();
+                        let clos = |res| match res {
+                            Ok(res) => future::ok::<HttpResponse, failure::Error>(
+                                HttpResponse::Ok().json(res),
+                            ),
+                            Err(err) => future::ok(convert_error(err)),
+                        };
                         req.state()
                             .propose_channel(body.0, String::default(), body.1)
-                            .and_then(move |res| Ok(Json(res)))
-                            .responder()
+                            .then(clos)
                     },
                 )
             })
@@ -61,8 +62,12 @@ pub fn init_server(port: u16, guac: Guac) {
                         let body = body.clone();
                         req.state()
                             .notify_channel_opened(body, String::default())
-                            .and_then(move |res| Ok(Json(res)))
-                            .responder()
+                            .then(|res| match res {
+                                Ok(res) => future::ok::<HttpResponse, failure::Error>(
+                                    HttpResponse::Ok().json(res),
+                                ),
+                                Err(err) => future::ok(convert_error(err)),
+                            })
                     },
                 )
             })
@@ -72,8 +77,12 @@ pub fn init_server(port: u16, guac: Guac) {
                         let body = body.clone();
                         req.state()
                             .notify_re_draw(body, String::default())
-                            .and_then(move |res| Ok(Json(res)))
-                            .responder()
+                            .then(|res| match res {
+                                Ok(res) => future::ok::<HttpResponse, failure::Error>(
+                                    HttpResponse::Ok().json(res),
+                                ),
+                                Err(err) => future::ok(convert_error(err)),
+                            })
                     },
                 )
             })
@@ -83,13 +92,17 @@ pub fn init_server(port: u16, guac: Guac) {
                         let body = body.clone();
                         req.state()
                             .receive_payment(body.0, String::default(), body.1)
-                            .and_then(move |res| Ok(Json(res)))
-                            .responder()
+                            .then(|res| match res {
+                                Ok(res) => future::ok::<HttpResponse, failure::Error>(
+                                    HttpResponse::Ok().json(res),
+                                ),
+                                Err(err) => future::ok(convert_error(err)),
+                            })
                     },
                 )
             })
     })
     .bind(&format!("[::0]:{}", port))
-    .unwrap()
+    .expect("init server failed")
     .start();
 }

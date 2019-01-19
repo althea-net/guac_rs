@@ -6,7 +6,7 @@ use futures;
 
 use futures::Future;
 
-use qutex::{FutureGuard, Guard, QrwLock, Qutex};
+use qutex::{Guard, QrwLock, Qutex};
 use std::collections::HashMap;
 
 /// Storage contains a futures aware RwLock (QrwLock) which controls access to the inner data
@@ -25,38 +25,34 @@ impl Storage {
     pub fn get_counterparty(
         &self,
         k: Address,
-    ) -> Box<Future<Item = Guard<Counterparty>, Error = Error>> {
-        Box::new(
-            self.inner
-                .clone()
-                .read()
-                .from_err()
-                .and_then(move |data| match data.get(&k) {
-                    Some(v) => futures::future::ok(v.clone().lock()),
-                    None => futures::future::err(format_err!("Counterparty not found")),
-                })
-                .and_then(|v: FutureGuard<Counterparty>| v.from_err().and_then(|v| Ok(v))),
-        )
+    ) -> impl Future<Item = Option<Guard<Counterparty>>, Error = Error> {
+        self.inner
+            .clone()
+            .read()
+            .from_err()
+            .and_then(move |data| match data.get(&k) {
+                Some(v) => Box::new(v.clone().lock().from_err().and_then(|v| Ok(Some(v)))),
+                None => Box::new(futures::future::ok(None))
+                    as Box<Future<Item = Option<Guard<Counterparty>>, Error = Error>>,
+            })
     }
 
     pub fn new_counterparty(
         &self,
         k: Address,
         v: Counterparty,
-    ) -> Box<Future<Item = (), Error = Error>> {
-        Box::new(
-            self.inner
-                .clone()
-                .write()
-                .from_err()
-                .and_then(move |mut data| {
-                    if !data.contains_key(&k) {
-                        data.insert(k.clone(), Qutex::new(v.clone()));
-                    } else {
-                        bail!("Counterparty already exists");
-                    }
-                    Ok(())
-                }),
-        )
+    ) -> impl Future<Item = (), Error = Error> {
+        self.inner
+            .clone()
+            .write()
+            .from_err()
+            .and_then(move |mut data| {
+                if !data.contains_key(&k) {
+                    data.insert(k.clone(), Qutex::new(v.clone()));
+                } else {
+                    bail!("Counterparty already exists");
+                }
+                Ok(())
+            })
     }
 }
