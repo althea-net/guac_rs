@@ -110,6 +110,11 @@ pub trait UserApi {
 
     fn check_accrual(&self, their_address: Address) -> Box<Future<Item = Uint256, Error = Error>>;
 
+    fn check_my_balance(
+        &self,
+        their_address: Address,
+    ) -> Box<Future<Item = Uint256, Error = Error>>;
+
     fn get_state(&self, their_address: Address) -> Box<Future<Item = Counterparty, Error = Error>>;
 }
 
@@ -199,6 +204,36 @@ impl UserApi for Guac {
                         let accrual = channel.check_accrual();
                         Ok(accrual)
                     }
+                    counterparty => {
+                        let error = GuacError::WrongState {
+                            correct_state: "Open".to_string(),
+                            current_state: format!("{:?}", counterparty.clone()),
+                            action: "check_accrual".to_string(),
+                        };
+                        return Err(error.into());
+                    }
+                }),
+        )
+    }
+
+    fn check_my_balance(
+        &self,
+        their_address: Address,
+    ) -> Box<Future<Item = Uint256, Error = Error>> {
+        let storage = self.storage.clone();
+
+        Box::new(
+            storage
+                .get_counterparty(their_address.clone())
+                .and_then(check_for_counterparty)
+                .and_then(|mut counterparty| match &mut *counterparty {
+                    Counterparty::Open { channel, .. }
+                    | Counterparty::ReDrawing { channel, .. }
+                    | Counterparty::OtherReDrawing { channel, .. } => Ok(if channel.i_am_0 {
+                        channel.balance_0.clone()
+                    } else {
+                        channel.balance_1.clone()
+                    }),
                     counterparty => {
                         let error = GuacError::WrongState {
                             correct_state: "Open".to_string(),
