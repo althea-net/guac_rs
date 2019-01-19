@@ -31,12 +31,13 @@ extern crate uuid;
 pub mod crypto;
 pub mod channel;
 pub mod channel_manager;
+pub mod counterparty_api;
 pub mod storage;
 pub mod types;
 
 pub use self::channel_manager::BlockchainApi;
-pub use self::channel_manager::CounterpartyApi;
 pub use self::channel_manager::Guac;
+pub use self::counterparty_api::CounterpartyApi;
 pub use self::crypto::Crypto;
 pub use self::storage::Storage;
 pub use self::types::GuacError;
