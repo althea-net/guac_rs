@@ -86,38 +86,6 @@ pub trait BlockchainApi {
     ) -> Box<Future<Item = (), Error = Error>>;
 }
 
-pub trait UserApi {
-    fn fill_channel(
-        &self,
-        their_address: Address,
-        their_url: String,
-        amount: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>>;
-
-    fn make_payment(
-        &self,
-        their_address: Address,
-        their_url: String,
-        amount: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>>;
-
-    fn withdraw(
-        &self,
-        their_address: Address,
-        their_url: String,
-        amount: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>>;
-
-    fn check_accrual(&self, their_address: Address) -> Box<Future<Item = Uint256, Error = Error>>;
-
-    fn check_my_balance(
-        &self,
-        their_address: Address,
-    ) -> Box<Future<Item = Uint256, Error = Error>>;
-
-    fn get_state(&self, their_address: Address) -> Box<Future<Item = Counterparty, Error = Error>>;
-}
-
 pub trait CounterpartyApi {
     fn propose_channel(
         &self,
@@ -189,8 +157,11 @@ fn make_counterparty_if_none(
     }
 }
 
-impl UserApi for Guac {
-    fn check_accrual(&self, their_address: Address) -> Box<Future<Item = Uint256, Error = Error>> {
+impl Guac {
+    pub fn check_accrual(
+        &self,
+        their_address: Address,
+    ) -> impl Future<Item = Uint256, Error = Error> {
         let storage = self.storage.clone();
 
         Box::new(
@@ -216,10 +187,10 @@ impl UserApi for Guac {
         )
     }
 
-    fn check_my_balance(
+    pub fn check_my_balance(
         &self,
         their_address: Address,
-    ) -> Box<Future<Item = Uint256, Error = Error>> {
+    ) -> impl Future<Item = Uint256, Error = Error> {
         let storage = self.storage.clone();
 
         Box::new(
@@ -246,7 +217,10 @@ impl UserApi for Guac {
         )
     }
 
-    fn get_state(&self, their_address: Address) -> Box<Future<Item = Counterparty, Error = Error>> {
+    pub fn get_state(
+        &self,
+        their_address: Address,
+    ) -> impl Future<Item = Counterparty, Error = Error> {
         let storage = self.storage.clone();
 
         Box::new(
@@ -257,12 +231,12 @@ impl UserApi for Guac {
         )
     }
 
-    fn fill_channel(
+    pub fn fill_channel(
         &self,
         their_address: Address,
         their_url: String,
         amount: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> impl Future<Item = (), Error = Error> {
         let counterparty_client = self.counterparty_client.clone();
         let blockchain_client = self.blockchain_client.clone();
         let storage = self.storage.clone();
@@ -505,12 +479,12 @@ impl UserApi for Guac {
         )
     }
 
-    fn withdraw(
+    pub fn withdraw(
         &self,
         their_address: Address,
         their_url: String,
         amount: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> impl Future<Item = (), Error = Error> {
         let storage = self.storage.clone();
         let counterparty_client = self.counterparty_client.clone();
         let blockchain_client = self.blockchain_client.clone();
@@ -639,12 +613,12 @@ impl UserApi for Guac {
         )
     }
 
-    fn make_payment(
+    pub fn make_payment(
         &self,
         their_address: Address,
         their_url: String,
         amount: Uint256,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> impl Future<Item = (), Error = Error> {
         let storage = self.storage.clone();
         let counterparty_client = self.counterparty_client.clone();
         let crypto = self.crypto.clone();

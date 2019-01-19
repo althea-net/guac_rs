@@ -37,7 +37,6 @@ pub mod types;
 pub use self::channel_manager::BlockchainApi;
 pub use self::channel_manager::CounterpartyApi;
 pub use self::channel_manager::Guac;
-pub use self::channel_manager::UserApi;
 pub use self::crypto::Crypto;
 pub use self::storage::Storage;
 pub use self::types::GuacError;

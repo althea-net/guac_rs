@@ -24,10 +24,7 @@ use crate::blockchain_client::BlockchainClient;
 use crate::counterparty_client::CounterpartyClient;
 use clarity::{Address, PrivateKey};
 use guac_core::{Crypto, Guac, Storage};
-use num256::Uint256;
 use std::sync::Arc;
-
-use std::{thread, time};
 
 #[macro_export]
 macro_rules! try_future_box {
@@ -39,12 +36,6 @@ macro_rules! try_future_box {
             Ok(value) => value,
         }
     };
-}
-
-fn eth_to_wei(eth: u64) -> Uint256 {
-    let eth: Uint256 = eth.into();
-    let mult = 1000000000000000000u64.into();
-    eth * mult
 }
 
 pub fn init_guac(
@@ -82,13 +73,16 @@ mod tests {
     use actix::System;
     use failure::Error;
     use futures::{future, Future};
-    use guac_core::types::Counterparty;
-    use guac_core::UserApi;
     use num256::Uint256;
-    use web3::client::Web3;
-
     use std::cell::RefCell;
     use std::rc::Rc;
+    use web3::client::Web3;
+
+    fn eth_to_wei(eth: u64) -> Uint256 {
+        let eth: Uint256 = eth.into();
+        let mult = 1000000000000000000u64.into();
+        eth * mult
+    }
 
     fn make_nodes() -> (Guac, Guac) {
         let contract_addr: Address = CONFIG.contract_address.parse().unwrap();
@@ -185,27 +179,19 @@ mod tests {
 
     fn make_and_fill_channel(guac_1: Guac, guac_2: Guac) -> Box<Future<Item = (), Error = Error>> {
         Box::new(
-            // guac_1
-            //     .register_counterparty(guac_2.crypto.own_address)
-            //     .and_then(move |_| {
-                    // guac_2
-                    //     .register_counterparty(guac_1.crypto.own_address)
-                    //     .and_then(move |_| {
-                            guac_1
-                                .fill_channel(
-                                    guac_2.crypto.own_address,
-                                    "[::1]:8882".to_string(),
-                                    eth_to_wei(50),
-                                )
-                                .and_then(move |_| {
-                                    guac_2.fill_channel(
-                                        guac_1.crypto.own_address,
-                                        "[::1]:8881".to_string(),
-                                        eth_to_wei(50),
-                                    )
-                                })
-                        // })
-                // }),
+            guac_1
+                .fill_channel(
+                    guac_2.crypto.own_address,
+                    "[::1]:8882".to_string(),
+                    eth_to_wei(50),
+                )
+                .and_then(move |_| {
+                    guac_2.fill_channel(
+                        guac_1.crypto.own_address,
+                        "[::1]:8881".to_string(),
+                        eth_to_wei(50),
+                    )
+                }),
         )
     }
 
