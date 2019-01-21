@@ -102,76 +102,92 @@ impl Channel {
 
 impl Counterparty {
     pub fn fingerprint(&self, contract_address: Address) -> [u8; 32] {
-        let fingerprint = match self {
+        match self {
             Counterparty::New { i_am_0 } => {
-                let mut bytes: Vec<&[u8]> = Vec::new();
-                bytes.push("Counterparty".as_bytes());
-                bytes.push(contract_address.as_bytes());
-                bytes.push("New".as_bytes());
-                bytes.push(&bool_to_bytes(*i_am_0));
-                crypto::hash_bytes(&bytes)
+                let name: &[u8] = "Counterparty".as_bytes();
+                let caddr: &[u8] = contract_address.as_bytes();
+                let variant: &[u8] = "New".as_bytes();
+                let i_am_0: [u8; 32] = bool_to_bytes(*i_am_0);
+
+                let fingerprint = crypto::hash_bytes(&[name, caddr, variant, &i_am_0]);
+                let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+                return fingerprint;
             }
             Counterparty::Creating {
                 new_channel_tx,
                 i_am_0,
             } => {
-                let mut bytes: Vec<&[u8]> = Vec::new();
-                bytes.push("Counterparty".as_bytes());
-                bytes.push(contract_address.as_bytes());
-                bytes.push("Creating".as_bytes());
-                bytes.push(&new_channel_tx.fingerprint(contract_address));
-                bytes.push(&bool_to_bytes(*i_am_0));
-                crypto::hash_bytes(&bytes)
+                let name: &[u8] = "Counterparty".as_bytes();
+                let caddr: &[u8] = contract_address.as_bytes();
+                let variant: &[u8] = "Creating".as_bytes();
+                let new_channel_tx: &[u8] = &new_channel_tx.fingerprint(contract_address);
+                let i_am_0: [u8; 32] = bool_to_bytes(*i_am_0);
+
+                let fingerprint =
+                    crypto::hash_bytes(&[name, caddr, variant, new_channel_tx, &i_am_0]);
+                let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+                return fingerprint;
             }
             Counterparty::OtherCreating {
                 new_channel_tx,
                 i_am_0,
             } => {
-                let mut bytes: Vec<&[u8]> = Vec::new();
-                bytes.push("Counterparty".as_bytes());
-                bytes.push(contract_address.as_bytes());
-                bytes.push("OtherCreating".as_bytes());
-                bytes.push(&new_channel_tx.fingerprint(contract_address));
-                bytes.push(&bool_to_bytes(*i_am_0));
-                crypto::hash_bytes(&bytes)
+                let name: &[u8] = "Counterparty".as_bytes();
+                let caddr: &[u8] = contract_address.as_bytes();
+                let variant: &[u8] = "OtherCreating".as_bytes();
+                let new_channel_tx: &[u8] = &new_channel_tx.fingerprint(contract_address);
+                let i_am_0: [u8; 32] = bool_to_bytes(*i_am_0);
+
+                let fingerprint =
+                    crypto::hash_bytes(&[name, caddr, variant, new_channel_tx, &i_am_0]);
+                let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+                return fingerprint;
             }
             Counterparty::ReDrawing {
                 re_draw_tx,
                 channel,
             } => {
-                let mut bytes: Vec<&[u8]> = Vec::new();
-                bytes.push("Counterparty".as_bytes());
-                bytes.push(contract_address.as_bytes());
-                bytes.push("ReDrawing".as_bytes());
-                bytes.push(&re_draw_tx.fingerprint(contract_address));
-                bytes.push(&channel.fingerprint(contract_address));
-                crypto::hash_bytes(&bytes)
+                let name: &[u8] = "Counterparty".as_bytes();
+                let caddr: &[u8] = contract_address.as_bytes();
+                let variant: &[u8] = "ReDrawing".as_bytes();
+                let re_draw_tx: &[u8] = &re_draw_tx.fingerprint(contract_address);
+                let channel: &[u8] = &channel.fingerprint(contract_address);
+
+                let fingerprint = crypto::hash_bytes(&[name, caddr, variant, re_draw_tx, channel]);
+                let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+                return fingerprint;
             }
             Counterparty::OtherReDrawing {
                 re_draw_tx,
                 channel,
             } => {
-                let mut bytes: Vec<&[u8]> = Vec::new();
-                bytes.push("Counterparty".as_bytes());
-                bytes.push(contract_address.as_bytes());
-                bytes.push("OtherReDrawing".as_bytes());
-                bytes.push(&re_draw_tx.fingerprint(contract_address));
-                bytes.push(&channel.fingerprint(contract_address));
-                crypto::hash_bytes(&bytes)
+                let name: &[u8] = "Counterparty".as_bytes();
+                let caddr: &[u8] = contract_address.as_bytes();
+                let variant: &[u8] = "OtherReDrawing".as_bytes();
+                let re_draw_tx: &[u8] = &re_draw_tx.fingerprint(contract_address);
+                let channel: &[u8] = &channel.fingerprint(contract_address);
+
+                let fingerprint = crypto::hash_bytes(&[name, caddr, variant, re_draw_tx, channel]);
+                let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+                return fingerprint;
             }
             Counterparty::Open { channel } => {
-                let mut bytes: Vec<&[u8]> = Vec::new();
-                bytes.push("Counterparty".as_bytes());
-                bytes.push(contract_address.as_bytes());
-                bytes.push(&channel.fingerprint(contract_address));
-                crypto::hash_bytes(&bytes)
+                let name: &[u8] = "Counterparty".as_bytes();
+                let caddr: &[u8] = contract_address.as_bytes();
+                let variant: &[u8] = "Open".as_bytes();
+                let channel: &[u8] = &channel.fingerprint(contract_address);
+
+                let fingerprint = crypto::hash_bytes(&[name, caddr, variant, channel]);
+                let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+                return fingerprint;
             }
-        };
-
-        // let fingerprint = crypto::hash_bytes(&bytes);
-        let fingerprint: [u8; 32] = fingerprint.clone().into();
-
-        return fingerprint;
+        }
     }
 }
 
