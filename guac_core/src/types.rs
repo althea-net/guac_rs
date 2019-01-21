@@ -2,6 +2,7 @@ use crate::channel::Channel;
 use crate::crypto;
 use clarity::{Address, Signature};
 use num256::Uint256;
+use std::vec::Vec;
 
 #[derive(Debug, Fail)]
 pub enum GuacError {
@@ -57,6 +58,126 @@ pub enum Counterparty {
     Open {
         channel: Channel,
     },
+}
+
+// TODO: Figure out real solidity bytes representation of bool instead of just guessing
+fn bool_to_bytes(boo: bool) -> [u8; 32] {
+    if boo {
+        let res: Uint256 = 1u8.into();
+        let res: [u8; 32] = res.into();
+        res
+    } else {
+        let res: Uint256 = 0u8.into();
+        let res: [u8; 32] = res.into();
+        res
+    }
+}
+
+impl Channel {
+    pub fn fingerprint(&self, contract_address: Address) -> [u8; 32] {
+        let func_name: &[u8] = "Channel".as_bytes();
+        let contract_address: &[u8] = contract_address.as_bytes();
+        let channel_id: [u8; 32] = self.channel_id.clone().into();
+        let sequence_number: [u8; 32] = self.sequence_number.clone().into();
+        let balance_0: [u8; 32] = self.balance_0.clone().into();
+        let balance_1: [u8; 32] = self.balance_1.clone().into();
+        let accrual: [u8; 32] = self.accrual.clone().into();
+        let i_am_0: [u8; 32] = bool_to_bytes(self.i_am_0);
+
+        let fingerprint = crypto::hash_bytes(&[
+            func_name,
+            contract_address,
+            &channel_id,
+            &sequence_number,
+            &balance_0,
+            &balance_1,
+            &accrual,
+            &i_am_0,
+        ]);
+        let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+        return fingerprint;
+    }
+}
+
+impl Counterparty {
+    pub fn fingerprint(&self, contract_address: Address) -> [u8; 32] {
+        let fingerprint = match self {
+            Counterparty::New { i_am_0 } => {
+                let mut bytes: Vec<&[u8]> = Vec::new();
+                bytes.push("Counterparty".as_bytes());
+                bytes.push(contract_address.as_bytes());
+                bytes.push("New".as_bytes());
+                bytes.push(&bool_to_bytes(*i_am_0));
+                crypto::hash_bytes(&bytes)
+            }
+            Counterparty::Creating {
+                new_channel_tx,
+                i_am_0,
+            } => {
+                let mut bytes: Vec<&[u8]> = Vec::new();
+                bytes.push("Counterparty".as_bytes());
+                bytes.push(contract_address.as_bytes());
+                bytes.push("Creating".as_bytes());
+                bytes.push(&new_channel_tx.fingerprint(contract_address));
+                bytes.push(&bool_to_bytes(*i_am_0));
+                crypto::hash_bytes(&bytes)
+            }
+            Counterparty::OtherCreating {
+                new_channel_tx,
+                i_am_0,
+            } => {
+                let mut bytes: Vec<&[u8]> = Vec::new();
+                bytes.push("Counterparty".as_bytes());
+                bytes.push(contract_address.as_bytes());
+                bytes.push("OtherCreating".as_bytes());
+                bytes.push(&new_channel_tx.fingerprint(contract_address));
+                bytes.push(&bool_to_bytes(*i_am_0));
+                crypto::hash_bytes(&bytes)
+            }
+            Counterparty::ReDrawing {
+                re_draw_tx,
+                channel,
+            } => {
+                let mut bytes: Vec<&[u8]> = Vec::new();
+                bytes.push("Counterparty".as_bytes());
+                bytes.push(contract_address.as_bytes());
+                bytes.push("ReDrawing".as_bytes());
+                bytes.push(&re_draw_tx.fingerprint(contract_address));
+                bytes.push(&channel.fingerprint(contract_address));
+                crypto::hash_bytes(&bytes)
+            }
+            Counterparty::OtherReDrawing {
+                re_draw_tx,
+                channel,
+            } => {
+                let mut bytes: Vec<&[u8]> = Vec::new();
+                bytes.push("Counterparty".as_bytes());
+                bytes.push(contract_address.as_bytes());
+                bytes.push("OtherReDrawing".as_bytes());
+                bytes.push(&re_draw_tx.fingerprint(contract_address));
+                bytes.push(&channel.fingerprint(contract_address));
+                crypto::hash_bytes(&bytes)
+            }
+            Counterparty::Open { channel } => {
+                let mut bytes: Vec<&[u8]> = Vec::new();
+                bytes.push("Counterparty".as_bytes());
+                bytes.push(contract_address.as_bytes());
+                bytes.push(&channel.fingerprint(contract_address));
+                crypto::hash_bytes(&bytes)
+            }
+        };
+
+        // let fingerprint = crypto::hash_bytes(&bytes);
+        let fingerprint: [u8; 32] = fingerprint.clone().into();
+
+        return fingerprint;
+    }
+}
+
+pub struct CounterpartySave {
+    counterparty: Counterparty,
+    signature: Signature,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
