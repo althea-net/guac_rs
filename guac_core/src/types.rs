@@ -34,7 +34,7 @@ pub enum GuacError {
     Error { message: String },
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Counterparty {
     New {
         i_am_0: bool,

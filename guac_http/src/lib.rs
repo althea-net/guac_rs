@@ -16,15 +16,22 @@ extern crate tokio;
 extern crate web3;
 
 mod blockchain_client;
+mod bounty_hunter_client;
 mod config;
 mod counterparty_client;
 mod counterparty_server;
 
 use crate::blockchain_client::BlockchainClient;
+use crate::bounty_hunter_client::BountyHunterClient;
 use crate::counterparty_client::CounterpartyClient;
 use clarity::{Address, PrivateKey};
+use failure::Error;
+use futures::{future, Future};
+use guac_core::BountyHunterApi;
 use guac_core::{Crypto, Guac, Storage};
 use std::sync::Arc;
+use tokio_retry::strategy::{jitter, ExponentialBackoff};
+use tokio_retry::Retry;
 
 #[macro_export]
 macro_rules! try_future_box {
@@ -44,26 +51,46 @@ pub fn init_guac(
     own_address: Address,
     secret: PrivateKey,
     full_node_url: String,
-) -> Guac {
-    let guac = Guac {
-        blockchain_client: Arc::new(Box::new(BlockchainClient::new(
-            contract_address,
-            own_address,
-            secret,
-            &full_node_url,
-        ))),
-        counterparty_client: Arc::new(Box::new(CounterpartyClient {})),
-        storage: Arc::new(Box::new(Storage::new())),
-        crypto: Arc::new(Box::new(Crypto {
-            contract_address,
-            own_address,
-            secret,
-        })),
+    bounty_hunter_url: String,
+) -> Box<Future<Item = Guac, Error = Error>> {
+    let bounty_hunter_client = BountyHunterClient { bounty_hunter_url };
+    let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(3);
+
+    let action = {
+        let bounty_hunter_client = bounty_hunter_client.clone();
+        move || {
+            bounty_hunter_client
+                .get_counterparties(own_address)
+                .map_err(|e| e.compat())
+        }
     };
 
-    counterparty_server::init_server(port, guac.clone());
+    Box::new(
+        Retry::spawn(retry_strategy, action)
+            .from_err()
+            .and_then(move |counterparties| {
+                let guac = Guac {
+                    blockchain_client: Arc::new(Box::new(BlockchainClient::new(
+                        contract_address,
+                        own_address,
+                        secret,
+                        &full_node_url,
+                    ))),
+                    bounty_hunter_client: Arc::new(Box::new(bounty_hunter_client)),
+                    counterparty_client: Arc::new(Box::new(CounterpartyClient {})),
+                    storage: Arc::new(Box::new(Storage::new())),
+                    crypto: Arc::new(Box::new(Crypto {
+                        contract_address,
+                        own_address,
+                        secret,
+                    })),
+                };
 
-    guac
+                counterparty_server::init_server(port, guac.clone());
+
+                Ok(guac)
+            }),
+    )
 }
 
 #[cfg(test)]
@@ -84,7 +111,7 @@ mod tests {
         eth * mult
     }
 
-    fn make_nodes() -> (Guac, Guac) {
+    fn make_nodes() -> Box<Future<Item = (Guac, Guac), Error = Error>> {
         let contract_addr: Address = CONFIG.contract_address.parse().unwrap();
 
         let pk_1: PrivateKey = CONFIG.private_key_0.parse().unwrap();
@@ -99,6 +126,7 @@ mod tests {
             addr_1,
             pk_1,
             "http://127.0.0.1:8545".to_string(),
+            "http://127.0.0.1:6666".to_string(),
         );
         let guac_2 = init_guac(
             8882,
@@ -106,25 +134,24 @@ mod tests {
             addr_2,
             pk_2,
             "http://127.0.0.1:8545".to_string(),
+            "http://127.0.0.1:6666".to_string(),
         );
 
-        (guac_1, guac_2)
+        Box::new(guac_1.join(guac_2))
     }
 
     #[test]
     fn test_quick_deposit() {
         let system = actix::System::new("test");
 
-        let (guac_1, guac_2) = make_nodes();
+        actix::spawn(make_nodes().then(|guacs| {
+            let (guac_1, guac_2) = guacs.unwrap();
+            let _storage_1 = guac_1.storage.clone();
+            let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
 
-        let _storage_1 = guac_1.storage.clone();
-        let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
-        let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
-
-        let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
-        let snapshot_id_2 = snapshot_id.clone();
-
-        actix::spawn(
+            let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
+            let snapshot_id_2 = snapshot_id.clone();
             web3.evm_snapshot()
                 .and_then(move |s| {
                     *snapshot_id.borrow_mut() = s;
@@ -138,41 +165,8 @@ mod tests {
                         System::current().stop();
                         Box::new(future::ok(()))
                     })
-                }),
-        );
-
-        system.run();
-    }
-
-    #[test]
-    fn test_fill_channel() {
-        let system = actix::System::new("test");
-
-        let (guac_1, guac_2) = make_nodes();
-
-        let _storage_1 = guac_1.storage.clone();
-        let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
-        let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
-
-        let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
-        let snapshot_id_2 = snapshot_id.clone();
-
-        actix::spawn(
-            web3.evm_snapshot()
-                .and_then(move |s| {
-                    *snapshot_id.borrow_mut() = s;
-                    make_and_fill_channel(guac_1, guac_2)
                 })
-                .then(move |res| {
-                    let snapshot_id_2 = snapshot_id_2.borrow().clone();
-                    web4.evm_revert(snapshot_id_2).then(|_| {
-                        res.unwrap();
-
-                        System::current().stop();
-                        Box::new(future::ok(()))
-                    })
-                }),
-        );
+        }));
 
         system.run();
     }
@@ -196,19 +190,52 @@ mod tests {
     }
 
     #[test]
+    fn test_fill_channel() {
+        let system = actix::System::new("test");
+
+        actix::spawn(make_nodes().then(|guacs| {
+            let (guac_1, guac_2) = guacs.unwrap();
+            let _storage_1 = guac_1.storage.clone();
+            let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
+
+            let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
+            let snapshot_id_2 = snapshot_id.clone();
+
+            // actix::spawn(
+            web3.evm_snapshot()
+                .and_then(move |s| {
+                    *snapshot_id.borrow_mut() = s;
+                    make_and_fill_channel(guac_1, guac_2)
+                })
+                .then(move |res| {
+                    let snapshot_id_2 = snapshot_id_2.borrow().clone();
+                    web4.evm_revert(snapshot_id_2).then(|_| {
+                        res.unwrap();
+
+                        System::current().stop();
+                        Box::new(future::ok(()))
+                    })
+                })
+        }));
+
+        system.run();
+    }
+
+    #[test]
     fn test_make_payment_simple() {
         let system = actix::System::new("test");
 
-        let (guac_1, guac_2) = make_nodes();
+        actix::spawn(make_nodes().then(|guacs| {
+            let (guac_1, guac_2) = guacs.unwrap();
+            let _storage_1 = guac_1.storage.clone();
+            let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
 
-        let _storage_1 = guac_1.storage.clone();
-        let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
-        let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
+            let snapshot_id_2 = snapshot_id.clone();
 
-        let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
-        let snapshot_id_2 = snapshot_id.clone();
-
-        actix::spawn(
+            // actix::spawn(
             web3.evm_snapshot()
                 .and_then(move |s| {
                     *snapshot_id.borrow_mut() = s;
@@ -228,8 +255,8 @@ mod tests {
                         System::current().stop();
                         Box::new(future::ok(()))
                     })
-                }),
-        );
+                })
+        }));
 
         system.run();
     }
@@ -238,16 +265,16 @@ mod tests {
     fn test_make_payment_packet_loss() {
         let system = actix::System::new("test");
 
-        let (guac_1, guac_2) = make_nodes();
+        actix::spawn(make_nodes().then(|guacs| {
+            let (guac_1, guac_2) = guacs.unwrap();
+            let _storage_1 = guac_1.storage.clone();
+            let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
 
-        let _storage_1 = guac_1.storage.clone();
-        let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
-        let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
+            let snapshot_id_2 = snapshot_id.clone();
 
-        let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
-        let snapshot_id_2 = snapshot_id.clone();
-
-        actix::spawn(
+            // actix::spawn(
             web3.evm_snapshot()
                 .and_then(move |s| {
                     *snapshot_id.borrow_mut() = s;
@@ -276,8 +303,8 @@ mod tests {
                         System::current().stop();
                         Box::new(future::ok(()))
                     })
-                }),
-        );
+                })
+        }));
 
         system.run();
     }
@@ -286,16 +313,16 @@ mod tests {
     fn test_refill_channel() {
         let system = actix::System::new("test");
 
-        let (guac_1, guac_2) = make_nodes();
+        actix::spawn(make_nodes().then(|guacs| {
+            let (guac_1, guac_2) = guacs.unwrap();
+            let _storage_1 = guac_1.storage.clone();
+            let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
 
-        let _storage_1 = guac_1.storage.clone();
-        let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
-        let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
+            let snapshot_id_2 = snapshot_id.clone();
 
-        let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
-        let snapshot_id_2 = snapshot_id.clone();
-
-        actix::spawn(
+            // actix::spawn(
             web3.evm_snapshot()
                 .and_then(move |s| {
                     *snapshot_id.borrow_mut() = s;
@@ -323,8 +350,8 @@ mod tests {
                         System::current().stop();
                         Box::new(future::ok(()))
                     })
-                }),
-        );
+                })
+        }));
 
         system.run();
     }
@@ -333,16 +360,16 @@ mod tests {
     fn test_withdraw_channel() {
         let system = actix::System::new("test");
 
-        let (guac_1, guac_2) = make_nodes();
+        actix::spawn(make_nodes().then(|guacs| {
+            let (guac_1, guac_2) = guacs.unwrap();
+            let _storage_1 = guac_1.storage.clone();
+            let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
 
-        let _storage_1 = guac_1.storage.clone();
-        let web3 = Web3::new(&"http://127.0.0.1:8545".to_string());
-        let web4 = Web3::new(&"http://127.0.0.1:8545".to_string());
+            let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
+            let snapshot_id_2 = snapshot_id.clone();
 
-        let snapshot_id: Rc<RefCell<Uint256>> = Rc::new(RefCell::new(0u64.into()));
-        let snapshot_id_2 = snapshot_id.clone();
-
-        actix::spawn(
+            // actix::spawn(
             web3.evm_snapshot()
                 .and_then(move |s| {
                     *snapshot_id.borrow_mut() = s;
@@ -398,8 +425,8 @@ mod tests {
                         System::current().stop();
                         Box::new(future::ok(()))
                     })
-                }),
-        );
+                })
+        }));
 
         system.run();
     }

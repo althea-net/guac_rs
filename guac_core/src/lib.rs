@@ -36,6 +36,7 @@ pub mod storage;
 pub mod types;
 
 pub use self::channel_manager::BlockchainApi;
+pub use self::channel_manager::BountyHunterApi;
 pub use self::channel_manager::Guac;
 pub use self::counterparty_api::CounterpartyApi;
 pub use self::crypto::Crypto;

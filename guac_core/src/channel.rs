@@ -27,7 +27,7 @@ use num256::Uint256;
 use crate::types::{GuacError, UpdateTx};
 use num::traits::ops::checked::CheckedSub;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Channel {
     pub channel_id: [u8; 32],
     pub sequence_number: Uint256,

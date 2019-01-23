@@ -1,13 +1,14 @@
 use crate::channel::Channel;
 use crate::crypto::Crypto;
 use crate::storage::Storage;
-use crate::types::{Counterparty, GuacError, NewChannelTx, ReDrawTx};
+use crate::types::{Counterparty, GuacError, NewChannelTx, ReDrawTx, UpdateTx};
 use crate::CounterpartyApi;
-use clarity::Address;
+use clarity::{Address, PrivateKey};
 use failure::Error;
 use futures::{future, Future};
 use num256::Uint256;
 use qutex::Guard;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Todo:
@@ -32,6 +33,7 @@ macro_rules! try_future_box {
 pub struct Guac {
     pub blockchain_client: Arc<Box<BlockchainApi + Send + Sync>>,
     pub counterparty_client: Arc<Box<CounterpartyApi + Send + Sync>>,
+    pub bounty_hunter_client: Arc<Box<BountyHunterApi + Send + Sync>>,
     pub storage: Arc<Box<Storage>>,
     pub crypto: Arc<Box<Crypto>>,
 }
@@ -67,6 +69,18 @@ pub trait BlockchainApi {
         &self,
         amount: Uint256,
         re_draw_tx: ReDrawTx,
+    ) -> Box<Future<Item = (), Error = Error>>;
+}
+
+pub trait BountyHunterApi {
+    fn get_counterparties(
+        &self,
+        my_address: Address,
+    ) -> Box<Future<Item = Option<HashMap<Address, Counterparty>>, Error = Error>>;
+    fn set_counterparty(
+        &self,
+        my_address: Address,
+        counterparty: Counterparty,
     ) -> Box<Future<Item = (), Error = Error>>;
 }
 
@@ -192,6 +206,7 @@ impl Guac {
     ) -> impl Future<Item = (), Error = Error> {
         let counterparty_client = self.counterparty_client.clone();
         let blockchain_client = self.blockchain_client.clone();
+        let bounty_hunter_client = self.bounty_hunter_client.clone();
         let storage = self.storage.clone();
         let crypto = self.crypto.clone();
 
